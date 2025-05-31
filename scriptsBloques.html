@@ -1,0 +1,277 @@
+<!-- scriptsBloques.html -->
+<script>
+        // Cargar todos los combos relacionados con bloques
+        function cargarCombosBloques() {
+          // Cargar bloques
+          google.script.run
+            .withSuccessHandler(data => {
+              const combos = ['comboBloquesActualizar', 'comboBloquesEliminar', 'comboBloquesVincular'];
+              combos.forEach(id => {
+                const combo = document.getElementById(id);
+                combo.innerHTML = ''; // Limpiar contenido previo
+
+                if (data.length === 0) {
+                  const option = document.createElement('option');
+                  option.value = '';
+                  option.textContent = 'No hay bloques disponibles';
+                  combo.appendChild(option);
+                } else {
+                  data.forEach(bloque => {
+                    const option = document.createElement('option');
+                    option.value = bloque.id;
+                    option.textContent = bloque.nombre;
+                    combo.appendChild(option);
+                  });
+                }
+              });
+            })
+            .withFailureHandler(error => {
+              console.error('Error al cargar bloques:', error);
+              alert('No se pudieron cargar los bloques. Intenta nuevamente.');
+            })
+            .getBloquesOrdenados();
+
+          // Cargar temas sin bloque
+          google.script.run
+            .withSuccessHandler(data => {
+              const combo = document.getElementById('comboTemasDisponiblesBloques');
+              combo.innerHTML = ''; // Limpiar contenido previo
+
+              if (data.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No hay temas disponibles para vincular';
+                combo.appendChild(option);
+              } else {
+                data.forEach(tema => {
+                  const option = document.createElement('option');
+                  option.value = tema.id;
+                  option.textContent = tema.nombre;
+                  combo.appendChild(option);
+                });
+              }
+            })
+            .withFailureHandler(error => {
+              console.error('Error al cargar temas sin bloque:', error);
+              alert('No se pudieron cargar los temas sin bloque. Intenta nuevamente.');
+            })
+            .getTemasSinBloque();
+        }
+
+        // Renderizar la tabla de bloques y sus temas
+        function renderBloques(data) {
+          const tabla = document.getElementById('bloquesTabla');
+          let html = '<table border="1"><tr><th>Bloque</th><th>Temas</th><th>Acción</th></tr>';
+
+          if (data.length === 0) {
+            html += '<tr><td colspan="3">No hay bloques disponibles.</td></tr>';
+          } else {
+            data.forEach(bloque => {
+              const temas = bloque.temas.map(tema => tema.nombre).join(', ') || 'Sin temas asignados';
+              html += `
+                <tr>
+                  <td>${bloque.nombre}</td>
+                  <td>${temas}</td>
+                  <td>
+                    <button onclick="mostrarTemasPorBloque('${bloque.id}', '${bloque.nombre}')">Ver Temas</button>
+                    <button onclick="deleteBloque('${bloque.id}', '${bloque.nombre}')">Eliminar</button>
+                  </td>
+                </tr>
+              `;
+            });
+          }
+
+          html += '</table>';
+          tabla.innerHTML = html;
+        }
+
+        // Función para insertar un nuevo bloque
+        function insertBloque() {
+          const nombre = document.getElementById('bloqueNombre').value.trim();
+
+          if (!nombre) {
+            alert('El nombre del bloque no puede estar vacío.');
+            return;
+          }
+
+          google.script.run
+            .withSuccessHandler(() => {
+              //alert('Bloque '+nombre+' añadido correctamente.');
+              document.getElementById('bloqueNombre').value = ''; // Limpiar campo
+              cargarCombosBloques(); // Recargar combos
+              listarBloques();
+            })
+            .withFailureHandler(error => {
+              alert(`Error al agregar el bloque: ${error.message}`);
+              document.getElementById('bloqueNombre').value = ''; // Limpiar campo
+              })
+            .addBloque(nombre);
+        }
+
+          // Función para actualizar un bloque
+          function updateBloque() {
+            const id = document.getElementById('comboBloquesActualizar').value;
+            const nuevoNombre = document.getElementById('bloqueNuevoNombre').value.trim();
+
+            if (!id) {
+              alert('Por favor, selecciona un bloque para actualizar.');
+              return;
+            }
+
+            if (!nuevoNombre) {
+              alert('El nombre del bloque no puede estar vacío.');
+              return;
+            }
+            google.script.run.withSuccessHandler(() => {
+              alert('Bloque actualizado correctamente.');
+              document.getElementById('bloqueNuevoNombre').value = ''; // Limpiar campo
+              cargarCombosBloques(); // Recargar combos
+              listarBloques();
+            })
+            .withFailureHandler(error => {
+              alert(`No se pudo actualizar el bloque: ${error.message}`);
+              document.getElementById('bloqueNuevoNombre').value = ''; // Limpiar campo
+            })
+            .updateBloque(id, nuevoNombre);
+          }
+
+          // Función para eliminar un bloque
+          function deleteBloque() {
+            const combo = document.getElementById('comboBloquesEliminar');
+            const id = combo.value; // Obtiene el valor del id seleccionado
+            const nombre = combo.options[combo.selectedIndex].text; // Obtiene el texto del bloque seleccionado
+
+            if (!id) {
+              alert('Por favor, selecciona un bloque para eliminar.');
+              return;
+            }
+
+            if (confirm(`¿Estás seguro de que deseas eliminar el bloque "${nombre}"?`)) {
+                google.script.run
+                  .withSuccessHandler(() => {
+                  alert(`Bloque con id: ${id}, y de nombre: ${nombre} eliminado correctamente.`);
+                cargarCombosBloques(); // Recargar combos
+                listarBloques();
+              })
+              .withFailureHandler(error => {
+              console.error('Error al eliminar el bloque:', error);
+              alert(`Error: ${error.message}`);
+            })
+              .eliminarBloque(id);
+            }
+          }
+      
+          // Función para eliminar un bloque desde la tabla
+          function eliminarBloque(idBloque, nombreBloque) {
+            if (confirm(`¿Estás seguro de que deseas eliminar el bloque "${nombreBloque}"?`)) {
+              google.script.run
+                .withSuccessHandler(() => {
+                  alert(`Bloque "${nombreBloque}" eliminado correctamente.`);
+                  listarBloques(); // Recargar la tabla de bloques
+                  cargarCombosBloques(); // Recargar los combos
+                })
+                .withFailureHandler(error => {
+                  console.error('Error al eliminar el bloque:', error);
+                  alert(error.message);
+                })
+                .eliminarBloque(idBloque);
+            }
+          }
+
+          // Función para vincular un tema de nivel 1 a un bloque
+          function vincularTemaABloque() {
+            const comboBloque = document.getElementById('comboBloquesVincular');
+            const comboTema = document.getElementById('comboTemasDisponiblesBloques');
+
+            const idBloque = comboBloque.value;
+            const idTema = comboTema.value;
+            
+            const nombreBloque = comboBloque.options[comboBloque.selectedIndex].text;
+            const nombreTema = comboTema.options[comboTema.selectedIndex].text;
+
+            if (!idBloque || !idTema) {
+              alert('Por favor, selecciona un bloque y un tema de nivel 1 para vincular.');
+              return;
+            }
+
+            google.script.run
+              .withSuccessHandler(() => {
+                alert(`Tema "${nombreTema}" vinculado correctamente al bloque "${nombreBloque}".`);
+                cargarCombosBloques(); // Recargar combos
+                mostrarTemasPorBloque(idBloque, nombreBloque); // Actualizar la lista de temas vinculados
+              })
+              .withFailureHandler(error => {
+                console.error('Error al vincular el tema al bloque:', error);
+                alert(error.message);
+              })
+              .vincularTemaABloque(idBloque, idTema);
+          }
+
+          // Mostrar los temas vinculados a un bloque (solo nivel 1)
+          function mostrarTemasPorBloque(idBloque, nombreBloque) {
+            google.script.run.withSuccessHandler(data => {
+              renderTemasVinculadosBloque(data.temas, nombreBloque, idBloque);
+            }).withFailureHandler(error => {
+              console.error('Error al cargar los temas vinculados:', error);
+              alert(error.message);
+            }).getTemasPorBloqueConNombre(idBloque);
+          }
+
+          // Renderizar temas vinculados al bloque
+          function renderTemasVinculadosBloque(temas, bloqueNombre, idBloque) {
+            const temasContainer = document.getElementById('temasVinculadosBloque');
+            let html = `<h3>Temas vinculados al bloque "${bloqueNombre}"</h3>`;
+
+            if (temas.length === 0) {
+              html += '<p>No hay temas vinculados a este bloque.</p>';
+            } else {
+              html += '<table border="1"><tr><th>Nombre del Tema</th><th>Acción</th></tr>';
+              temas.forEach(tema => {
+                html += `
+                  <tr>
+                    <td>${tema.nombre}</td>
+                    <td><button onclick="desvincularTemaDeBloque('${tema.id}', '${idBloque}', '${bloqueNombre}')">Desvincular</button></td>
+                  </tr>
+                `;
+              });
+              html += '</table>';
+            }
+
+            temasContainer.innerHTML = html;
+          }
+
+          // Función para desvincular un tema de un bloque
+          function desvincularTemaDeBloque(idTema, idBloque, bloqueNombre) {
+            const temaNombre = document.querySelector(`button[onclick="desvincularTemaDeBloque('${idTema}', '${idBloque}', '${bloqueNombre}')"]`)
+              .closest('tr')
+              .querySelector('td:first-child').innerText;
+
+            if (confirm(`¿Estás seguro de que deseas desvincular el tema "${temaNombre}" del bloque "${bloqueNombre}"?`)) {
+              google.script.run
+                .withSuccessHandler(() => {
+                  alert(`El tema "${temaNombre}" ha sido desvinculado correctamente del bloque "${bloqueNombre}".`);
+                  mostrarTemasPorBloque(idBloque, bloqueNombre); // Actualizar la tabla de temas vinculados
+                  listarBloques(); // Recarga la tabla de bloques
+                  cargarCombosBloques(); // Recargar los combos
+                })
+                .withFailureHandler(error => {
+                  console.error('Error al desvincular el tema:', error);
+                  alert(error.message);
+                })
+                .desvincularTemaDeBloque(idBloque, idTema);
+            }
+          }
+
+          // Mostrar todos los bloques y temas asociados
+          function listarBloques() {
+            google.script.run
+              .withSuccessHandler(renderBloques)
+              .withFailureHandler(error => {
+                console.error('Error al listar bloques:', error);
+                alert('No se pudieron cargar los bloques. Intenta nuevamente.');
+              })
+              .getBloquesConTemas();
+          }
+          
+          listarBloques();
+</script>

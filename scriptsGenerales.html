@@ -1,0 +1,74 @@
+ <!-- scriptsGenerales.html -->
+
+ <script>
+ function showSection(id) {
+    console.log("Cambiando a sección:", id);
+
+    // Ocultar todas
+    document.querySelectorAll('.section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    // Mostrar la seleccionada
+    const target = document.getElementById(id);
+    if (target) {
+      target.classList.add('active');
+
+      // Cargar combos y listas según la sección
+      switch (id) {
+        case 'oposiciones':
+          if (typeof cargarCombosOposiciones === 'function') cargarCombosOposiciones();
+          if (typeof listarOposiciones === 'function') listarOposiciones();
+          break;
+        case 'bloques':
+          if (typeof cargarCombosBloques === 'function') cargarCombosBloques();
+          if (typeof listarBloques === 'function') listarBloques();
+          break;
+        case 'temas':
+          if (typeof cargarCombosEntidadTemas === 'function') cargarCombosEntidadTemas();
+          if (typeof listarTemas === 'function') listarTemas();
+          break;
+        case 'test':
+        case 'conceptos':
+          if (typeof cargarCombosEntidadConceptos === 'function') cargarCombosEntidadConceptos();
+          if (typeof listarConceptos === 'function') listarConceptos();
+          break;
+        case 'estudio':
+        case 'repasos':
+          // Puedes añadir lógica aquí más adelante
+          break;
+      }
+    } else {
+      console.error("No se encontró el div con ID:", id);
+    }
+  }
+
+  // Al cargar la página
+  window.onload = function () {
+    showSection('oposiciones'); // Sección por defecto
+  };
+
+  function cargarDatosGenerales() {
+    if (typeof cargarCombosOposiciones === 'function') cargarCombosOposiciones();
+    if (typeof cargarCombosBloques === 'function') cargarCombosBloques();
+    if (typeof cargarCombosEntidadTemas === 'function') cargarCombosEntidadTemas();
+    if (typeof cargarCombosEntidadConceptos === 'function') cargarCombosEntidadConceptos();
+  }
+/*
+        // Función para cargar contenido dinámico
+        function loadSection(section) {
+            google.script.run.withSuccessHandler(updateContent).getSectionHTML(section);
+        }
+
+        function updateContent(html) {
+            document.getElementById("content").innerHTML = html;
+        }
+
+        // Llama a la función al cargar la página
+        document.addEventListener("DOMContentLoaded", function() {
+            loadSection("oposiciones"); // Carga la sección inicial
+
+        });
+*/
+
+ </script>

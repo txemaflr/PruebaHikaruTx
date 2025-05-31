@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gestión de Temario</title>
+  <?!= include('scriptsGenerales') ?>
+  <?!= include('scriptsOposiciones') ?>
+  <?!= include('scriptsBloques') ?>
+  <?!= include('scriptsTemas') ?>
+  <?!= include('scriptsConceptos') ?>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+    header { background-color: #007bff; color: white; padding: 1rem 2rem; text-align: center; }
+    nav { display: flex; justify-content: center; background-color: #0056b3; padding: 0.5rem 0; }
+    nav button { background-color: #007bff; color: white; border: none; padding: 0.5rem 1rem; margin: 0 0.5rem; cursor: pointer; border-radius: 5px; font-size: 1rem; }
+    nav button:hover { background-color: #004c99; }
+    .container { padding: 1rem 2rem; }
+    .section { display: none; }
+    .section.active { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    table, th, td { border: 1px solid #ddd; }
+    th, td { padding: 0.5rem; text-align: left; }
+    th { background-color: #007bff; color: white; }
+    input, select, button { margin-bottom: 0.5rem; padding: 0.4rem; }
+    label { display: block; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Gestión de Temario</h1>
+  <nav>
+    <button onclick="showSection('oposiciones')">Oposiciones</button>
+    <button onclick="showSection('bloques')">Bloques</button>
+    <button onclick="showSection('temas')">Temas</button>
+    <button onclick="showSection('test')">Test</button>
+    <button onclick="showSection('conceptos')">Conceptos</button>
+    <button onclick="showSection('estudio')">Estudio</button>
+    <button onclick="showSection('repasos')">Repasos</button>
+  </nav>
+  <div class="container">
+
+    <!-- Sección Oposiciones -->
+    <div id="oposiciones" class="section">
+      <h2>Gestión de Oposiciones</h2>
+      <label>Nombre de la oposición:</label>
+      <input type="text" id="nombreOposicion" placeholder="Nombre de la oposición" />
+      <button onclick="agregarOposicion()">Agregar</button>
+
+      <label>Selecciona una oposición para actualizar:</label>
+      <select id="comboOposicionesActualizar"></select>
+      <input type="text" id="nuevoNombreOposicion" placeholder="Nuevo nombre" />
+      <button onclick="actualizarOposicion()">Actualizar</button>
+
+      <label>Selecciona una oposición para eliminar:</label>
+      <select id="comboOposicionesEliminar"></select>
+      <button onclick="eliminarOposicion()">Eliminar</button>
+
+      <label>Vincular tema a oposición:</label>
+      <select id="comboOposicionesVincular" onchange="cargarTemasDisponiblesParaVincular(this.value)"></select>
+      <select id="comboTemasDisponiblesOposiciones"></select>
+      <button onclick="vincularTemaOposicion()">Vincular Tema</button>
+
+      <div id="tablaOposiciones"></div>
+      <div id="temasVinculados"></div>
+    </div>
+
+    <!-- Sección Bloques -->
+    <div id="bloques" class="section">
+      <h2>Gestión de Bloques</h2>
+      <label>Nombre del bloque:</label>
+      <input type="text" id="bloqueNombre" placeholder="Nombre del bloque" />
+      <button onclick="insertBloque()">Agregar</button>
+
+      <label>Selecciona un bloque para actualizar:</label>
+      <select id="comboBloquesActualizar"></select>
+      <input type="text" id="bloqueNuevoNombre" placeholder="Nuevo nombre" />
+      <button onclick="updateBloque()">Actualizar</button>
+
+      <label>Selecciona un bloque para eliminar:</label>
+      <select id="comboBloquesEliminar"></select>
+      <button onclick="deleteBloque()">Eliminar</button>
+
+      <label>Vincular tema a bloque:</label>
+      <select id="comboBloquesVincular"></select>
+      <select id="comboTemasDisponiblesBloques"></select>
+      <button onclick="vincularTemaABloque()">Vincular Tema</button>
+
+      <div id="bloquesTabla"></div>
+      <div id="temasVinculadosBloque"></div>
+    </div>
+
+    <!-- Sección Temas -->
+    <div id="temas" class="section">
+      <h2>Gestión de Temas</h2>
+      <input type="hidden" id="temaIdEditando" />
+      <label>Nombre del tema*:</label>
+      <input type="text" id="temaNombre" required />
+
+      <label>Nombre completo del tema:</label>
+      <input type="text" id="temaNombreCompleto" />
+
+      <label>Prenombre:</label>
+      <input type="text" id="temaPrenombre" placeholder="Ej. 1.2.3." />
+
+      <label>Tema padre:</label>
+      <select id="comboTemasPadre"></select>
+
+      <label>Bloque:</label>
+      <select id="comboBloquesInsertar"></select>
+
+      <label>Página desde:</label>
+      <input type="number" id="temaPagDesde" />
+
+      <label>Página hasta:</label>
+      <input type="number" id="temaPagHasta" />
+
+      <label><input type="checkbox" id="temaMaquetado" /> Maquetado</label>
+
+      <button id="btnGuardarTema" onclick="guardarTema()">Insertar Tema</button>
+      <button id="btnCancelarEdicion" onclick="cancelarEdicionTema()" style="display: none;">Cancelar</button>
+
+      <hr>
+      <div id="tablaTemas"></div>
+    </div>
+
+    <!-- Sección Estudio -->
+    <div id="estudio" class="section">
+      <h2>Gestión de Estudio</h2>
+      <p>Contenido en desarrollo...</p>
+    </div>
+
+    <!-- Sección Test -->
+    <div id="test" class="section">
+      <h2>Gestión de Test</h2>
+      <p>Contenido en desarrollo...</p>
+    </div>
+
+    <!-- Sección Conceptos -->
+    <div id="conceptos" class="section">
+      <h2>Gestión de Conceptos</h2>
+
+      <!-- Formulario de Concepto -->
+      <input type="hidden" id="conceptoIdEditando" />
+      <h3 id="formularioConceptoTitulo">Insertar Concepto</h3>
+
+      <label>Nombre del concepto*:</label>
+      <input type="text" id="conceptoNombre" required />
+
+      <label>Tipo de concepto*:</label>
+      <select id="comboTiposConcepto"></select>
+
+      <label>Importancia:</label>
+      <select id="conceptoImportancia"></select>
+
+      <label>Descripción:</label>
+      <textarea id="conceptoDescripcion" rows="3" style="width: 100%;"></textarea>
+
+      <label>Pista:</label>
+      <textarea id="conceptoPista" rows="2" style="width: 100%;"></textarea>
+
+      <label>Técnica:</label>
+      <textarea id="conceptoTecnica" rows="2" style="width: 100%;"></textarea>
+
+      <label>Asociar a tema:</label>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <select id="comboTemasConcepto"></select>
+        <button type="button" onclick="agregarTemaAlConcepto()">➕ Añadir</button>
+      </div>
+      <ul id="listaTemasAsociados"></ul>
+
+      <label><input type="checkbox" id="conceptoRevisar" checked /> Revisar</label>
+
+      <button id="btnGuardarConcepto" onclick="guardarConcepto()">Insertar</button>
+      <button id="btnCancelarEdicionConcepto" onclick="cancelarEdicionConcepto()" style="display: none;">Cancelar</button>
+
+      <hr>
+
+      <!-- Filtro por tema -->
+      <label>Filtrar por tema:</label>
+      <select id="comboFiltroTemasConcepto" onchange="filtrarConceptosPorTema()">
+        <option value="">— Mostrar todos —</option>
+      </select>
+
+      <label><input type="checkbox" id="checkIncluirSubtemas" checked /> Incluir subtemas</label>
+
+      <!-- Tabla de Conceptos -->
+      <div id="tablaConceptos"></div>
+    </div>
+
+    <!-- Sección Repasos -->
+    <div id="repasos" class="section">
+      <h2>Gestión de Repasos</h2>
+      <p>Contenido en desarrollo...</p>
+    </div>
+  </div>
+</body>
+</html>

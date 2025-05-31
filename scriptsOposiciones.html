@@ -1,0 +1,368 @@
+<!-- scriptsOposiciones.html -->
+<script>
+  function cargarCombosOposiciones() {
+    google.script.run
+      .withSuccessHandler(data => {
+        const combos = ['comboOposicionesActualizar', 'comboOposicionesEliminar', 'comboOposicionesVincular'];
+        combos.forEach(id => {
+          const combo = document.getElementById(id);
+          combo.innerHTML = ''; // Limpiar contenido previo
+          
+          if (data.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No hay oposiciones disponibles';
+            combo.appendChild(option);
+          } else {
+            data.forEach(oposicion => {
+              const option = document.createElement('option');
+              option.value = oposicion.id;
+              option.textContent = oposicion.nombre;
+              combo.appendChild(option);
+            });
+          }
+        });
+                
+      // Cargar temas disponibles para la primera oposición del combo
+      const firstOposicionId = document.getElementById('comboOposicionesVincular').value;
+      if (firstOposicionId) {
+        cargarTemasDisponiblesParaVincular(firstOposicionId);
+      }
+    })
+    .withFailureHandler(error => {
+      console.error('Error al cargar oposiciones:', error);
+      alert('No se pudieron cargar las oposiciones. Intenta nuevamente.');
+    })
+  .getOposicionesOrdenadas();
+  }
+
+  // AGREGAR una oposición
+  function agregarOposicion() {
+    const nombre = document.getElementById('nombreOposicion').value.trim();
+
+    if (!nombre) {
+      alert('El nombre de la oposición no puede estar vacío.');
+      return;
+    }
+    
+    google.script.run
+      .withSuccessHandler(() => {
+        alert(`Oposición: ${nombre} agregada correctamente.`);
+        document.getElementById('nombreOposicion').value = ''; // Limpiar campo    
+        cargarCombosOposiciones(); // Recargar combos
+        listarOposiciones();
+      })
+      .withFailureHandler(error => {
+        alert(`Error al agregar la oposición: ${error.message}`);
+        document.getElementById('nombreOposicion').value = ''; // Limpiar campo incluso en error
+          })
+      .addOposicion(nombre); // Llamada al backend           
+  }
+
+  // ACTUALIZAR una oposición
+  function actualizarOposicion() {
+    const id = document.getElementById('comboOposicionesActualizar').value;
+    const nuevoNombre = document.getElementById('nuevoNombreOposicion').value;
+
+    if (!id || !nuevoNombre.trim()) {
+      alert('Por favor, selecciona una oposición y completa el nuevo nombre.');
+      return;
+    }
+    
+    google.script.run
+      .withSuccessHandler(() => {
+        alert('Oposición actualizada correctamente.');
+        document.getElementById('nuevoNombreOposicion').value = ''; // Limpiar campo
+        cargarCombosOposiciones(); // Recargar combos
+        listarOposiciones();
+      })
+      .withFailureHandler(error => {
+        console.error('Error al actualizar la oposición:', error);
+        // Mostrar el mensaje del backend al usuario
+        alert(`Error: ${error.message}`);
+      })
+      .updateOposicion(id, nuevoNombre); // Llamada al backend            
+  }
+
+  // ELIMINAR una oposición
+  function eliminarOposicion() {
+    const id = document.getElementById('comboOposicionesEliminar').value;
+
+    if (!id) {
+      alert('Por favor, selecciona una oposición para eliminar.');
+      return;
+    }
+
+    if (confirm('¿Estás seguro de que deseas eliminar esta oposición y sus relaciones?')) {
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Oposición eliminada correctamente.');
+          cargarCombosOposiciones(); // Recargar combos
+          listarOposiciones();
+        })
+        .withFailureHandler(error => {
+          console.error('Error al eliminar la oposición:', error);
+          alert('No se pudo eliminar la oposición. Intenta nuevamente.');
+        })
+        .deleteOposicion(id); // Llamada al backend
+    }            
+  }
+      
+  // LISTAR OPOSICIONES y añadir interacción
+  function listarOposiciones() {
+    google.script.run
+      .withSuccessHandler(renderOposiciones) // Renderiza la tabla con los datos
+      .withFailureHandler(error => {
+        console.error('Error al listar oposiciones:', error);
+        alert('No se pudieron cargar las oposiciones. Intenta nuevamente.');
+      })
+      .getOposiciones(); // Llamada al backend            
+  }
+
+  // RENDERIZAR TABLA OPOSICIONES
+  function renderOposiciones(data) {
+    const tableContainer = document.getElementById('tablaOposiciones');
+    let html = '<table border="1" style="width: 100%; border-collapse: collapse;">';
+    html += `
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+    data.forEach(oposicion => {
+      html += `
+        <tr>
+          <td>${oposicion.id}</td>
+          <td>${oposicion.nombre}</td>
+          <td>
+            <button onclick="mostrarTemasParaOposicion('${oposicion.id}', '${oposicion.nombre}')">Mostrar Temas</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += '</tbody></table>';
+    tableContainer.innerHTML = html; // Insertar la tabla en el contenedor
+  }
+
+  // Función para mostrar los temas vinculados a una oposición por niveles
+  function mostrarTemasParaOposicion(idOposicion, nombreOposicion) {
+    google.script.run
+      .withSuccessHandler(data => renderTemasVinculadosOposicion(data, nombreOposicion))
+      .withFailureHandler(error => {
+        console.error('Error al cargar los temas vinculados:', error);
+        alert('No se pudieron cargar los temas vinculados. Intenta nuevamente.');
+      })
+      .getTemasVinculadosEnArbolOrdenados(idOposicion); // Llamada al backend
+  }
+
+//INICIO-->expandir
+function renderTemasVinculadosOposicion(temasArbol, nombreOposicion) {
+  const temasContainer = document.getElementById('temasVinculados');
+  let html = `<h3>Temas vinculados a "${nombreOposicion}"</h3>`;
+
+  if (temasArbol.length === 0) {
+    html += '<p>No hay temas vinculados a esta oposición.</p>';
+  } else {
+    html += `
+      <table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 1rem;">
+        <thead>
+          <tr>
+            <th>Nombre del Tema</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${renderTemasExpandibles(temasArbol)}
+        </tbody>
+      </table>
+    `;
+  }
+
+  temasContainer.innerHTML = html;
+}
+
+function renderTemasExpandibles(temas, nivel = 0, parentId = "") {
+  return temas.map((tema, idx) => {
+    const rowId = `row-${tema.id}`;
+    const parentAttr = parentId ? `data-parent="${parentId}"` : "";
+    const indent = "&nbsp;&nbsp;&nbsp;&nbsp;".repeat(nivel);
+    const toggleId = `toggle-${tema.id}`;
+    const hasHijos = tema.hijos && tema.hijos.length > 0;
+
+    const toggleBtn = hasHijos
+      ? `<button id="btn-${toggleId}" onclick="toggleTemaRow('${tema.id}')">+</button>`
+      : "";
+
+    const eliminarBtn = hasHijos
+      ? '<span style="color: gray;">No se puede eliminar (tiene hijos)</span>'
+      : `<button onclick="desvincularTemaDeOposicion('${tema.id}', '${tema.nombre}', '${idOposicion}', '${nombreOposicion}')">Eliminar</button>`;
+
+    let row = `
+      <tr id="${rowId}" ${parentAttr} style="${nivel > 0 ? 'display:none;' : ''}">
+        <td>${indent}${toggleBtn} ${tema.prenombre || ''} ${tema.nombre}</td>
+        <td>${eliminarBtn}</td>
+      </tr>
+    `;
+
+    if (hasHijos) {
+      row += renderTemasExpandibles(tema.hijos, nivel + 1, tema.id);
+    }
+
+    return row;
+  }).join('');
+}
+
+function toggleTemaRow(idPadre) {
+  const btn = document.getElementById(`btn-toggle-${idPadre}`);
+  const isExpanded = btn.textContent === "-";
+  btn.textContent = isExpanded ? "+" : "-";
+
+  function toggleChildren(id, show) {
+    document.querySelectorAll(`tr[data-parent='${id}']`).forEach(row => {
+      row.style.display = show ? "" : "none";
+      if (!show) {
+        const childId = row.id.replace("row-", "");
+        const childBtn = document.getElementById(`btn-toggle-${childId}`);
+        if (childBtn) {
+          childBtn.textContent = "+";
+          toggleChildren(childId, false); // colapsar recursivo
+        }
+      }
+    });
+  }
+
+  toggleChildren(idPadre, !isExpanded);
+}
+
+function desvincularTemaDeOposicion(idTema, nombreTema, idOposicion, nombreOposicion) {
+  if (!idOposicion || !nombreOposicion) {
+    alert("No se pudo determinar la oposición actual.");
+    return;
+  }
+
+  if (confirm(`¿Estás seguro de que deseas desvincular el tema "${nombreTema}" de "${nombreOposicion}"?`)) {
+    const botonesExpand = document.querySelectorAll("button[id^='btn-toggle-']");
+    const expandIds = Array.from(botonesExpand)
+      .filter(btn => btn.textContent === "-")
+      .map(btn => btn.id.replace('btn-toggle-', ''));
+
+    google.script.run
+      .withSuccessHandler(() => {
+        alert(`Tema "${nombreTema}" desvinculado correctamente.`);
+
+        // Actualizar la tabla de temas vinculados manteniendo el estado del árbol
+        google.script.run.withSuccessHandler(temasArbol => {
+          renderTemasVinculadosOposicion(temasArbol, nombreOposicion);
+          expandIds.forEach(id => {
+            const btn = document.getElementById(`btn-toggle-${id}`);
+            if (btn && btn.textContent === "+") toggleTemaRow(id);
+          });
+        }).getTemasVinculadosEnArbolOrdenados(idOposicion);
+
+        // Actualizar el combo de temas disponibles
+        cargarTemasDisponiblesParaVincular(idOposicion);
+      })
+      .withFailureHandler(error => {
+        console.error('Error al desvincular el tema:', error);
+        alert('No se pudo desvincular el tema. Intenta nuevamente.');
+      })
+      .desvincularTemaAOposicion(idTema);
+  }
+}
+//FIN-->EXPANDIR
+
+
+
+ 
+
+  // Función obtiene los temas disponibles desde el backend y los agrega al combo en formato árbol
+  function cargarTemasDisponiblesParaVincular(idOposicion) {
+    if (!idOposicion) {
+      document.getElementById('comboTemasDisponiblesOposiciones').innerHTML = '<option value="">Selecciona una oposición primero</option>';
+      return;
+    }
+
+    google.script.run.withSuccessHandler(data => {
+      const combo = document.getElementById('comboTemasDisponiblesOposiciones');
+      combo.innerHTML = ''; // Limpiar contenido previo
+
+      if (data.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No hay temas disponibles para vincular';
+        combo.appendChild(option);
+        return;
+      }
+
+      // Crear las opciones del combo con la jerarquía
+      data.forEach(tema => {
+        const option = document.createElement('option');
+        option.value = tema.id;
+        option.textContent = tema.nombre; // La jerarquía ya está formateada en el backend
+        combo.appendChild(option);
+      });
+    }).getTemasDisponiblesEnArbol(idOposicion);
+  }
+
+  // Renderiza los temas en el combo respetando la jerarquía.
+  function renderComboTemasDisponibles(temasArbol) {
+    const combo = document.getElementById('comboTemasDisponiblesOposiciones');
+    combo.innerHTML = ''; // Limpiar opciones previas
+
+    // Renderizar opciones recursivamente
+    function renderTemas(temas, nivel = 0) {
+      return temas
+        .map(tema => {
+          const indent = '&nbsp;'.repeat(nivel * 4); // Indentación visual para niveles
+          const label = nivel === 0
+            ? tema.nombre // Nivel 1 (sin prenombre)
+            : `${tema.prenombre} ${tema.nombre}`; // Niveles 2+
+
+          return `
+            <option value="${tema.id}">${indent}${label}</option>
+            ${renderTemas(tema.hijos, nivel + 1)} <!-- Procesar hijos -->
+          `;
+        })
+        .join('');
+    }
+
+    combo.innerHTML = `
+      <option value="">Selecciona un tema</option>
+      ${renderTemas(temasArbol)}
+    `;
+  }
+
+  function vincularTemaOposicion() {
+    const idOposicion = document.getElementById('comboOposicionesVincular').value;
+    const idTema = document.getElementById('comboTemasDisponiblesOposiciones').value;
+
+    if (!idOposicion || !idTema) {
+      alert('Por favor, selecciona una oposición y un tema.');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(() => {
+        alert(`El Tema: ${idTema} y sus hijos vinculados correctamente a la oposición.`);
+        cargarTemasDisponiblesParaVincular(idOposicion); // Actualizar combo de temas disponibles
+        mostrarTemasParaOposicion(idOposicion, document.getElementById('comboOposicionesVincular').selectedOptions[0].text); // Actualizar lista de temas vinculados
+      })
+      .withFailureHandler(error => {
+        console.error('Error al vincular el tema:', error);
+        alert('No se pudo vincular el tema. Intenta nuevamente.');
+      })
+      
+      .vincularTemaConHijos(idOposicion, idTema); // Llamada al backend
+        alert("idoposicion: "+idOposicion + " y el idtema: "+ idTema)
+  }
+
+
+  // Inicialización
+  listarOposiciones();
+</script>

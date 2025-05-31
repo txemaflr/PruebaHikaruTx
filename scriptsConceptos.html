@@ -1,0 +1,265 @@
+<script>
+let tiposConceptoMap = {};
+let temasMap = {};
+let temasJerarquia = [];
+let temasAsociados = new Set();
+let conceptosGlobal = [];
+
+function prepararFormularioConcepto() {
+  document.getElementById("conceptoIdEditando").value = "";
+  document.getElementById("conceptoNombre").value = "";
+  document.getElementById("comboTiposConcepto").value = "";
+  document.getElementById("conceptoImportancia").value = "";
+  document.getElementById("conceptoDescripcion").value = "";
+  document.getElementById("conceptoPista").value = "";
+  document.getElementById("conceptoTecnica").value = "";
+  document.getElementById("conceptoRevisar").checked = true;
+  document.getElementById("comboTemasConcepto").value = "";
+  document.getElementById("listaTemasAsociados").innerHTML = "";
+  temasAsociados.clear();
+
+  document.getElementById("formularioConceptoTitulo").innerText = "Insertar Concepto";
+  document.getElementById("btnGuardarConcepto").innerText = "Insertar";
+  document.getElementById("btnCancelarEdicionConcepto").style.display = "none";
+}
+
+function cancelarEdicionConcepto() {
+  prepararFormularioConcepto();
+}
+
+function cargarCombosEntidadConceptos() {
+  cargarTiposConcepto();
+  cargarImportanciasConcepto();
+  cargarTemasJerarquico();
+}
+
+function cargarImportanciasConcepto() {
+  const combo = document.getElementById("conceptoImportancia");
+  combo.innerHTML = "";
+  ["Alta", "Media", "Baja"].forEach(valor => {
+    const option = document.createElement("option");
+    option.value = valor;
+    option.textContent = valor;
+    combo.appendChild(option);
+  });
+}
+
+function cargarTiposConcepto() {
+  google.script.run.withSuccessHandler(function(tipos) {
+    const combo = document.getElementById("comboTiposConcepto");
+    combo.innerHTML = '<option value="">Selecciona tipo</option>';
+    tiposConceptoMap = {};
+    tipos.forEach(t => {
+      tiposConceptoMap[t.id_tipo] = t.nombre;
+      const option = document.createElement("option");
+      option.value = t.id_tipo;
+      option.textContent = t.nombre;
+      combo.appendChild(option);
+    });
+  }).getTiposConcepto();
+}
+
+function cargarTemasJerarquico() {
+  google.script.run.withSuccessHandler(function(temas) {
+    temasJerarquia = temas;
+    temasMap = {};
+    const comboInsertar = document.getElementById("comboTemasConcepto");
+    const comboFiltro = document.getElementById("comboFiltroTemasConcepto");
+    comboInsertar.innerHTML = '<option value="">Selecciona un tema</option>';
+    comboFiltro.innerHTML = '<option value="">— Mostrar todos —</option>';
+
+    function render(temas, nivel = 0) {
+      temas.forEach(t => {
+        const label = `${"-".repeat(nivel)} ${t.prenombre || ''} ${t.nombre}`.trim();
+        temasMap[t.id] = label;
+
+        const optionInsertar = document.createElement("option");
+        optionInsertar.value = t.id;
+        optionInsertar.textContent = label;
+        comboInsertar.appendChild(optionInsertar);
+
+        const optionFiltro = document.createElement("option");
+        optionFiltro.value = t.id;
+        optionFiltro.textContent = label;
+        comboFiltro.appendChild(optionFiltro);
+
+        if (t.hijos.length) render(t.hijos, nivel + 1);
+      });
+    }
+    render(temas);
+  }).getTemasEnArbol();
+}
+
+function agregarTemaAlConcepto() {
+  const combo = document.getElementById("comboTemasConcepto");
+  const id = combo.value;
+  if (!id || temasAsociados.has(id)) return;
+  temasAsociados.add(id);
+  const li = document.createElement("li");
+  li.textContent = temasMap[id] || id;
+  const btn = document.createElement("button");
+  btn.textContent = "❌";
+  btn.style.marginLeft = "1rem";
+  btn.onclick = () => {
+    temasAsociados.delete(id);
+    li.remove();
+  };
+  li.appendChild(btn);
+  document.getElementById("listaTemasAsociados").appendChild(li);
+}
+
+function guardarConcepto() {
+  const id = document.getElementById("conceptoIdEditando").value;
+  const nombre = document.getElementById("conceptoNombre").value.trim();
+  const id_tipo = document.getElementById("comboTiposConcepto").value;
+  const importancia = document.getElementById("conceptoImportancia").value.trim();
+  const descripcion = document.getElementById("conceptoDescripcion").value.trim();
+  const pista = document.getElementById("conceptoPista").value.trim();
+  const tecnica = document.getElementById("conceptoTecnica").value.trim();
+  const revisar = document.getElementById("conceptoRevisar").checked;
+  const idTemas = Array.from(temasAsociados);
+
+  if (!nombre || !id_tipo) {
+    alert("Los campos 'Nombre' y 'Tipo' son obligatorios.");
+    return;
+  }
+
+  const callback = () => {
+    alert("Concepto guardado correctamente");
+    prepararFormularioConcepto();
+    listarConceptos();
+  };
+
+  if (id) {
+    google.script.run.withSuccessHandler(callback).updateConcepto(id, nombre, id_tipo, importancia, descripcion, pista, tecnica, revisar, idTemas);
+  } else {
+    google.script.run.withSuccessHandler(callback).addConcepto(nombre, id_tipo, importancia, descripcion, pista, tecnica, revisar, idTemas);
+  }
+}
+
+function listarConceptos() {
+  google.script.run.withSuccessHandler(function(conceptos) {
+    conceptosGlobal = conceptos;
+    renderConceptos(conceptos);
+  }).getConceptos();
+}
+
+function renderConceptos(conceptos) {
+  const contenedor = document.getElementById("tablaConceptos");
+  contenedor.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Tipo</th>
+          <th>Importancia</th>
+          <th>Descripción</th>
+          <th>Pista</th>
+          <th>Técnica</th>
+          <th>Temas</th>
+          <th>Revisar</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${conceptos.map(renderConceptoFila).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderConceptoFila(c) {
+  const temas = Array.isArray(c.idTemas) ? c.idTemas.map(id => temasMap[id] || id).join(", ") : "";
+  return `
+    <tr>
+      <td>${c.nombre}</td>
+      <td>${tiposConceptoMap[c.id_tipo] || ''}</td>
+      <td>${c.importancia || ''}</td>
+      <td>${c.descripcion || ''}</td>
+      <td>${c.pista || ''}</td>
+      <td>${c.tecnica || ''}</td>
+      <td>${temas}</td>
+      <td style="text-align: center;">${c.revisar ? '✅' : '—'}</td>
+      <td>
+        <button onclick="cargarConceptoEnFormulario('${c.id_concepto}')">✏️</button>
+        <button onclick="eliminarConcepto('${c.id_concepto}')">🗑️</button>
+      </td>
+    </tr>
+  `;
+}
+
+function cargarConceptoEnFormulario(id) {
+  google.script.run.withSuccessHandler(function(c) {
+    document.getElementById("conceptoIdEditando").value = c.id_concepto;
+    document.getElementById("conceptoNombre").value = c.nombre;
+    document.getElementById("comboTiposConcepto").value = c.id_tipo;
+    document.getElementById("conceptoImportancia").value = c.importancia || "";
+    document.getElementById("conceptoDescripcion").value = c.descripcion || "";
+    document.getElementById("conceptoPista").value = c.pista || "";
+    document.getElementById("conceptoTecnica").value = c.tecnica || "";
+    document.getElementById("conceptoRevisar").checked = !!c.revisar;
+
+    temasAsociados.clear();
+    document.getElementById("listaTemasAsociados").innerHTML = "";
+    if (c.idTemas && c.idTemas.length > 0) {
+      c.idTemas.forEach(id => {
+        temasAsociados.add(id);
+        const li = document.createElement("li");
+        li.textContent = temasMap[id] || id;
+        const btn = document.createElement("button");
+        btn.textContent = "❌";
+        btn.style.marginLeft = "1rem";
+        btn.onclick = () => {
+          temasAsociados.delete(id);
+          li.remove();
+        };
+        li.appendChild(btn);
+        document.getElementById("listaTemasAsociados").appendChild(li);
+      });
+    }
+
+    document.getElementById("formularioConceptoTitulo").innerText = "Actualizar Concepto";
+    document.getElementById("btnGuardarConcepto").innerText = "Actualizar";
+    document.getElementById("btnCancelarEdicionConcepto").style.display = "inline-block";
+  }).getConceptoPorId(id);
+}
+
+function eliminarConcepto(id) {
+  if (!confirm("¿Seguro que deseas eliminar este concepto?")) return;
+  google.script.run.withSuccessHandler(() => {
+    alert("Concepto eliminado correctamente");
+    listarConceptos();
+  }).deleteConcepto(id);
+}
+
+function filtrarConceptosPorTema() {
+  const idSeleccionado = document.getElementById("comboFiltroTemasConcepto").value;
+  console.log(idSeleccionado);
+  const incluirSubtemas = document.getElementById("checkIncluirSubtemas")?.checked;
+  console.log(incluirSubtemas);
+
+  if (!idSeleccionado) {
+    renderConceptos(conceptosGlobal);
+    return;
+  }
+
+  const idsValidos = new Set();
+
+  function recolectarHijos(temas, dentro = false) {
+    for (const t of temas) {
+      const esPadre = String(t.id) === String(idSeleccionado);
+      if (esPadre || dentro) idsValidos.add(t.id);
+      if (t.hijos?.length) recolectarHijos(t.hijos, esPadre || dentro);
+    }
+  }
+
+  recolectarHijos(temasJerarquia);
+
+  const conceptosFiltrados = conceptosGlobal.filter(c =>
+    Array.isArray(c.idTemas) &&
+    c.idTemas.some(id => idsValidos.has(id))
+  );
+
+  renderConceptos(conceptosFiltrados);
+}
+</script>

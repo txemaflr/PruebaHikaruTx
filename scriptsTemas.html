@@ -1,0 +1,234 @@
+<!-- scriptsTemas.html -->
+<script>
+let bloquesMap = {}; // Se rellena antes de listarTemas
+
+function prepararFormularioTema() {
+  document.getElementById("temaIdEditando").value = "";
+  document.getElementById("temaNombre").value = "";
+  document.getElementById("temaNombreCompleto").value = "";
+  document.getElementById("temaPrenombre").value = "";
+  document.getElementById("comboTemasPadre").value = "";
+  document.getElementById("comboBloquesInsertar").value = "";
+  document.getElementById("temaPagDesde").value = "";
+  document.getElementById("temaPagHasta").value = "";
+  document.getElementById("temaMaquetado").checked = false;
+
+  document.getElementById("formularioTitulo").innerText = "Insertar Tema";
+  document.getElementById("btnGuardarTema").innerText = "Insertar Tema";
+  document.getElementById("btnCancelarEdicion").style.display = "none";
+}
+
+function cancelarEdicionTema() {
+  prepararFormularioTema();
+}
+
+function guardarTema() {
+  const idTema = document.getElementById("temaIdEditando").value;
+  const nombre = document.getElementById("temaNombre").value.trim();
+  const nombreCompleto = document.getElementById("temaNombreCompleto").value.trim();
+  const prenombre = document.getElementById("temaPrenombre").value.trim();
+  const idPadre = document.getElementById("comboTemasPadre").value || null;
+  const idBloque = document.getElementById("comboBloquesInsertar").value || null;
+  const pagDesde = parseInt(document.getElementById("temaPagDesde").value);
+  const pagHasta = parseInt(document.getElementById("temaPagHasta").value);
+  const maquetado = document.getElementById("temaMaquetado").checked;
+
+  if (!nombre) {
+    alert("El campo 'Nombre del tema' es obligatorio.");
+    return;
+  }
+
+  if (idTema) {
+    google.script.run.withSuccessHandler(() => {
+      alert("Tema actualizado correctamente.");
+      prepararFormularioTema();
+      listarTemas();
+    }).updateTema(idTema, nombre, nombreCompleto, prenombre, idBloque, pagDesde, pagHasta, maquetado);
+  } else {
+    google.script.run.withSuccessHandler(() => {
+      alert("Tema insertado correctamente.");
+      prepararFormularioTema();
+      listarTemas();
+    }).addTema(nombre, nombreCompleto, prenombre, idPadre, idBloque, pagDesde, pagHasta, maquetado);
+  }
+}
+
+function listarTemas() {
+  google.script.run.withSuccessHandler(function(bloques) {
+    bloquesMap = {};
+    bloques.forEach(b => bloquesMap[b.id] = b.nombre);
+    google.script.run.withSuccessHandler(renderTemasArbol).getTemasEnArbol();
+  }).getBloques();
+}
+
+function renderTemasArbol(temasArbol) {
+  const contenedor = document.getElementById("tablaTemas");
+  contenedor.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Bloque</th>
+          <th>Pág. desde</th>
+          <th>Pág. hasta</th>
+          <th>Maquetado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${renderTemasRecursivo(temasArbol)}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTemasRecursivo(temas, nivel = 0, parentId = null) {
+  return temas.map(tema => {
+    const indent = '&nbsp;'.repeat(nivel * 4);
+    const bloqueNombre = getBloqueNombre(tema.id_bloque);
+    const pagDesde = tema.pag_desde || '';
+    const pagHasta = tema.pag_hasta || '';
+    const maquetado = tema.maquetado ? '✅' : '—';
+    const rowId = `row-${tema.id}`;
+    const toggleId = `toggle-${tema.id}`;
+    const hasHijos = tema.hijos.length > 0;
+
+    const toggleBtn = hasHijos ? `<button id="btn-${toggleId}" onclick="toggleHijos('${tema.id}')">+</button>` : '';
+
+    const nombreHTML = `${indent}${toggleBtn} ${tema.prenombre || ''} ${tema.nombre}`;
+
+    let row = `
+      <tr id="${rowId}" data-id="${tema.id}" data-parent="${parentId || ''}" style="${parentId ? 'display:none;' : ''}">
+        <td>${nombreHTML}</td>
+        <td>${bloqueNombre}</td>
+        <td>${pagDesde}</td>
+        <td>${pagHasta}</td>
+        <td style="text-align: center;">${maquetado}</td>
+        <td>
+          <button onclick="cargarTemaEnFormulario('${tema.id}')">✏️</button>
+          <button onclick="eliminarTemaDesdeTabla('${tema.id}')" ${hasHijos ? 'disabled' : ''}>🗑️</button>
+        </td>
+      </tr>
+    `;
+
+    if (hasHijos) {
+      row += renderTemasRecursivo(tema.hijos, nivel + 1, tema.id);
+    }
+
+    return row;
+  }).join('');
+}
+/*
+function toggleHijos(idPadre) {
+  const padreBtn = document.getElementById(`btn-toggle-${idPadre}`);
+  const esExpandido = padreBtn && padreBtn.textContent === '-';
+
+  function toggleRecursivo(id, mostrar) {
+    document.querySelectorAll(`tr[data-parent='${id}']`).forEach(row => {
+      row.style.display = mostrar ? '' : 'none';
+      const hijoId = row.getAttribute('data-id');
+      if (!mostrar) toggleRecursivo(hijoId, false);
+    });
+  }
+
+  toggleRecursivo(idPadre, !esExpandido);
+
+  if (padreBtn) padreBtn.textContent = esExpandido ? '+' : '-';
+}
+*/
+//NUEVO-----
+function toggleHijos(idPadre) {
+  const hijos = document.querySelectorAll(`tr[data-parent='${idPadre}']`);
+  const btn = document.getElementById(`btn-toggle-${idPadre}`);
+  const expandiendo = btn.textContent === '+';
+
+  hijos.forEach(row => {
+    const idHijo = row.getAttribute('data-id');
+    if (expandiendo) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+      resetBotonYDescendientes(idHijo); // Oculta todos sus hijos y reinicia su botón
+    }
+  });
+
+  // Actualizar el botón principal
+  btn.textContent = expandiendo ? '−' : '+';
+}
+
+// Esta función asegura que todos los botones hijos vuelvan a '+'
+function resetBotonYDescendientes(idPadre) {
+  const btnHijo = document.getElementById(`btn-toggle-${idPadre}`);
+  if (btnHijo) btnHijo.textContent = '+';
+
+  const nietos = document.querySelectorAll(`tr[data-parent='${idPadre}']`);
+  nietos.forEach(row => {
+    row.style.display = 'none';
+    const idNieto = row.getAttribute('data-id');
+    resetBotonYDescendientes(idNieto);
+  });
+}
+//FINNUEVO---
+function cargarTemaEnFormulario(id) {
+  google.script.run.withSuccessHandler(function(t) {
+    document.getElementById("temaIdEditando").value = t.id;
+    document.getElementById("temaNombre").value = t.nombre;
+    document.getElementById("temaNombreCompleto").value = t.nombre_completo;
+    document.getElementById("temaPrenombre").value = t.prenombre;
+    document.getElementById("comboTemasPadre").value = t.id_padre || "";
+    document.getElementById("comboBloquesInsertar").value = t.id_bloque || "";
+    document.getElementById("temaPagDesde").value = t.pag_desde || "";
+    document.getElementById("temaPagHasta").value = t.pag_hasta || "";
+    document.getElementById("temaMaquetado").checked = !!t.maquetado;
+
+    document.getElementById("formularioTitulo").innerText = "Actualizar Tema";
+    document.getElementById("btnGuardarTema").innerText = "Actualizar Tema";
+    document.getElementById("btnCancelarEdicion").style.display = "inline-block";
+  }).getTemaPorId(id);
+}
+
+function eliminarTemaDesdeTabla(id) {
+  if (!confirm("¿Seguro que deseas eliminar este tema?")) return;
+  google.script.run.withSuccessHandler(() => {
+    alert("Tema eliminado correctamente");
+    listarTemas();
+  }).deleteTema(id);
+}
+
+function cargarCombosEntidadTemas() {
+  google.script.run.withSuccessHandler(function(temasArbol) {
+    const combo = document.getElementById("comboTemasPadre");
+    combo.innerHTML = '<option value="">(Opcional) Tema padre</option>';
+
+    function renderOpciones(temas, nivel = 0) {
+      temas.forEach(t => {
+        const option = document.createElement("option");
+        option.value = t.id;
+        const indent = '—'.repeat(nivel);
+        option.textContent = `${indent} ${t.prenombre || ''} ${t.nombre}`;
+        combo.appendChild(option);
+        if (t.hijos.length > 0) renderOpciones(t.hijos, nivel + 1);
+      });
+    }
+
+    renderOpciones(temasArbol);
+  }).getTemasEnArbol();
+
+  google.script.run.withSuccessHandler(function(bloques) {
+    const combo = document.getElementById("comboBloquesInsertar");
+    combo.innerHTML = '<option value="">(Opcional) Bloque</option>';
+    bloquesMap = {};
+    bloques.forEach(b => {
+      bloquesMap[b.id] = b.nombre;
+      const option = document.createElement("option");
+      option.value = b.id;
+      option.textContent = b.nombre;
+      combo.appendChild(option);
+    });
+  }).getBloques();
+}
+
+function getBloqueNombre(idBloque) {
+  return bloquesMap[idBloque] || '';
+}
+</script>
