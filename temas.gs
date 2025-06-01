@@ -138,6 +138,7 @@ function addTema(nombre, nombreCompleto, prenombre, idPadre, idBloque, pagDesde,
   fila[headers.indexOf("maquetado")] = maquetado;
 
   sheet.appendRow(fila);
+  invalidarCacheTemas();
 }
 
 function updateTema(idTema, nombre, nombreCompleto, prenombre, idBloque, pagDesde, pagHasta, maquetado) {
@@ -158,6 +159,7 @@ function updateTema(idTema, nombre, nombreCompleto, prenombre, idBloque, pagDesd
       return;
     }
   }
+  invalidarCacheTemas();
 }
 
 function deleteTema(idTema) {
@@ -174,6 +176,7 @@ function deleteTema(idTema) {
       return;
     }
   }
+  invalidarCacheTemas();
 }
 
 function calcularNivel(idPadre, data, headers) {
