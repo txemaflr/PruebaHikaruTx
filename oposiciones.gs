@@ -28,6 +28,7 @@ function addOposicion(nombre) {
   // Agregar oposición con ID único (agregar fila)
   sheet.appendRow([uniqueId, nombre]); 
   return `Oposición "${nombre}" añadida correctamente.`;
+  invalidarCacheOposiciones();
 }
 
 // Actualizar una oposición
@@ -56,6 +57,7 @@ function updateOposicion(id, nuevoNombre) {
   }
 
   throw new Error(`Oposición con ID ${id} no encontrada.`);
+  invalidarCacheOposiciones();
 }
 
 // Verificar unicidad al actualizar
@@ -96,6 +98,7 @@ function deleteOposicion(id) {
   }
 
   throw new Error(`Oposición con ID ${id} no encontrada.`);
+  invalidarCacheOposiciones();
 }
 
 function getTemasDisponiblesParaOposicion(idOposicion) {
