@@ -75,6 +75,7 @@ function addConcepto(nombre, id_tipo, importancia, descripcion, pista, tecnica, 
   idTemas.forEach(idTema => {
     relSheet.appendRow([newId, idTema]);
   });
+  invalidarCacheConceptos();
 }
 
 function updateConcepto(id, nombre, id_tipo, importancia, descripcion, pista, tecnica, revisar, idTemas = []) {
@@ -109,6 +110,7 @@ function updateConcepto(id, nombre, id_tipo, importancia, descripcion, pista, te
   idTemas.forEach(idTema => {
     relSheet.appendRow([id, idTema]);
   });
+  invalidarCacheConceptos();
 }
 
 function deleteConcepto(id) {
@@ -126,6 +128,7 @@ function deleteConcepto(id) {
       relSheet.deleteRow(i + 1);
     }
   }
+  invalidarCacheConceptos();
 }
 
 function getConceptoPorId(id) {
