@@ -243,13 +243,21 @@ function actualizarEstadisticasDiarias(idConcepto) {
   
   if (filaHoy === -1) {
     // Crear nueva entrada
-    statsSheet.appendRow([hoy, 1, idConcepto]);
+    statsSheet.appendRow([hoy, 1, String(idConcepto)]);
   } else {
     // Actualizar entrada existente
     const conceptosEstudiados = data[filaHoy][1] + 1;
-    const conceptosIds = data[filaHoy][2] ? data[filaHoy][2].split(',') : [];
+    
+    // Verificar si data[filaHoy][2] existe y es una cadena
+    let conceptosIds = [];
+    if (data[filaHoy][2]) {
+      // Convertir a string si no lo es
+      const idsString = String(data[filaHoy][2]);
+      conceptosIds = idsString.split(',');
+    }
+    
     if (!conceptosIds.includes(String(idConcepto))) {
-      conceptosIds.push(idConcepto);
+      conceptosIds.push(String(idConcepto));
     }
     
     statsSheet.getRange(filaHoy + 1, 2).setValue(conceptosEstudiados);
