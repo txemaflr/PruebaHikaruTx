@@ -1,0 +1,241 @@
+<!-- scriptsEstudio.html -->
+<script>
+// Variables globales para estudio
+let estudioActivo = false;
+let conceptoActual = null;
+let tiempoInicio = null;
+let tiempoConcepto = null;
+let sesionEstudio = {
+  conceptos: [],
+  inicio: null
+};
+
+// Cargar datos iniciales de estudio
+function cargarDatosEstudio() {
+  // Cargar oposiciones en el select
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      const select = document.getElementById('comboOposicionesEstudio');
+      select.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
+      
+      oposiciones.forEach(function(op) {
+        const option = document.createElement('option');
+        option.value = op.id;
+        option.textContent = op.nombre;
+        select.appendChild(option);
+      });
+    })
+    .withFailureHandler(mostrarError)
+    .getOposiciones();
+    
+  // Cargar estadísticas
+  actualizarEstadisticasEstudio();
+}
+
+// Actualizar estadísticas
+function actualizarEstadisticasEstudio() {
+  const idOposicion = document.getElementById('comboOposicionesEstudio').value;
+  if (!idOposicion) return;
+  
+  google.script.run
+    .withSuccessHandler(function(stats) {
+      document.getElementById('rachaEstudio').textContent = stats.racha || 0;
+      document.getElementById('conceptosHoy').textContent = stats.conceptosHoy || 0;
+    })
+    .withFailureHandler(mostrarError)
+    .getEstadisticasEstudio(idOposicion);
+}
+
+// Iniciar sesión de estudio
+function iniciarEstudio() {
+  const idOposicion = document.getElementById('comboOposicionesEstudio').value;
+  const modoEstudio = document.getElementById('modoEstudio').value;
+  
+  if (!idOposicion) {
+    alert('Por favor, selecciona una oposición');
+    return;
+  }
+  
+  // Resetear sesión
+  estudioActivo = true;
+  sesionEstudio = {
+    conceptos: [],
+    inicio: new Date()
+  };
+  
+  // Ocultar controles y mostrar área de estudio
+  document.getElementById('controlesEstudio').style.display = 'none';
+  document.getElementById('areaEstudio').style.display = 'block';
+  document.getElementById('resumenEstudio').style.display = 'none';
+  
+  // Cargar primer concepto
+  cargarSiguienteConcepto();
+}
+
+// Cargar siguiente concepto
+function cargarSiguienteConcepto() {
+  const idOposicion = document.getElementById('comboOposicionesEstudio').value;
+  const modoEstudio = document.getElementById('modoEstudio').value;
+  
+  mostrarCargando(true);
+  
+  google.script.run
+    .withSuccessHandler(function(concepto) {
+      mostrarCargando(false);
+      
+      if (!concepto) {
+        finalizarEstudio();
+        return;
+      }
+      
+      conceptoActual = concepto;
+      tiempoConcepto = new Date();
+      
+      // Mostrar concepto
+      mostrarConcepto(concepto);
+    })
+    .withFailureHandler(function(error) {
+      mostrarCargando(false);
+      mostrarError(error);
+    })
+    .obtenerSiguienteConcepto(idOposicion, modoEstudio);
+}
+
+// Mostrar concepto en pantalla
+function mostrarConcepto(concepto) {
+  // Resetear visibilidad
+  document.getElementById('conceptoDescripcion').style.display = 'none';
+  document.getElementById('conceptoPistaEstudio').style.display = 'none';
+  document.getElementById('conceptoTecnicaEstudio').style.display = 'none';
+  document.getElementById('btnVerDescripcion').style.display = 'inline-block';
+  document.getElementById('btnVerPista').style.display = concepto.pista ? 'inline-block' : 'none';
+  document.getElementById('btnVerTecnica').style.display = concepto.tecnica ? 'inline-block' : 'none';
+  
+  // Mostrar datos del concepto
+  document.getElementById('conceptoNombreEstudio').textContent = concepto.nombre;
+  document.getElementById('conceptoTipo').textContent = concepto.tipo || 'Concepto';
+  document.getElementById('conceptoTema').textContent = concepto.tema || 'Sin tema';
+  document.getElementById('conceptoBloque').textContent = concepto.bloque || 'Sin bloque';
+  
+  // Mostrar importancia con estrellas
+  const importancia = concepto.importancia || 3;
+  let estrellas = '';
+  for (let i = 1; i <= 5; i++) {
+    estrellas += i <= importancia ? '★' : '☆';
+  }
+  document.getElementById('conceptoImportanciaEstudio').textContent = estrellas;
+  
+  // Llenar contenidos ocultos
+  if (concepto.descripcion) {
+    document.getElementById('conceptoDescripcionTexto').textContent = concepto.descripcion;
+  }
+  if (concepto.pista) {
+    document.getElementById('conceptoPistaTexto').textContent = concepto.pista;
+  }
+  if (concepto.tecnica) {
+    document.getElementById('conceptoTecnicaTexto').textContent = concepto.tecnica;
+  }
+  
+  // Mostrar botones de evaluación
+  document.getElementById('botonesEvaluacion').style.display = 'block';
+}
+
+// Funciones para revelar información
+function verDescripcion() {
+  document.getElementById('conceptoDescripcion').style.display = 'block';
+  document.getElementById('btnVerDescripcion').style.display = 'none';
+}
+
+function verPista() {
+  document.getElementById('conceptoPistaEstudio').style.display = 'block';
+  document.getElementById('btnVerPista').style.display = 'none';
+}
+
+function verTecnica() {
+  document.getElementById('conceptoTecnicaEstudio').style.display = 'block';
+  document.getElementById('btnVerTecnica').style.display = 'none';
+}
+
+// Evaluar comprensión
+function evaluarComprension(nivel) {
+  if (!conceptoActual) return;
+  
+  const tiempoEstudio = new Date() - tiempoConcepto;
+  
+  // Guardar en sesión
+  sesionEstudio.conceptos.push({
+    concepto: conceptoActual,
+    nivel: nivel,
+    tiempo: tiempoEstudio
+  });
+  
+  // Guardar en servidor
+  google.script.run
+    .withSuccessHandler(function() {
+      // Actualizar contador
+      const contador = parseInt(document.getElementById('conceptosHoy').textContent) || 0;
+      document.getElementById('conceptosHoy').textContent = contador + 1;
+      
+      // Cargar siguiente concepto
+      cargarSiguienteConcepto();
+    })
+    .withFailureHandler(mostrarError)
+    .guardarProgresoConcepto(conceptoActual.id, nivel, tiempoEstudio);
+}
+
+// Finalizar estudio
+function finalizarEstudio() {
+  estudioActivo = false;
+  
+  // Calcular estadísticas
+  const tiempoTotal = new Date() - sesionEstudio.inicio;
+  const minutos = Math.floor(tiempoTotal / 60000);
+  const segundos = Math.floor((tiempoTotal % 60000) / 1000);
+  
+  const totalConceptos = sesionEstudio.conceptos.length;
+  const conceptosFaciles = sesionEstudio.conceptos.filter(c => c.nivel >= 3).length;
+  const conceptosDificiles = sesionEstudio.conceptos.filter(c => c.nivel <= 2).length;
+  
+  // Mostrar resumen
+  document.getElementById('resumenTotalConceptos').textContent = totalConceptos;
+  document.getElementById('resumenConceptosFaciles').textContent = conceptosFaciles;
+  document.getElementById('resumenConceptosDificiles').textContent = conceptosDificiles;
+  document.getElementById('resumenTiempoTotal').textContent = `${minutos}m ${segundos}s`;
+  
+  // Mostrar sección de resumen
+  document.getElementById('areaEstudio').style.display = 'none';
+  document.getElementById('resumenEstudio').style.display = 'block';
+}
+
+// Cancelar estudio
+function cancelarEstudio() {
+  if (confirm('¿Estás seguro de que quieres cancelar la sesión de estudio?')) {
+    estudioActivo = false;
+    volverAControles();
+  }
+}
+
+// Volver a controles
+function volverAControles() {
+  document.getElementById('controlesEstudio').style.display = 'block';
+  document.getElementById('areaEstudio').style.display = 'none';
+  document.getElementById('resumenEstudio').style.display = 'none';
+  
+  // Actualizar estadísticas
+  actualizarEstadisticasEstudio();
+}
+
+// Mostrar/ocultar cargando
+function mostrarCargando(mostrar) {
+  const elemento = document.getElementById('cargandoEstudio');
+  if (elemento) {
+    elemento.style.display = mostrar ? 'block' : 'none';
+  }
+}
+
+// Mostrar error
+function mostrarError(error) {
+  console.error('Error:', error);
+  alert('Error: ' + error.message);
+}
+</script>
