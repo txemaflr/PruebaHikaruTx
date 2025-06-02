@@ -1,303 +1,428 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gestión de Oposiciones - Panel Principal</title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <!-- Vue.js 3 -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Iconos -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  
-  <!-- Animaciones -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
-  
+  <title>Gestión de Temario</title>
+  <?!= include('scriptsGenerales') ?>
+  <?!= include('scriptsOposiciones') ?>
+  <?!= include('scriptsBloques') ?>
+  <?!= include('scriptsTemas') ?>
+  <?!= include('scriptsConceptos') ?>
+  <?!= include('scriptsEstudio') ?>
+  <?!= include('scriptsTest') ?>
   <style>
-    /* Transiciones suaves */
-    .fade-enter-active, .fade-leave-active {
-      transition: opacity 0.3s ease;
-    }
-    .fade-enter-from, .fade-leave-to {
-      opacity: 0;
-    }
-    
-    /* Loader */
-    .loader {
-      border-top-color: #3490dc;
-      -webkit-animation: spinner 1.5s linear infinite;
-      animation: spinner 1.5s linear infinite;
-    }
-    
-    @keyframes spinner {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    /* Scrollbar personalizada */
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+    header { background-color: #007bff; color: white; padding: 1rem 2rem; text-align: center; }
+    nav { display: flex; justify-content: center; background-color: #0056b3; padding: 0.5rem 0; }
+    nav button { background-color: #007bff; color: white; border: none; padding: 0.5rem 1rem; margin: 0 0.5rem; cursor: pointer; border-radius: 5px; font-size: 1rem; }
+    nav button:hover { background-color: #004c99; }
+    .container { padding: 1rem 2rem; }
+    .section { display: none; }
+    .section.active { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    table, th, td { border: 1px solid #ddd; }
+    th, td { padding: 0.5rem; text-align: left; }
+    th { background-color: #007bff; color: white; }
+    input, select, button { margin-bottom: 0.5rem; padding: 0.4rem; }
+    label { display: block; margin-top: 0.5rem; }
   </style>
 </head>
-<body class="bg-gray-50">
-  <div id="app">
-    <!-- Navbar Superior -->
-    <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg sticky top-0 z-50">
-      <div class="container mx-auto px-4">
-        <div class="flex justify-between items-center py-4">
-          <div class="flex items-center space-x-3">
-            <i class="fas fa-graduation-cap text-2xl"></i>
-            <h1 class="text-xl font-bold">Gestión de Oposiciones</h1>
-          </div>
-          
-          <!-- Estadísticas Rápidas -->
-          <div class="hidden md:flex items-center space-x-6 text-sm">
-            <div class="flex items-center space-x-2">
-              <i class="fas fa-book"></i>
-              <span>{{ estadisticas.temas }} Temas</span>
-            </div>
-            <div class="flex items-center space-x-2">
-              <i class="fas fa-lightbulb"></i>
-              <span>{{ estadisticas.conceptos }} Conceptos</span>
-            </div>
-            <div class="flex items-center space-x-2">
-              <i class="fas fa-clock"></i>
-              <span>{{ horaActual }}</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Menú de Navegación -->
-        <div class="flex space-x-1 pb-2 overflow-x-auto">
-          <button v-for="seccion in secciones" 
-                  :key="seccion.id"
-                  @click="cambiarSeccion(seccion.id)"
-                  :class="[
-                    'px-4 py-2 rounded-t-lg transition-all duration-200 whitespace-nowrap',
-                    seccionActiva === seccion.id 
-                      ? 'bg-white text-blue-600 font-semibold' 
-                      : 'text-blue-100 hover:bg-blue-700'
-                  ]">
-            <i :class="seccion.icono + ' mr-2'"></i>
-            {{ seccion.nombre }}
-          </button>
-        </div>
-      </div>
-    </nav>
+<body>
+  <h1>Gestión de Temario</h1>
+  <nav>
+    <button onclick="showSection('oposiciones')">Oposiciones</button>
+    <button onclick="showSection('bloques')">Bloques</button>
+    <button onclick="showSection('temas')">Temas</button>
+    <button onclick="showSection('test')">Test</button>
+    <button onclick="showSection('conceptos')">Conceptos</button>
+    <button onclick="showSection('estudio')">Estudio</button>
+    <button onclick="showSection('repasos')">Repasos</button>
+  </nav>
+  <div class="container">
 
-    <!-- Contenido Principal -->
-    <main class="container mx-auto px-4 py-6">
-      <!-- Alertas Globales -->
-      <transition name="fade">
-        <div v-if="alerta.visible" 
-             :class="[
-               'mb-4 p-4 rounded-lg flex items-center justify-between animate__animated animate__fadeInDown',
-               alerta.tipo === 'success' ? 'bg-green-100 text-green-700' : 
-               alerta.tipo === 'error' ? 'bg-red-100 text-red-700' : 
-               'bg-yellow-100 text-yellow-700'
-             ]">
-          <div class="flex items-center">
-            <i :class="[
-              'mr-3',
-              alerta.tipo === 'success' ? 'fas fa-check-circle' : 
-              alerta.tipo === 'error' ? 'fas fa-exclamation-circle' : 
-              'fas fa-info-circle'
-            ]"></i>
-            <span>{{ alerta.mensaje }}</span>
-          </div>
-          <button @click="alerta.visible = false" class="ml-4">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      </transition>
+    <!-- Sección Oposiciones -->
+    <div id="oposiciones" class="section">
+      <h2>Gestión de Oposiciones</h2>
+      <label>Nombre de la oposición:</label>
+      <input type="text" id="nombreOposicion" placeholder="Nombre de la oposición" />
+      <button onclick="agregarOposicion()">Agregar</button>
 
-      <!-- Loader Global -->
-      <div v-if="cargando" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg shadow-xl">
-          <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4 mx-auto"></div>
-          <p class="text-center text-gray-600">Cargando...</p>
-        </div>
-      </div>
+      <label>Selecciona una oposición para actualizar:</label>
+      <select id="comboOposicionesActualizar"></select>
+      <input type="text" id="nuevoNombreOposicion" placeholder="Nuevo nombre" />
+      <button onclick="actualizarOposicion()">Actualizar</button>
 
-      <!-- Componentes Dinámicos -->
-      <transition name="fade" mode="out-in">
-        <component :is="componenteActual" 
-                   :key="seccionActiva"
-                   @mostrar-alerta="mostrarAlerta"
-                   @actualizar-estadisticas="actualizarEstadisticas">
-        </component>
-      </transition>
-    </main>
+      <label>Selecciona una oposición para eliminar:</label>
+      <select id="comboOposicionesEliminar"></select>
+      <button onclick="eliminarOposicion()">Eliminar</button>
 
-    <!-- Footer -->
-    <footer class="bg-gray-800 text-white py-4 mt-12">
-      <div class="container mx-auto px-4 text-center">
-        <p class="text-sm">2025 Txema Sistema de Oposiciones - Desarrollado con ❤️</p>
-      </div>
-    </footer>
+      <label>Vincular tema a oposición:</label>
+      <select id="comboOposicionesVincular" onchange="cargarTemasDisponiblesParaVincular(this.value)"></select>
+      <select id="comboTemasDisponiblesOposiciones"></select>
+      <button onclick="vincularTemaOposicion()">Vincular Tema</button>
+
+      <div id="tablaOposiciones"></div>
+      <div id="temasVinculados"></div>
+    </div>
+
+    <!-- Sección Bloques -->
+    <div id="bloques" class="section">
+      <h2>Gestión de Bloques</h2>
+      <label>Nombre del bloque:</label>
+      <input type="text" id="bloqueNombre" placeholder="Nombre del bloque" />
+      <button onclick="insertBloque()">Agregar</button>
+
+      <label>Selecciona un bloque para actualizar:</label>
+      <select id="comboBloquesActualizar"></select>
+      <input type="text" id="bloqueNuevoNombre" placeholder="Nuevo nombre" />
+      <button onclick="updateBloque()">Actualizar</button>
+
+      <label>Selecciona un bloque para eliminar:</label>
+      <select id="comboBloquesEliminar"></select>
+      <button onclick="deleteBloque()">Eliminar</button>
+
+      <label>Vincular tema a bloque:</label>
+      <select id="comboBloquesVincular"></select>
+      <select id="comboTemasDisponiblesBloques"></select>
+      <button onclick="vincularTemaABloque()">Vincular Tema</button>
+
+      <div id="bloquesTabla"></div>
+      <div id="temasVinculadosBloque"></div>
+    </div>
+
+    <!-- Sección Temas -->
+    <div id="temas" class="section">
+      <h2>Gestión de Temas</h2>
+      <input type="hidden" id="temaIdEditando" />
+      <label>Nombre del tema*:</label>
+      <input type="text" id="temaNombre" required />
+
+      <label>Nombre completo del tema:</label>
+      <input type="text" id="temaNombreCompleto" />
+
+      <label>Prenombre:</label>
+      <input type="text" id="temaPrenombre" placeholder="Ej. 1.2.3." />
+
+      <label>Tema padre:</label>
+      <select id="comboTemasPadre"></select>
+
+      <label>Bloque:</label>
+      <select id="comboBloquesInsertar"></select>
+
+      <label>Página desde:</label>
+      <input type="number" id="temaPagDesde" />
+
+      <label>Página hasta:</label>
+      <input type="number" id="temaPagHasta" />
+
+      <label><input type="checkbox" id="temaMaquetado" /> Maquetado</label>
+
+      <button id="btnGuardarTema" onclick="guardarTema()">Insertar Tema</button>
+      <button id="btnCancelarEdicion" onclick="cancelarEdicionTema()" style="display: none;">Cancelar</button>
+
+      <hr>
+      <div id="tablaTemas"></div>
+    </div>
+
+<!-- Sección Estudio -->
+<div id="estudio" class="section">
+  <h2>Sistema de Estudio Inteligente</h2>
+  
+  <!-- Controles iniciales -->
+  <div id="controlesEstudio">
+    <div style="background-color: #f0f0f0; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;">
+      <h3>Estadísticas del día</h3>
+      <p>🔥 Racha: <strong id="rachaEstudio">0</strong> días | 
+         📚 Conceptos hoy: <strong id="conceptosHoy">0</strong></p>
+    </div>
+    
+    <label>Selecciona una oposición:</label>
+    <select id="comboOposicionesEstudio" onchange="actualizarEstadisticasEstudio()">
+      <option value="">-- Selecciona una oposición --</option>
+    </select>
+    
+    <label>Modo de estudio:</label>
+    <select id="modoEstudio">
+      <option value="inteligente">Inteligente (Recomendado)</option>
+      <option value="secuencial">Secuencial</option>
+      <option value="aleatorio">Aleatorio</option>
+      <option value="repaso">Solo Repasos</option>
+    </select>
+    
+    <br><br>
+    <button onclick="iniciarEstudio()" style="background-color: #28a745; color: white; padding: 0.7rem 2rem; font-size: 1.1rem;">
+      ▶️ Iniciar Sesión de Estudio
+    </button>
   </div>
-
-  <!-- Templates de Componentes -->
-  <?!= include('componentes/OposicionesComponent') ?>
-  <?!= include('componentes/BloquesComponent') ?>
-  <?!= include('componentes/TemasComponent') ?>
-  <?!= include('componentes/ConceptosComponent') ?>
-  <?!= include('componentes/TestComponent') ?>
-  <?!= include('componentes/EstudioComponent') ?>
-  <?!= include('componentes/RepasosComponent') ?>
-
-  <script>
-    const { createApp } = Vue;
-
-    // Mixin Global para funcionalidades comunes
-    const GlobalMixin = {
-      data() {
-        return {
-          cargando: false
-        }
-      },
-      methods: {
-        async ejecutarConCarga(promesa) {
-          this.cargando = true;
-          try {
-            const resultado = await promesa;
-            return resultado;
-          } finally {
-            this.cargando = false;
-          }
-        },
-        
-        ejecutarGAS(funcionNombre, ...args) {
-          return new Promise((resolve, reject) => {
-            google.script.run
-              .withSuccessHandler(resolve)
-              .withFailureHandler(reject)
-              [funcionNombre](...args);
-          });
-        }
-      }
-    };
-
-    // App Principal
-    createApp({
-      mixins: [GlobalMixin],
-      data() {
-        return {
-          seccionActiva: 'oposiciones',
-          secciones: [
-            { id: 'oposiciones', nombre: 'Oposiciones', icono: 'fas fa-university' },
-            { id: 'bloques', nombre: 'Bloques', icono: 'fas fa-layer-group' },
-            { id: 'temas', nombre: 'Temas', icono: 'fas fa-book' },
-            { id: 'conceptos', nombre: 'Conceptos', icono: 'fas fa-lightbulb' },
-            { id: 'test', nombre: 'Test', icono: 'fas fa-pencil-alt' },
-            { id: 'estudio', nombre: 'Estudio', icono: 'fas fa-brain' },
-            { id: 'repasos', nombre: 'Repasos', icono: 'fas fa-redo' }
-          ],
-          alerta: {
-            visible: false,
-            tipo: 'success',
-            mensaje: ''
-          },
-          estadisticas: {
-            temas: 0,
-            conceptos: 0
-          },
-          horaActual: ''
-        }
-      },
+  
+  <!-- Área de estudio -->
+  <div id="areaEstudio" style="display: none;">
+    <div style="text-align: right; margin-bottom: 1rem;">
+      <button onclick="cancelarEstudio()" style="background-color: #dc3545; color: white;">
+        ❌ Cancelar Sesión
+      </button>
+    </div>
+    
+    <!-- Información del concepto -->
+    <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+          <strong>Tema:</strong> <span id="conceptoTema"></span><br>
+          <strong>Bloque:</strong> <span id="conceptoBloque"></span>
+        </div>
+        <div style="text-align: right;">
+          <strong>Tipo:</strong> <span id="conceptoTipo"></span><br>
+          <strong>Importancia:</strong> <span id="conceptoImportanciaEstudio" style="color: #ffc107;"></span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Concepto principal -->
+    <div style="background-color: white; padding: 2rem; border: 2px solid #007bff; border-radius: 10px; margin-bottom: 1rem;">
+      <h3 id="conceptoNombreEstudio" style="color: #007bff; margin-top: 0;"></h3>
       
-      computed: {
-        componenteActual() {
-          return this.seccionActiva.charAt(0).toUpperCase() + 
-                 this.seccionActiva.slice(1) + 'Component';
-        }
-      },
+      <!-- Descripción (oculta inicialmente) -->
+      <div id="conceptoDescripcion" style="display: none; margin-top: 1rem;">
+        <h4>📖 Descripción:</h4>
+        <p id="conceptoDescripcionTexto" style="background-color: #f8f9fa; padding: 1rem; border-radius: 5px;"></p>
+      </div>
       
-      methods: {
-        cambiarSeccion(seccion) {
-          this.seccionActiva = seccion;
-          // Guardar en localStorage
-          localStorage.setItem('seccionActiva', seccion);
-        },
-        
-        mostrarAlerta(tipo, mensaje) {
-          this.alerta = {
-            visible: true,
-            tipo,
-            mensaje
-          };
-          
-          // Auto-ocultar después de 5 segundos
-          setTimeout(() => {
-            this.alerta.visible = false;
-          }, 5000);
-        },
-        
-        actualizarEstadisticas() {
-          // Actualizar estadísticas desde el servidor
-          this.ejecutarGAS('getEstadisticasGenerales')
-            .then(stats => {
-              this.estadisticas = stats;
-            })
-            .catch(console.error);
-        },
-        
-        actualizarHora() {
-          const ahora = new Date();
-          this.horaActual = ahora.toLocaleTimeString('es-ES', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
-        }
-      },
+      <!-- Pista (oculta inicialmente) -->
+      <div id="conceptoPistaEstudio" style="display: none; margin-top: 1rem;">
+        <h4>💡 Pista:</h4>
+        <p id="conceptoPistaTexto" style="background-color: #e3f2fd; padding: 1rem; border-radius: 5px; border-left: 4px solid #2196f3;"></p>
+      </div>
       
-      mounted() {
-        // Restaurar última sección
-        const ultimaSeccion = localStorage.getItem('seccionActiva');
-        if (ultimaSeccion && this.secciones.find(s => s.id === ultimaSeccion)) {
-          this.seccionActiva = ultimaSeccion;
-        }
-        
-        // Actualizar estadísticas
-        this.actualizarEstadisticas();
-        
-        // Actualizar hora cada minuto
-        this.actualizarHora();
-        setInterval(this.actualizarHora, 60000);
-        
-        // Mensaje de bienvenida
-        this.mostrarAlerta('success', '¡Bienvenido al Sistema de Oposiciones!');
-      },
+      <!-- Técnica (oculta inicialmente) -->
+      <div id="conceptoTecnicaEstudio" style="display: none; margin-top: 1rem;">
+        <h4>🧠 Técnica de memorización:</h4>
+        <p id="conceptoTecnicaTexto" style="background-color: #e8f5e9; padding: 1rem; border-radius: 5px; border-left: 4px solid #4caf50;"></p>
+      </div>
+    </div>
+    
+    <!-- Botones de revelación -->
+    <div style="text-align: center; margin-bottom: 1rem;">
+      <button id="btnVerDescripcion" onclick="verDescripcion()" style="margin: 0.2rem;">
+        👁️ Ver Descripción
+      </button>
+      <button id="btnVerPista" onclick="verPista()" style="margin: 0.2rem; display: none;">
+        💡 Ver Pista
+      </button>
+      <button id="btnVerTecnica" onclick="verTecnica()" style="margin: 0.2rem; display: none;">
+        🧠 Ver Técnica
+      </button>
+    </div>
+    
+    <!-- Botones de evaluación -->
+    <div id="botonesEvaluacion" style="background-color: #f8f9fa; padding: 1rem; border-radius: 5px; text-align: center;">
+      <p><strong>¿Cómo de bien conoces este concepto?</strong></p>
+      <button onclick="evaluarComprension(1)" style="background-color: #dc3545; color: white; margin: 0.2rem; padding: 0.5rem 1rem;">
+        ❌ No lo sé
+      </button>
+      <button onclick="evaluarComprension(2)" style="background-color: #fd7e14; color: white; margin: 0.2rem; padding: 0.5rem 1rem;">
+        😕 Difícil
+      </button>
+      <button onclick="evaluarComprension(3)" style="background-color: #007bff; color: white; margin: 0.2rem; padding: 0.5rem 1rem;">
+        ✓ Bien
+      </button>
+      <button onclick="evaluarComprension(4)" style="background-color: #28a745; color: white; margin: 0.2rem; padding: 0.5rem 1rem;">
+        😊 Fácil
+      </button>
+    </div>
+    
+    <!-- Indicador de carga -->
+    <div id="cargandoEstudio" style="display: none; text-align: center; padding: 2rem;">
+      <p>Cargando siguiente concepto...</p>
+    </div>
+  </div>
+  
+  <!-- Resumen de sesión -->
+  <div id="resumenEstudio" style="display: none;">
+    <div style="background-color: #d4edda; padding: 1.5rem; border-radius: 10px; text-align: center;">
+      <h3>🎉 ¡Sesión Completada!</h3>
       
-      // Registrar componentes
-      components: {
-        OposicionesComponent,
-        BloquesComponent,
-        TemasComponent,
-        ConceptosComponent,
-        TestComponent,
-        EstudioComponent,
-        RepasosComponent
-      }
-    }).mount('#app');
-  </script>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1rem 0;">
+        <div style="background-color: white; padding: 1rem; border-radius: 5px;">
+          <h4 style="margin: 0;">📚 Total</h4>
+          <p style="font-size: 2rem; margin: 0.5rem 0;" id="resumenTotalConceptos">0</p>
+          <p style="margin: 0; color: #666;">conceptos</p>
+        </div>
+        <div style="background-color: white; padding: 1rem; border-radius: 5px;">
+          <h4 style="margin: 0;">⏱️ Tiempo</h4>
+          <p style="font-size: 2rem; margin: 0.5rem 0;" id="resumenTiempoTotal">0m 0s</p>
+          <p style="margin: 0; color: #666;">total</p>
+        </div>
+        <div style="background-color: white; padding: 1rem; border-radius: 5px;">
+          <h4 style="margin: 0; color: #28a745;">✅ Fáciles</h4>
+          <p style="font-size: 2rem; margin: 0.5rem 0; color: #28a745;" id="resumenConceptosFaciles">0</p>
+          <p style="margin: 0; color: #666;">dominados</p>
+        </div>
+        <div style="background-color: white; padding: 1rem; border-radius: 5px;">
+          <h4 style="margin: 0; color: #dc3545;">📖 Repasar</h4>
+          <p style="font-size: 2rem; margin: 0.5rem 0; color: #dc3545;" id="resumenConceptosDificiles">0</p>
+          <p style="margin: 0; color: #666;">necesitan repaso</p>
+        </div>
+      </div>
+      
+      <button onclick="volverAControles()" style="background-color: #007bff; color: white; padding: 0.5rem 2rem; margin-top: 1rem;">
+        Volver al inicio
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Sección Test -->
+<div id="test" class="section">
+  <h2>Gestión de Test</h2>
+  
+  <!-- Configuración del test -->
+  <div id="configuracionTest">
+    <h3>Configurar Test</h3>
+    
+    <label>Selecciona una oposición:</label>
+    <select id="selectOposicionTest" onchange="cargarTemasParaTest()">
+      <option value="">-- Selecciona una oposición --</option>
+    </select>
+    
+    <div id="contenedorTemasTest"></div>
+    
+    <label>Número de preguntas:</label>
+    <input type="number" id="numPreguntasTest" min="5" max="125" value="20" />
+    
+    <label>Modo de test:</label>
+<div class="radio-group">
+  <input type="radio" id="modoPractica" name="modoTest" value="practica" checked />
+  <label for="modoPractica">Práctica (ver respuestas al momento)</label>
+</div>
+<div class="radio-group">
+  <input type="radio" id="modoExamen" name="modoTest" value="examen" />
+  <label for="modoExamen">Examen (ver respuestas al final)</label>
+</div>
+
+<h4>Opciones adicionales:</h4>
+<div class="checkbox-group">
+  <input type="checkbox" id="checkSoloFalladas" />
+  <label for="checkSoloFalladas">Solo preguntas falladas anteriormente</label>
+</div>
+<div class="checkbox-group">
+  <input type="checkbox" id="checkExcluirDominadas" />
+  <label for="checkExcluirDominadas">Excluir preguntas dominadas (5 aciertos seguidos)</label>
+</div>
+<div class="checkbox-group">
+  <input type="checkbox" id="checkSoloDominadas" />
+  <label for="checkSoloDominadas">Solo preguntas dominadas (para repasar)</label>
+</div>
+    
+    <button onclick="configurarTest()" style="margin-top: 20px;">Comenzar Test</button>
+  </div>
+  
+  <!-- Loading -->
+  <div id="loadingTest" style="display: none; text-align: center; padding: 50px;">
+    <p>Cargando...</p>
+  </div>
+  
+  <!-- Ejecutando test -->
+  <div id="ejecutandoTest" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="contadorPreguntas">Pregunta 1 de 20</span>
+      <span class="timer-test" id="tiempoTest">00:00</span>
+    </div>
+    
+    <div id="contenidoPregunta"></div>
+    
+    <div style="margin-top: 20px;">
+      <button id="btnAnterior" onclick="preguntaAnterior()">Anterior</button>
+      <button id="btnSiguiente" onclick="preguntaSiguiente()">Siguiente</button>
+    </div>
+  </div>
+  
+  <!-- Resultados -->
+  <div id="resultadosTest" style="display: none;">
+    <h3>Resultados del Test</h3>
+    
+    <div style="text-align: center; margin: 20px 0;">
+      <div style="font-size: 48px; font-weight: bold; color: #2196f3;">
+        <span id="resultadoPorcentaje">0%</span>
+      </div>
+    </div>
+    
+    <table style="margin: 0 auto;">
+      <tr>
+        <td style="padding: 10px;">Respuestas correctas:</td>
+        <td style="padding: 10px; font-weight: bold; color: #4caf50;" id="resultadoCorrectas">0</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px;">Respuestas incorrectas:</td>
+        <td style="padding: 10px; font-weight: bold; color: #f44336;" id="resultadoIncorrectas">0</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px;">Tiempo empleado:</td>
+        <td style="padding: 10px; font-weight: bold;" id="resultadoTiempo">0m 0s</td>
+      </tr>
+    </table>
+    
+    <div style="text-align: center; margin-top: 30px;">
+      <button onclick="volverConfiguracion()">Nuevo Test</button>
+    </div>
+  </div>
+</div>
+
+    <!-- Sección Conceptos -->
+    <div id="conceptos" class="section">
+      <h2>Gestión de Conceptos</h2>
+
+      <!-- Formulario de Concepto -->
+      <input type="hidden" id="conceptoIdEditando" />
+      <h3 id="formularioConceptoTitulo">Insertar Concepto</h3>
+
+      <label>Nombre del concepto*:</label>
+      <input type="text" id="conceptoNombre" required />
+
+      <label>Tipo de concepto*:</label>
+      <select id="comboTiposConcepto"></select>
+
+      <label>Importancia:</label>
+      <select id="conceptoImportancia"></select>
+
+      <label>Descripción:</label>
+      <textarea id="conceptoDescripcion" rows="3" style="width: 100%;"></textarea>
+
+      <label>Pista:</label>
+      <textarea id="conceptoPista" rows="2" style="width: 100%;"></textarea>
+
+      <label>Técnica:</label>
+      <textarea id="conceptoTecnica" rows="2" style="width: 100%;"></textarea>
+
+      <label>Asociar a tema:</label>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <select id="comboTemasConcepto"></select>
+        <button type="button" onclick="agregarTemaAlConcepto()">➕ Añadir</button>
+      </div>
+      <ul id="listaTemasAsociados"></ul>
+
+      <label><input type="checkbox" id="conceptoRevisar" checked /> Revisar</label>
+
+      <button id="btnGuardarConcepto" onclick="guardarConcepto()">Insertar</button>
+      <button id="btnCancelarEdicionConcepto" onclick="cancelarEdicionConcepto()" style="display: none;">Cancelar</button>
+
+      <hr>
+
+      <!-- Filtro por tema -->
+      <label>Filtrar por tema:</label>
+      <select id="comboFiltroTemasConcepto" onchange="filtrarConceptosPorTema()">
+        <option value="">— Mostrar todos —</option>
+      </select>
+
+      <label><input type="checkbox" id="checkIncluirSubtemas" checked /> Incluir subtemas</label>
+
+      <!-- Tabla de Conceptos -->
+      <div id="tablaConceptos"></div>
+    </div>
+
+    <!-- Sección Repasos -->
+    <div id="repasos" class="section">
+      <h2>Gestión de Repasos</h2>
+      <p>Contenido en desarrollo...</p>
+    </div>
+  </div>
 </body>
 </html>
