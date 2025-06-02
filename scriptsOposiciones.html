@@ -362,6 +362,84 @@ function desvincularTemaDeOposicion(idTema, nombreTema, idOposicion, nombreOposi
         alert("idoposicion: "+idOposicion + " y el idtema: "+ idTema)
   }
 
+// Función para mostrar temas vinculados a una oposición
+function mostrarTemasVinculados(idOposicion) {
+  console.log('Mostrando temas para oposición:', idOposicion);
+  
+  // Crear o limpiar el contenedor
+  let contenedor = document.getElementById('temasVinculadosModal');
+  if (!contenedor) {
+    // Crear modal si no existe
+    contenedor = document.createElement('div');
+    contenedor.id = 'temasVinculadosModal';
+    contenedor.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; max-height: 80vh; overflow-y: auto; z-index: 1000;';
+    document.body.appendChild(contenedor);
+    
+    // Crear fondo oscuro
+    const backdrop = document.createElement('div');
+    backdrop.id = 'modalBackdrop';
+    backdrop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;';
+    backdrop.onclick = function() {
+      contenedor.style.display = 'none';
+      backdrop.style.display = 'none';
+    };
+    document.body.appendChild(backdrop);
+  }
+  
+  // Mostrar modal
+  contenedor.style.display = 'block';
+  document.getElementById('modalBackdrop').style.display = 'block';
+  
+  // Mostrar loading
+  contenedor.innerHTML = '<h3>Temas vinculados</h3><p>Cargando...</p>';
+  
+  google.script.run
+    .withSuccessHandler(function(temasVinculados) {
+      let html = '<h3>Temas vinculados</h3>';
+      html += '<button onclick="cerrarModalTemas()" style="float: right;">Cerrar</button>';
+      html += '<div style="clear: both;"></div>';
+      
+      if (!temasVinculados || temasVinculados.length === 0) {
+        html += '<p>No hay temas vinculados a esta oposición.</p>';
+      } else {
+        html += '<div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-top: 10px;">';
+        
+        function mostrarTema(tema, nivel = 0) {
+          const margen = nivel * 20;
+          html += '<div style="margin-left: ' + margen + 'px; padding: 5px 0;">';
+          html += '<strong>' + (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre + '</strong>';
+          html += '</div>';
+          
+          if (tema.hijos && tema.hijos.length > 0) {
+            tema.hijos.forEach(function(hijo) {
+              mostrarTema(hijo, nivel + 1);
+            });
+          }
+        }
+        
+        temasVinculados.forEach(function(tema) {
+          mostrarTema(tema);
+        });
+        
+        html += '</div>';
+      }
+      
+      contenedor.innerHTML = html;
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error:', error);
+      contenedor.innerHTML = '<h3>Error</h3><p>No se pudieron cargar los temas vinculados.</p><button onclick="cerrarModalTemas()">Cerrar</button>';
+    })
+    .getTemasVinculadosEnArbolOrdenados(idOposicion);
+}
+
+// Función para cerrar el modal
+function cerrarModalTemas() {
+  const modal = document.getElementById('temasVinculadosModal');
+  const backdrop = document.getElementById('modalBackdrop');
+  if (modal) modal.style.display = 'none';
+  if (backdrop) backdrop.style.display = 'none';
+}
 
   // Inicialización
   listarOposiciones();
