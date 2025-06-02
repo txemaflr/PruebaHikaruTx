@@ -1,3 +1,8 @@
+function inicializarHojasEstudio() {
+  crearHojasEstudio();
+  console.log('Hojas creadas correctamente');
+}
+
 function doGet() {
   return HtmlService.createTemplateFromFile('index').evaluate()
     .setTitle("Gestión de Temario")
@@ -177,6 +182,37 @@ function getEstadisticasGenerales() {
   return getEstadisticasGenerales(); // Función definida en estudio.gs
 }
 
+function crearHojasEstudio() {
+  return crearHojasEstudio(); // Función definida en estudio.gs
+}
+
+// FUNCIONES PARA TESTS - Añadir al final de Código.gs
+
+// Tests - Generar test
+function generarTest(idOposicion, idsTemas, numPreguntas, modo, opciones) {
+  return generarTest(idOposicion, idsTemas, numPreguntas, modo, opciones); // Función definida en tests.gs
+}
+
+// Tests - Guardar respuesta
+function guardarRespuestaTest(idHistorial, idPregunta, respuestaUsuario, indexPregunta) {
+  return guardarRespuestaTest(idHistorial, idPregunta, respuestaUsuario, indexPregunta); // Función definida en tests.gs
+}
+
+// Tests - Finalizar test
+function finalizarTest(idHistorial, tiempoInicio) {
+  return finalizarTest(idHistorial, tiempoInicio); // Función definida en tests.gs
+}
+
+// Tests - Importar preguntas
+function importarPreguntasDesdeSheet(urlSheet) {
+  return importarPreguntasDesdeSheet(urlSheet); // Función definida en tests.gs
+}
+
+// Tests - Buscar archivos en carpeta
+function buscarArchivosTestEnCarpeta(nombreCarpeta) {
+  return buscarArchivosTestEnCarpeta(nombreCarpeta); // Función definida en tests.gs
+}
+
 // FUNCIONES CON CACHÉ PARA MEJORAR RENDIMIENTO
 function getOposicionesOrdenadas() {
   return withCache('oposiciones_ordenadas', () => {
@@ -212,3 +248,4 @@ function invalidarCacheTemas() {
 function invalidarCacheConceptos() {
   invalidateCache(['conceptos', 'tipos_concepto']);
 }
+
