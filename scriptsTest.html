@@ -1,0 +1,636 @@
+<!-- scriptsTest.html -->
+<script>
+// Variables globales para el test
+let testActual = null;
+let preguntaActual = 0;
+let respuestasUsuario = [];
+let tiempoInicio = null;
+let timerInterval = null;
+
+// Cargar datos iniciales para tests
+function cargarDatosTest() {
+  console.log('cargarDatosTest ejecutándose...');
+  alert('Función cargarDatosTest llamada'); // Temporal para debug
+  cargarOposicionesParaTest();
+}
+
+// Cargar oposiciones en el select
+function cargarOposicionesParaTest() {
+  console.log('cargarOposicionesParaTest: Dentro');
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      console.log('Oposiciones recibidas:', oposiciones);
+      const select = document.getElementById('selectOposicionTest');
+      
+      // Limpiar select
+      while (select.options.length > 0) {
+        select.remove(0);
+      }
+      
+      // Opción por defecto
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.text = '-- Selecciona una oposición --';
+      select.add(defaultOption);
+      
+      // Añadir oposiciones
+      oposiciones.forEach(function(op) {
+        const option = document.createElement('option');
+        option.value = op.id;
+        option.text = op.nombre;
+        select.add(option);
+      });
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error:', error);
+      alert('Error al cargar oposiciones');
+    })
+    .getOposicionesOrdenadas(); // Cambiar a getOposicionesOrdenadas como en tus otros archivos
+}
+
+// Cargar temas cuando se selecciona una oposición
+function cargarTemasParaTest() {
+  const idOposicion = document.getElementById('selectOposicionTest').value;
+  if (!idOposicion) {
+    document.getElementById('contenedorTemasTest').innerHTML = '';
+    return;
+  }
+  
+  google.script.run
+    .withSuccessHandler(function(temas) {
+      mostrarArbolTemasTest(temas);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar temas:', error);
+    })
+    .getTemasVinculadosEnArbolOrdenados(idOposicion);
+}
+
+// Mostrar árbol de temas con checkboxes
+function mostrarArbolTemasTest(temas) {
+  const contenedor = document.getElementById('contenedorTemasTest');
+  contenedor.innerHTML = '<h4 style="margin-top: 15px;">Selecciona los temas:</h4>';
+  
+  const divTemas = document.createElement('div');
+  divTemas.className = 'lista-temas-test';
+  
+  function crearNodoTema(tema, nivel = 0) {
+    const div = document.createElement('div');
+    div.className = 'tema-checkbox';
+    div.style.marginLeft = (nivel * 20) + 'px';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = tema.id;
+    checkbox.id = 'tema_' + tema.id;
+    checkbox.className = 'checkbox-tema';
+    
+    const label = document.createElement('label');
+    label.htmlFor = 'tema_' + tema.id;
+    label.textContent = (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre;
+    
+    div.appendChild(checkbox);
+    div.appendChild(label);
+    
+    divTemas.appendChild(div);
+    
+    // Procesar hijos
+    if (tema.hijos && tema.hijos.length > 0) {
+      tema.hijos.forEach(hijo => crearNodoTema(hijo, nivel + 1));
+    }
+  }
+  
+  temas.forEach(tema => crearNodoTema(tema));
+  contenedor.appendChild(divTemas);
+  
+  // Botón seleccionar todos
+  const btnTodos = document.createElement('button');
+  btnTodos.textContent = 'Seleccionar todos';
+  btnTodos.className = 'btn-secundario';
+  btnTodos.onclick = function() {
+    document.querySelectorAll('.checkbox-tema').forEach(cb => cb.checked = true);
+  };
+  contenedor.appendChild(btnTodos);
+}
+
+// Configurar y generar test
+function configurarTest() {
+  const idOposicion = document.getElementById('selectOposicionTest').value;
+  const numPreguntas = parseInt(document.getElementById('numPreguntasTest').value);
+  const modo = document.querySelector('input[name="modoTest"]:checked').value;
+  
+  // Obtener temas seleccionados
+  const temasSeleccionados = [];
+  document.querySelectorAll('.checkbox-tema:checked').forEach(cb => {
+    temasSeleccionados.push(parseInt(cb.value));
+  });
+  
+  // Validaciones
+  if (!idOposicion) {
+    alert('Selecciona una oposición');
+    return;
+  }
+  
+  if (temasSeleccionados.length === 0) {
+    alert('Selecciona al menos un tema');
+    return;
+  }
+  
+  if (numPreguntas < 5 || numPreguntas > 125) {
+    alert('El número de preguntas debe estar entre 5 y 125');
+    return;
+  }
+  
+  // Opciones adicionales
+  const opciones = {
+    soloFalladas: document.getElementById('checkSoloFalladas').checked,
+    incluirDominadas: !document.getElementById('checkExcluirDominadas').checked,
+    soloDominadas: document.getElementById('checkSoloDominadas').checked
+  };
+  
+  // Mostrar loading
+  document.getElementById('configuracionTest').style.display = 'none';
+  document.getElementById('loadingTest').style.display = 'block';
+  
+  // Generar test
+  google.script.run
+    .withSuccessHandler(function(test) {
+      testActual = test;
+      preguntaActual = 0;
+      respuestasUsuario = [];
+      tiempoInicio = test.tiempoInicio;
+      
+      document.getElementById('loadingTest').style.display = 'none';
+      document.getElementById('ejecutandoTest').style.display = 'block';
+      
+      // Iniciar timer
+      iniciarTimer();
+      
+      // Mostrar primera pregunta
+      mostrarPregunta();
+    })
+    .withFailureHandler(function(error) {
+      alert('Error al generar test: ' + error.message);
+      document.getElementById('loadingTest').style.display = 'none';
+      document.getElementById('configuracionTest').style.display = 'block';
+    })
+    .generarTest(idOposicion, temasSeleccionados, numPreguntas, modo, opciones);
+}
+
+// Mostrar pregunta actual
+function mostrarPregunta() {
+  if (preguntaActual >= testActual.preguntas.length) {
+    finalizarTest();
+    return;
+  }
+  
+  const pregunta = testActual.preguntas[preguntaActual];
+  const contenedor = document.getElementById('contenidoPregunta');
+  
+  // Contador de preguntas
+  document.getElementById('contadorPreguntas').textContent = 
+    `Pregunta ${preguntaActual + 1} de ${testActual.preguntas.length}`;
+  
+  // Título de la pregunta
+  contenedor.innerHTML = `
+    <h3>${pregunta.titulo}</h3>
+    ${pregunta.descripcion ? `<p>${pregunta.descripcion}</p>` : ''}
+    <div id="opcionesPregunta" class="opciones-test">
+      <div class="opcion-test" onclick="seleccionarOpcion('A')">
+        <span class="letra-opcion">A</span>
+        <span>${pregunta.opcion_a}</span>
+      </div>
+      <div class="opcion-test" onclick="seleccionarOpcion('B')">
+        <span class="letra-opcion">B</span>
+        <span>${pregunta.opcion_b}</span>
+      </div>
+      <div class="opcion-test" onclick="seleccionarOpcion('C')">
+        <span class="letra-opcion">C</span>
+        <span>${pregunta.opcion_c}</span>
+      </div>
+      <div class="opcion-test" onclick="seleccionarOpcion('D')">
+        <span class="letra-opcion">D</span>
+        <span>${pregunta.opcion_d}</span>
+      </div>
+    </div>
+  `;
+  
+  // Botones de navegación
+  document.getElementById('btnAnterior').disabled = preguntaActual === 0;
+  document.getElementById('btnSiguiente').textContent = 
+    preguntaActual === testActual.preguntas.length - 1 ? 'Finalizar' : 'Siguiente';
+  
+  // Mostrar respuesta seleccionada si ya respondió
+  if (respuestasUsuario[preguntaActual]) {
+    marcarOpcionSeleccionada(respuestasUsuario[preguntaActual]);
+  }
+  
+  // En modo práctica, mostrar si es correcta
+  if (testActual.modo === 'practica' && respuestasUsuario[preguntaActual]) {
+    mostrarResultadoPregunta();
+  }
+}
+
+// Seleccionar opción
+function seleccionarOpcion(opcion) {
+  // Limpiar selección anterior
+  document.querySelectorAll('.opcion-test').forEach(div => {
+    div.classList.remove('seleccionada');
+  });
+  
+  // Marcar nueva selección
+  marcarOpcionSeleccionada(opcion);
+  
+  // Guardar respuesta
+  const pregunta = testActual.preguntas[preguntaActual];
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      respuestasUsuario[preguntaActual] = {
+        opcion: opcion,
+        esCorrecta: resultado.esCorrecta,
+        respuestaCorrecta: resultado.respuestaCorrecta
+      };
+      
+      // En modo práctica, mostrar resultado inmediatamente
+      if (testActual.modo === 'practica') {
+        mostrarResultadoPregunta();
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al guardar respuesta:', error);
+    })
+    .guardarRespuestaTest(
+      testActual.idHistorial, 
+      pregunta.id, 
+      opcion, 
+      pregunta.index
+    );
+}
+
+// Marcar opción seleccionada
+function marcarOpcionSeleccionada(opcion) {
+  const opciones = document.querySelectorAll('.opcion-test');
+  const index = ['A', 'B', 'C', 'D'].indexOf(opcion);
+  if (index >= 0) {
+    opciones[index].classList.add('seleccionada');
+  }
+}
+
+// Mostrar resultado en modo práctica
+function mostrarResultadoPregunta() {
+  const respuesta = respuestasUsuario[preguntaActual];
+  const pregunta = testActual.preguntas[preguntaActual];
+  
+  document.querySelectorAll('.opcion-test').forEach((div, index) => {
+    const letra = ['A', 'B', 'C', 'D'][index];
+    
+    if (letra === respuesta.respuestaCorrecta) {
+      div.classList.add('correcta');
+    } else if (letra === respuesta.opcion && !respuesta.esCorrecta) {
+      div.classList.add('incorrecta');
+    }
+  });
+  
+  // Mostrar retroalimentación si existe
+  if (pregunta.retroalimentacion) {
+    const retroDiv = document.createElement('div');
+    retroDiv.className = 'retroalimentacion';
+    retroDiv.innerHTML = `<strong>Explicación:</strong> ${pregunta.retroalimentacion}`;
+    document.getElementById('contenidoPregunta').appendChild(retroDiv);
+  }
+}
+
+// Navegación
+function preguntaAnterior() {
+  if (preguntaActual > 0) {
+    preguntaActual--;
+    mostrarPregunta();
+  }
+}
+
+function preguntaSiguiente() {
+  if (preguntaActual < testActual.preguntas.length - 1) {
+    preguntaActual++;
+    mostrarPregunta();
+  } else {
+    finalizarTest();
+  }
+}
+
+// Timer
+function iniciarTimer() {
+  let segundos = 0;
+  timerInterval = setInterval(function() {
+    segundos++;
+    const minutos = Math.floor(segundos / 60);
+    const seg = segundos % 60;
+    document.getElementById('tiempoTest').textContent = 
+      `${String(minutos).padStart(2, '0')}:${String(seg).padStart(2, '0')}`;
+  }, 1000);
+}
+
+// Finalizar test
+function finalizarTest() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
+  
+  // Verificar preguntas sin responder
+  const sinResponder = testActual.preguntas.length - respuestasUsuario.filter(r => r).length;
+  if (sinResponder > 0 && !confirm(`Hay ${sinResponder} preguntas sin responder. ¿Deseas finalizar?`)) {
+    return;
+  }
+  
+  document.getElementById('ejecutandoTest').style.display = 'none';
+  document.getElementById('loadingTest').style.display = 'block';
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      mostrarResultados(resultado);
+    })
+    .withFailureHandler(function(error) {
+      alert('Error al finalizar test: ' + error.message);
+      document.getElementById('loadingTest').style.display = 'none';
+      document.getElementById('ejecutandoTest').style.display = 'block';
+    })
+    .finalizarTest(testActual.idHistorial, tiempoInicio);
+}
+
+// Mostrar resultados
+function mostrarResultados(resultado) {
+  document.getElementById('loadingTest').style.display = 'none';
+  document.getElementById('resultadosTest').style.display = 'block';
+  
+  document.getElementById('resultadoCorrectas').textContent = resultado.correctas;
+  document.getElementById('resultadoIncorrectas').textContent = resultado.incorrectas;
+  document.getElementById('resultadoPorcentaje').textContent = resultado.porcentaje + '%';
+  document.getElementById('resultadoTiempo').textContent = resultado.tiempoFormateado;
+  
+  // Mostrar detalles si es modo examen
+  if (testActual.modo === 'examen') {
+    mostrarDetallesResultados();
+  }
+}
+
+// Volver a configuración
+function volverConfiguracion() {
+  document.getElementById('resultadosTest').style.display = 'none';
+  document.getElementById('configuracionTest').style.display = 'block';
+  testActual = null;
+  preguntaActual = 0;
+  respuestasUsuario = [];
+}
+</script>
+
+<style>
+/* Estilos mejorados para la sección de tests */
+#test {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+#configuracionTest {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#configuracionTest h3 {
+  color: #007bff;
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+#configuracionTest label {
+  display: block;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #333;
+}
+
+#configuracionTest select,
+#configuracionTest input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+#contenedorTemasTest {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.lista-temas-test {
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.tema-checkbox {
+  padding: 5px 0;
+}
+
+.tema-checkbox input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.tema-checkbox label {
+  font-weight: normal;
+  margin: 0;
+  cursor: pointer;
+}
+
+#configuracionTest input[type="radio"] {
+  margin-right: 8px;
+}
+
+#configuracionTest input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.btn-secundario {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.btn-secundario:hover {
+  background: #5a6268;
+}
+
+/* Estilos para el test en ejecución */
+#ejecutandoTest {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.opciones-test {
+  margin: 25px 0;
+}
+
+.opcion-test {
+  background: #f8f9fa;
+  border: 2px solid #dee2e6;
+  padding: 15px;
+  margin: 12px 0;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.opcion-test:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+  transform: translateX(5px);
+}
+
+.opcion-test.seleccionada {
+  background-color: #cfe2ff;
+  border-color: #6ea8fe;
+}
+
+.opcion-test.correcta {
+  background-color: #d1e7dd;
+  border-color: #75b798;
+}
+
+.opcion-test.incorrecta {
+  background-color: #f8d7da;
+  border-color: #f1aeb5;
+}
+
+.letra-opcion {
+  font-weight: bold;
+  margin-right: 15px;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background-color: #007bff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.retroalimentacion {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #fff3cd;
+  border: 1px solid #ffecb5;
+  border-radius: 6px;
+  color: #664d03;
+}
+
+.timer-test {
+  font-size: 28px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+#contadorPreguntas {
+  font-size: 18px;
+  color: #6c757d;
+}
+
+/* Estilos para resultados */
+#resultadosTest {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+#resultadosTest h3 {
+  color: #007bff;
+  margin-bottom: 30px;
+  font-size: 28px;
+}
+
+#resultadosTest table {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+/* Botones principales */
+#test button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 5px;
+}
+
+#test button:hover {
+  background: #0056b3;
+}
+
+#test button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Loading */
+#loadingTest {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Alineación de checkboxes y radio buttons */
+#configuracionTest input[type="radio"],
+#configuracionTest input[type="checkbox"] {
+  margin-right: 8px;
+  vertical-align: middle;
+  width: auto;
+}
+
+#configuracionTest input[type="radio"] + label,
+#configuracionTest input[type="checkbox"] + label {
+  display: inline;
+  font-weight: normal;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.radio-group,
+.checkbox-group {
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+}
+
+.radio-group input,
+.checkbox-group input {
+  width: auto !important;
+  margin: 0 8px 0 0;
+}
+
+.radio-group label,
+.checkbox-group label {
+  margin: 0;
+  font-weight: normal;
+}
+</style>
