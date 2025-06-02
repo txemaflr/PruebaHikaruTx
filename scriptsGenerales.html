@@ -29,11 +29,21 @@
           if (typeof listarTemas === 'function') listarTemas();
           break;
         case 'test':
+          console.log('Entrando a sección test');
+          if (typeof cargarDatosTest === 'function') {
+           console.log('Llamando a cargarDatosTest');
+           cargarDatosTest();
+           } else {
+             console.log('cargarDatosTest no está definida');
+           }
+          break;
         case 'conceptos':
           if (typeof cargarCombosEntidadConceptos === 'function') cargarCombosEntidadConceptos();
           if (typeof listarConceptos === 'function') listarConceptos();
           break;
         case 'estudio':
+          if (typeof cargarDatosEstudio === 'function') cargarDatosEstudio();
+          break;
         case 'repasos':
           // Puedes añadir lógica aquí más adelante
           break;
@@ -46,13 +56,16 @@
   // Al cargar la página
   window.onload = function () {
     showSection('oposiciones'); // Sección por defecto
-  };
+  // Precargar datos para todas las secciones
+
+};
 
   function cargarDatosGenerales() {
     if (typeof cargarCombosOposiciones === 'function') cargarCombosOposiciones();
     if (typeof cargarCombosBloques === 'function') cargarCombosBloques();
     if (typeof cargarCombosEntidadTemas === 'function') cargarCombosEntidadTemas();
     if (typeof cargarCombosEntidadConceptos === 'function') cargarCombosEntidadConceptos();
+    if (typeof cargarDatosTest === 'function') cargarDatosTest();
   }
 /*
         // Función para cargar contenido dinámico
