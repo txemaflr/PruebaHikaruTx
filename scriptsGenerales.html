@@ -29,13 +29,7 @@
           if (typeof listarTemas === 'function') listarTemas();
           break;
         case 'test':
-          console.log('Entrando a sección test');
-          if (typeof cargarDatosTest === 'function') {
-           console.log('Llamando a cargarDatosTest');
-           cargarDatosTest();
-           } else {
-             console.log('cargarDatosTest no está definida');
-           }
+          if (typeof inicializarSeccionTest === 'function') { inicializarSeccionTest(); }
           break;
         case 'conceptos':
           if (typeof cargarCombosEntidadConceptos === 'function') cargarCombosEntidadConceptos();
