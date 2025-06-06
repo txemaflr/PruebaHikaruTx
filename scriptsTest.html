@@ -1,25 +1,32 @@
 <script>
-// Funciones para la sección de Tests
+// Variables globales para test
+var temasDisponiblesTest = [];
+// Variables para el test activo globales
+var testActivo = null;
+var preguntaActual = 0;
+var respuestasTest = [];
 
-// Cargar datos iniciales para tests
-function cargarDatosTest() {
-  console.log('Cargando datos para test...');
+// Cargar oposiciones cuando se entra a la sección Test
+function inicializarSeccionTest() {
+  console.log('Inicializando sección Test...');
   cargarOposicionesParaTest();
 }
 
-// Cargar oposiciones en el select
+// Cargar combo de oposiciones
 function cargarOposicionesParaTest() {
   google.script.run
     .withSuccessHandler(function(oposiciones) {
-      const combo = document.getElementById('selectOposicionTest');
+      const combo = document.getElementById('comboOposicionTest');
       combo.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
       
       oposiciones.forEach(function(op) {
         const option = document.createElement('option');
         option.value = op.id;
-        option.text = op.nombre;
-        combo.add(option);
+        option.textContent = op.nombre;
+        combo.appendChild(option);
       });
+      
+      console.log('Oposiciones cargadas:', oposiciones.length);
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar oposiciones:', error);
@@ -29,106 +36,122 @@ function cargarOposicionesParaTest() {
 }
 
 // Cargar temas cuando se selecciona una oposición
-function cargarTemasParaTest() {
-  const idOposicion = document.getElementById('selectOposicionTest').value;
-  const contenedor = document.getElementById('contenedorTemasTest');
+function cargarTemasParaTestPorOposicion() {
+  const idOposicion = document.getElementById('comboOposicionTest').value;
+  const seccionTemas = document.getElementById('seccionTemasTest');
+  const arbolTemas = document.getElementById('arbolTemasTest');
   
   if (!idOposicion) {
-    contenedor.innerHTML = '';
-    contenedor.style.display = 'none';
+    seccionTemas.style.display = 'none';
     return;
   }
   
-  contenedor.style.display = 'block';
+  seccionTemas.style.display = 'block';
+  arbolTemas.innerHTML = '<p>Cargando temas...</p>';
   
   google.script.run
     .withSuccessHandler(function(temas) {
-      mostrarArbolTemasTest(temas);
+      temasDisponiblesTest = temas;
+      mostrarArbolTemasParaTest(temas);
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar temas:', error);
-      contenedor.innerHTML = '<p style="color: red;">Error al cargar temas</p>';
+      arbolTemas.innerHTML = '<p style="color: red;">Error al cargar temas</p>';
     })
     .getTemasVinculadosEnArbolOrdenados(idOposicion);
 }
 
 // Mostrar árbol de temas con checkboxes
-function mostrarArbolTemasTest(temas) {
-  const contenedor = document.getElementById('contenedorTemasTest');
-  contenedor.innerHTML = '<h4>Selecciona los temas:</h4>';
+function mostrarArbolTemasParaTest(temas) {
+  const contenedor = document.getElementById('arbolTemasTest');
+  let html = '';
   
-  const divTemas = document.createElement('div');
-  divTemas.className = 'lista-temas-test';
-  
-  function crearNodoTema(tema, nivel = 0) {
-    const div = document.createElement('div');
-    div.className = 'tema-checkbox';
-    div.style.marginLeft = (nivel * 20) + 'px';
-    div.style.padding = '3px 0';
+  function renderTema(tema, nivel) {
+    const margen = nivel * 20;
+    const nombreCompleto = (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre;
     
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.value = tema.id;
-    checkbox.id = 'tema_test_' + tema.id;
-    checkbox.className = 'checkbox-tema';
+    html += '<div style="margin-left: ' + margen + 'px; padding: 3px 0;">';
+    html += '<label style="cursor: pointer; display: block;">';
+    html += '<input type="checkbox" class="checkTemaTest" value="' + tema.id + '" ';
+    html += 'data-nivel="' + nivel + '" ';
+    html += 'onchange="manejarSeleccionTema(this, ' + tema.id + ')" ';
+    html += 'style="margin-right: 5px;">';
+    html += nombreCompleto;
+    html += '</label>';
+    html += '</div>';
     
-    const label = document.createElement('label');
-    label.htmlFor = 'tema_test_' + tema.id;
-    label.style.marginLeft = '5px';
-    label.style.fontWeight = 'normal';
-    label.textContent = (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre;
-    
-    div.appendChild(checkbox);
-    div.appendChild(label);
-    divTemas.appendChild(div);
-    
-    // Procesar hijos
     if (tema.hijos && tema.hijos.length > 0) {
-      tema.hijos.forEach(hijo => crearNodoTema(hijo, nivel + 1));
+      tema.hijos.forEach(function(hijo) {
+        renderTema(hijo, nivel + 1);
+      });
     }
   }
   
   if (temas && temas.length > 0) {
-    temas.forEach(tema => crearNodoTema(tema));
+    temas.forEach(function(tema) {
+      renderTema(tema, 0);
+    });
   } else {
-    divTemas.innerHTML = '<p>No hay temas vinculados a esta oposición</p>';
+    html = '<p>No hay temas vinculados a esta oposición</p>';
   }
   
-  contenedor.appendChild(divTemas);
-  
-  // Botón seleccionar todos
-  const btnContainer = document.createElement('div');
-  btnContainer.style.marginTop = '10px';
-  
-  const btnTodos = document.createElement('button');
-  btnTodos.textContent = 'Seleccionar todos';
-  btnTodos.type = 'button';
-  btnTodos.onclick = function() {
-    document.querySelectorAll('.checkbox-tema').forEach(cb => cb.checked = true);
-  };
-  
-  btnContainer.appendChild(btnTodos);
-  contenedor.appendChild(btnContainer);
+  contenedor.innerHTML = html;
 }
 
-// Variables globales para el test
-let testActual = null;
-let preguntaActual = 0;
-let respuestasUsuario = [];
-let tiempoInicio = null;
-let timerInterval = null;
-
-// Configurar y generar test
-function configurarTest() {
-  const idOposicion = document.getElementById('selectOposicionTest').value;
-  const numPreguntas = parseInt(document.getElementById('numPreguntasTest').value);
-  const modo = document.querySelector('input[name="modoTest"]:checked')?.value;
+// Manejar selección de temas (seleccionar hijos automáticamente)
+function manejarSeleccionTema(checkbox, idTema) {
+  const seleccionado = checkbox.checked;
   
-  // Obtener temas seleccionados
-  const temasSeleccionados = [];
-  document.querySelectorAll('.checkbox-tema:checked').forEach(cb => {
-    temasSeleccionados.push(parseInt(cb.value));
+  // Buscar el tema en la estructura
+  function buscarTema(temas, id) {
+    for (let tema of temas) {
+      if (tema.id === id) return tema;
+      if (tema.hijos) {
+        const encontrado = buscarTema(tema.hijos, id);
+        if (encontrado) return encontrado;
+      }
+    }
+    return null;
+  }
+  
+  const tema = buscarTema(temasDisponiblesTest, idTema);
+  
+  // Seleccionar/deseleccionar todos los hijos
+  if (tema && tema.hijos) {
+    function toggleHijos(hijos) {
+      hijos.forEach(function(hijo) {
+        const checkHijo = document.querySelector('input[value="' + hijo.id + '"]');
+        if (checkHijo) {
+          checkHijo.checked = seleccionado;
+        }
+        if (hijo.hijos) toggleHijos(hijo.hijos);
+      });
+    }
+    toggleHijos(tema.hijos);
+  }
+}
+
+// Seleccionar todos los temas
+function seleccionarTodosLosTemas() {
+  document.querySelectorAll('.checkTemaTest').forEach(function(check) {
+    check.checked = true;
   });
+}
+
+// Deseleccionar todos los temas
+function deseleccionarTodosLosTemas() {
+  document.querySelectorAll('.checkTemaTest').forEach(function(check) {
+    check.checked = false;
+  });
+}
+
+// Preparar el test (corregir esta función)
+function prepararTest() {
+  // Obtener valores ANTES de usarlos
+  const idOposicion = document.getElementById('comboOposicionTest').value;
+  const numPreguntas = parseInt(document.getElementById('numeroPreguntasTest').value);
+  const modoRadio = document.querySelector('input[name="modoTest"]:checked');
+  const modo = modoRadio ? modoRadio.value : 'practica';
   
   // Validaciones
   if (!idOposicion) {
@@ -136,96 +159,658 @@ function configurarTest() {
     return;
   }
   
+  const temasSeleccionados = [];
+  document.querySelectorAll('.checkTemaTest:checked').forEach(function(check) {
+    temasSeleccionados.push(parseInt(check.value));
+  });
+  
   if (temasSeleccionados.length === 0) {
     alert('Selecciona al menos un tema');
     return;
   }
   
-  if (!numPreguntas || numPreguntas < 5 || numPreguntas > 125) {
+  if (isNaN(numPreguntas) || numPreguntas < 5 || numPreguntas > 125) {
     alert('El número de preguntas debe estar entre 5 y 125');
     return;
   }
   
-  if (!modo) {
-    alert('Selecciona un modo de test');
+  const opciones = {
+    soloFalladas: document.getElementById('checkSoloFalladas').checked,
+    excluirDominadas: document.getElementById('checkExcluirDominadas').checked,
+    soloDominadas: document.getElementById('checkMostrarDominadas').checked
+  };
+  
+  console.log('Configuración del test:', {
+    oposicion: idOposicion,
+    temas: temasSeleccionados,
+    preguntas: numPreguntas,
+    modo: modo,
+    opciones: opciones
+  });
+  
+  // Ocultar panel de configuración
+  document.getElementById('panelConfiguracionTest').style.display = 'none';
+  //document.querySelector('.contenedor-administracion')?.style.display = 'none'; // Ocultar columna derecha
+  const panelAdmin = document.querySelector('div[style*="width: 350px"]');
+  if (panelAdmin) panelAdmin.style.display = 'none';
+  
+  // Mostrar loading
+  document.getElementById('panelEjecucionTest').innerHTML = '<p style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin"></i> Generando test...</p>';
+  document.getElementById('panelEjecucionTest').style.display = 'block';
+  
+  // Llamar al backend para generar el test
+  google.script.run
+    .withSuccessHandler(function(test) {
+      console.log('Test generado:', test);
+      testActivo = test;
+      preguntaActual = 0;
+      respuestasTest = [];
+      mostrarPregunta();
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al generar test:', error);
+      alert('Error al generar test: ' + error.message);
+      volverAConfiguracion();
+    })
+    .generarTest(idOposicion, temasSeleccionados, numPreguntas, modo, opciones);
+}
+
+// Mostrar una pregunta (ACTUALIZADA)
+function mostrarPregunta() {
+  if (!testActivo || preguntaActual >= testActivo.preguntas.length) {
+    finalizarTest();
     return;
   }
   
-  // Opciones adicionales
-  const opciones = {
-    soloFalladas: document.getElementById('checkSoloFalladas').checked,
-    incluirDominadas: !document.getElementById('checkExcluirDominadas').checked,
-    soloDominadas: document.getElementById('checkSoloDominadas').checked
-  };
+  const pregunta = testActivo.preguntas[preguntaActual];
+  const totalPreguntas = testActivo.preguntas.length;
+  const yaRespondida = respuestasTest[preguntaActual] !== undefined;
   
-  console.log('Generando test con:', {
-    idOposicion,
-    temasSeleccionados,
-    numPreguntas,
-    modo,
-    opciones
+  let html = '<div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+  
+  // Progreso
+  html += '<div style="margin-bottom: 20px;">';
+  html += '<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">';
+  html += '<span>Pregunta ' + (preguntaActual + 1) + ' de ' + totalPreguntas + '</span>';
+  html += '<span>Modo: ' + testActivo.modo + '</span>';
+  html += '</div>';
+  html += '<div style="background: #e0e0e0; height: 10px; border-radius: 5px;">';
+  html += '<div style="background: #007bff; height: 100%; width: ' + ((preguntaActual + 1) / totalPreguntas * 100) + '%; border-radius: 5px;"></div>';
+  html += '</div>';
+  html += '</div>';
+  
+  // Pregunta
+  html += '<h3>' + pregunta.titulo + '</h3>';
+  if (pregunta.descripcion) {
+    html += '<p>' + pregunta.descripcion + '</p>';
+  }
+  
+  // Opciones
+  html += '<div style="margin: 20px 0;" id="contenedorOpciones">';
+  ['A', 'B', 'C', 'D'].forEach(function(letra, index) {
+    const opcion = pregunta['opcion_' + letra.toLowerCase()];
+    html += '<div style="margin: 10px 0; padding: 15px; border: 2px solid #ddd; border-radius: 5px; cursor: pointer;" ';
+    html += 'id="opcion' + letra + '" ';
+    html += 'onclick="seleccionarRespuesta(\'' + letra + '\')" ';
+    html += 'ondblclick="deseleccionarRespuesta()">';
+    html += '<strong>' + letra + '.</strong> ' + opcion;
+    html += '</div>';
+  });
+  html += '</div>';
+  
+  // Área de retroalimentación (oculta inicialmente)
+  html += '<div id="areaRetroalimentacion" style="display: none;"></div>';
+  
+  // Botones navegación
+  html += '<div style="display: flex; justify-content: space-between; margin-top: 20px;">';
+  html += '<button onclick="preguntaAnterior()" ' + (preguntaActual === 0 ? 'disabled' : '') + '>Anterior</button>';
+  
+  if (testActivo.modo === 'practica') {
+    html += '<button id="btnCorregir" onclick="corregirPregunta()" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px;">Corregir</button>';
+  }
+  
+  html += '<button id="btnSiguiente" onclick="siguientePregunta()">';
+  html += (preguntaActual === totalPreguntas - 1) ? 'Finalizar' : 'Siguiente';
+  html += '</button>';
+  html += '</div>';
+  
+  html += '</div>';
+  
+  document.getElementById('panelEjecucionTest').innerHTML = html;
+  
+  // Si ya había respondido, mostrar la respuesta seleccionada
+  if (yaRespondida && respuestasTest[preguntaActual].letra) {
+    seleccionarRespuesta(respuestasTest[preguntaActual].letra, false);
+    if (testActivo.modo === 'practica' && respuestasTest[preguntaActual].corregida) {
+      mostrarCorreccion();
+    }
+  }
+}
+
+// Función para corregir en modo práctica (CORREGIDA)
+function corregirPregunta() {
+  if (!respuestasTest[preguntaActual] || !respuestasTest[preguntaActual].letra) {
+    alert('Selecciona una respuesta primero');
+    return;
+  }
+  
+  // Si ya está corregida, no hacer nada
+  if (respuestasTest[preguntaActual].corregida) {
+    return;
+  }
+  
+  const pregunta = testActivo.preguntas[preguntaActual];
+  const respuestaUsuario = respuestasTest[preguntaActual].letra;
+  
+  // Deshabilitar botón mientras se procesa
+  const btnCorregir = document.getElementById('btnCorregir');
+  if (btnCorregir) {
+    btnCorregir.disabled = true;
+    btnCorregir.textContent = 'Corrigiendo...';
+  }
+  
+  // Guardar respuesta en el servidor
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      respuestasTest[preguntaActual].esCorrecta = resultado.esCorrecta;
+      respuestasTest[preguntaActual].corregida = true;
+      mostrarCorreccion();
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al guardar respuesta:', error);
+      if (btnCorregir) {
+        btnCorregir.disabled = false;
+        btnCorregir.textContent = 'Corregir';
+      }
+    })
+    .guardarRespuestaTest(
+      testActivo.idHistorial, 
+      pregunta.id, 
+      respuestaUsuario, 
+      pregunta.index
+    );
+}
+
+// Mostrar corrección (CORREGIDA)
+function mostrarCorreccion() {
+  const pregunta = testActivo.preguntas[preguntaActual];
+  const respuestaUsuario = respuestasTest[preguntaActual].letra;
+  const esCorrecta = respuestasTest[preguntaActual].esCorrecta;
+  
+  // Deshabilitar clicks en opciones
+  document.getElementById('contenedorOpciones').style.pointerEvents = 'none';
+  
+  // Marcar respuestas (limpiar antes los spans anteriores)
+  ['A', 'B', 'C', 'D'].forEach(function(letra) {
+    const elem = document.getElementById('opcion' + letra);
+    // Limpiar cualquier marca anterior
+    elem.innerHTML = elem.innerHTML.replace(/<span.*?<\/span>/g, '');
+    
+    if (letra === pregunta.respuesta_correcta) {
+      elem.style.background = '#e8f5e9';
+      elem.style.borderColor = '#4caf50';
+      elem.innerHTML += ' <span style="color: #4caf50; float: right;">✓ Correcta</span>';
+    } else if (letra === respuestaUsuario && !esCorrecta) {
+      elem.style.background = '#ffebee';
+      elem.style.borderColor = '#f44336';
+      elem.innerHTML += ' <span style="color: #f44336; float: right;">✗ Incorrecta</span>';
+    }
   });
   
-  // Por ahora solo mostrar alerta
-  alert('Función de test en desarrollo. Configuración recibida correctamente.');
+  // Mostrar retroalimentación (limpiar antes)
+  const areaRetro = document.getElementById('areaRetroalimentacion');
+  areaRetro.innerHTML = ''; // Limpiar contenido anterior
+  
+  if (pregunta.retroalimentacion) {
+    areaRetro.style.display = 'block';
+    areaRetro.innerHTML = '<div style="margin-top: 15px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">' +
+                         '<strong>Explicación:</strong> ' + pregunta.retroalimentacion +
+                         '</div>';
+  }
+  
+  // Ocultar botón corregir
+  const btnCorregir = document.getElementById('btnCorregir');
+  if (btnCorregir) btnCorregir.style.display = 'none';
 }
+
+// Seleccionar respuesta (CORREGIDA)
+function seleccionarRespuesta(letra, guardar = true) {
+  // Si ya está corregida, no permitir cambios
+  if (respuestasTest[preguntaActual] && respuestasTest[preguntaActual].corregida) {
+    return;
+  }
+  
+  // Guardar respuesta localmente
+  if (guardar) {
+    respuestasTest[preguntaActual] = {
+      letra: letra,
+      corregida: false,
+      esCorrecta: null
+    };
+  }
+  
+  // Marcar visualmente
+  ['A', 'B', 'C', 'D'].forEach(function(l) {
+    const elem = document.getElementById('opcion' + l);
+    if (l === letra) {
+      elem.style.background = '#e3f2fd';
+      elem.style.borderColor = '#2196f3';
+    } else {
+      elem.style.background = 'white';
+      elem.style.borderColor = '#ddd';
+    }
+  });
+  
+  // NO guardar automáticamente en el servidor en modo práctica
+  // Eso se hará solo cuando se presione "Corregir"
+}
+
+// Seleccionar respuesta
+function seleccionarRespuesta(letra) {
+  // Guardar respuesta
+  respuestasTest[preguntaActual] = letra;
+  
+  // Marcar visualmente
+  ['A', 'B', 'C', 'D'].forEach(function(l) {
+    const elem = document.getElementById('opcion' + l);
+    if (l === letra) {
+      elem.style.background = '#e3f2fd';
+      elem.style.borderColor = '#2196f3';
+    } else {
+      elem.style.background = 'white';
+      elem.style.borderColor = '#ddd';
+    }
+  });
+  
+  // En modo práctica, mostrar si es correcta
+  if (testActivo.modo === 'practica') {
+    const pregunta = testActivo.preguntas[preguntaActual];
+    const esCorrecta = letra === pregunta.respuesta_correcta;
+    
+    // Guardar respuesta en el servidor
+    google.script.run
+      .withSuccessHandler(function(resultado) {
+        if (testActivo.modo === 'practica') {
+          mostrarResultadoPregunta(resultado);
+        }
+      })
+      .guardarRespuestaTest(
+        testActivo.idHistorial, 
+        pregunta.id, 
+        letra, 
+        pregunta.index
+      );
+  }
+}
+
+// Mostrar resultado en modo práctica
+function mostrarResultadoPregunta(resultado) {
+  const pregunta = testActivo.preguntas[preguntaActual];
+  
+  ['A', 'B', 'C', 'D'].forEach(function(letra) {
+    const elem = document.getElementById('opcion' + letra);
+    if (letra === pregunta.respuesta_correcta) {
+      elem.style.background = '#e8f5e9';
+      elem.style.borderColor = '#4caf50';
+    } else if (letra === respuestasTest[preguntaActual] && !resultado.esCorrecta) {
+      elem.style.background = '#ffebee';
+      elem.style.borderColor = '#f44336';
+    }
+  });
+  
+  // Mostrar retroalimentación si existe
+  if (pregunta.retroalimentacion) {
+    const div = document.createElement('div');
+    div.style.cssText = 'margin-top: 15px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;';
+    div.innerHTML = '<strong>Explicación:</strong> ' + pregunta.retroalimentacion;
+    document.getElementById('panelEjecucionTest').appendChild(div);
+  }
+}
+
+// Navegación
+function preguntaAnterior() {
+  if (preguntaActual > 0) {
+    preguntaActual--;
+    mostrarPregunta();
+  }
+}
+
+// Siguiente pregunta (ACTUALIZADA)
+function siguientePregunta() {
+  // En modo práctica, verificar si se ha corregido antes de avanzar
+  if (testActivo.modo === 'practica' && respuestasTest[preguntaActual] && 
+      respuestasTest[preguntaActual].letra && !respuestasTest[preguntaActual].corregida) {
+    if (confirm('No has corregido esta pregunta. ¿Deseas continuar sin corregir?')) {
+      preguntaActual++;
+      mostrarPregunta();
+    }
+  } else {
+    if (preguntaActual < testActivo.preguntas.length - 1) {
+      preguntaActual++;
+      mostrarPregunta();
+    } else {
+      finalizarTest();
+    }
+  }
+}
+
+// Finalizar test (ACTUALIZADA para modo examen)
+function finalizarTest() {
+  const sinResponder = testActivo.preguntas.filter((p, i) => !respuestasTest[i] || !respuestasTest[i].letra).length;
+  
+  if (sinResponder > 0) {
+    if (!confirm('Hay ' + sinResponder + ' preguntas sin responder. ¿Deseas finalizar de todos modos?')) {
+      return;
+    }
+  }
+  
+  document.getElementById('panelEjecucionTest').innerHTML = '<p style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin"></i> Procesando resultados...</p>';
+  
+  // Si es modo examen, guardar todas las respuestas
+  if (testActivo.modo === 'examen') {
+    let respuestasPendientes = 0;
+    let respuestasGuardadas = 0;
+    
+    testActivo.preguntas.forEach(function(pregunta, index) {
+      if (respuestasTest[index] && respuestasTest[index].letra) {
+        respuestasPendientes++;
+        
+        google.script.run
+          .withSuccessHandler(function(resultado) {
+            respuestasTest[index].esCorrecta = resultado.esCorrecta;
+            respuestasGuardadas++;
+            
+            // Cuando se procesen todas, finalizar
+            if (respuestasGuardadas === respuestasPendientes) {
+              finalizarTestReal();
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('Error al guardar respuesta:', error);
+            respuestasGuardadas++;
+            if (respuestasGuardadas === respuestasPendientes) {
+              finalizarTestReal();
+            }
+          })
+          .guardarRespuestaTest(
+            testActivo.idHistorial,
+            pregunta.id,
+            respuestasTest[index].letra,
+            pregunta.index
+          );
+      }
+    });
+    
+    // Si no hay respuestas, finalizar directamente
+    if (respuestasPendientes === 0) {
+      finalizarTestReal();
+    }
+  } else {
+    // Modo práctica
+    finalizarTestReal();
+  }
+}
+
+function finalizarTestReal() {
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      mostrarResultadosTest(resultado);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al finalizar test:', error);
+      alert('Error al finalizar test');
+    })
+    .finalizarTest(testActivo.idHistorial, testActivo.tiempoInicio);
+}
+
+// Deseleccionar respuesta (doble click)
+function deseleccionarRespuesta() {
+  if (respuestasTest[preguntaActual] && !respuestasTest[preguntaActual].corregida) {
+    respuestasTest[preguntaActual] = null;
+    
+    ['A', 'B', 'C', 'D'].forEach(function(letra) {
+      const elem = document.getElementById('opcion' + letra);
+      elem.style.background = 'white';
+      elem.style.borderColor = '#ddd';
+    });
+  }
+}
+
+// Mostrar resultados
+function mostrarResultadosTest(resultado) {
+  let html = '<div style="background: white; padding: 20px; border-radius: 8px;">';
+  
+  // Resumen
+  html += '<div style="text-align: center; margin-bottom: 30px;">';
+  html += '<h2>Resultados del Test</h2>';
+  html += '<div style="font-size: 48px; color: #007bff; margin: 20px 0;">' + resultado.porcentaje + '%</div>';
+  html += '<p>Respuestas correctas: ' + resultado.correctas + ' de ' + resultado.total + '</p>';
+  html += '<p>Tiempo: ' + resultado.tiempoFormateado + '</p>';
+  html += '</div>';
+  
+  // Si es modo examen, mostrar todas las preguntas con respuestas
+  if (testActivo.modo === 'examen') {
+    html += '<hr style="margin: 30px 0;">';
+    html += '<h3>Revisión de respuestas</h3>';
+    html += '<div style="max-height: 60vh; overflow-y: auto; padding: 10px; border: 1px solid #eee; border-radius: 5px;">';
+    
+    testActivo.preguntas.forEach(function(pregunta, index) {
+      const respuestaUsuario = respuestasTest[index] ? respuestasTest[index].letra : null;
+      const esCorrecta = respuestaUsuario === pregunta.respuesta_correcta;
+      
+      html += '<div style="margin-bottom: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">';
+      
+      // Número y título
+      html += '<h4 style="margin-bottom: 15px;">';
+      html += '<span style="color: ' + (esCorrecta ? '#4caf50' : '#f44336') + ';">';
+      html += (esCorrecta ? '✓' : '✗') + '</span> ';
+      html += 'Pregunta ' + (index + 1) + ': ' + pregunta.titulo;
+      html += '</h4>';
+      
+      // Opciones
+      ['A', 'B', 'C', 'D'].forEach(function(letra) {
+        const opcion = pregunta['opcion_' + letra.toLowerCase()];
+        let estilo = 'margin: 5px 0; padding: 10px; border-radius: 5px;';
+        
+        if (letra === pregunta.respuesta_correcta) {
+          estilo += ' background: #e8f5e9; border: 1px solid #4caf50;';
+        } else if (letra === respuestaUsuario && !esCorrecta) {
+          estilo += ' background: #ffebee; border: 1px solid #f44336;';
+        } else {
+          estilo += ' background: white; border: 1px solid #ddd;';
+        }
+        
+        html += '<div style="' + estilo + '">';
+        html += '<strong>' + letra + '.</strong> ' + opcion;
+        
+        if (letra === pregunta.respuesta_correcta) {
+          html += ' <span style="color: #4caf50; float: right;">✓ Correcta</span>';
+        } else if (letra === respuestaUsuario && !esCorrecta) {
+          html += ' <span style="color: #f44336; float: right;">Tu respuesta</span>';
+        }
+        
+        html += '</div>';
+      });
+      
+      // Retroalimentación
+      if (pregunta.retroalimentacion) {
+        html += '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">';
+        html += '<strong>Explicación:</strong> ' + pregunta.retroalimentacion;
+        html += '</div>';
+      }
+      
+      html += '</div>';
+    });
+    
+    html += '</div>';
+  }
+  
+  html += '<div style="text-align: center; margin-top: 20px;">';
+  html += '<button onclick="volverAConfiguracion()" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px;">Nuevo Test</button>';
+  html += '</div>';
+  
+  html += '</div>';
+  
+  document.getElementById('panelEjecucionTest').innerHTML = html;
+}
+
+// Volver a configuración
+function volverAConfiguracion() {
+  document.getElementById('panelConfiguracionTest').style.display = 'block';
+  //document.querySelector('.contenedor-administracion')?.style.display = 'block'; // Mostrar columna derecha
+  const panelAdmin = document.querySelector('div[style*="width: 350px"]');
+  if (panelAdmin) panelAdmin.style.display = 'none';
+  document.getElementById('panelEjecucionTest').style.display = 'none';
+  testActivo = null;
+  preguntaActual = 0;
+  respuestasTest = [];
+}
+// Panel de administración
+function togglePanelAdmin() {
+  const panel = document.getElementById('opcionesAdmin');
+  const texto = document.getElementById('toggleAdminText');
+  const icono = document.getElementById('toggleAdminIcon');
+  
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    texto.textContent = 'Ocultar opciones';
+    icono.className = 'fas fa-chevron-up';
+    // Cargar estadísticas al abrir
+    actualizarEstadisticasPreguntas();
+  } else {
+    panel.style.display = 'none';
+    texto.textContent = 'Mostrar opciones';
+    icono.className = 'fas fa-chevron-down';
+  }
+}
+
+// Importar preguntas desde URL
+function importarPreguntasDesdeURL() {
+  const url = document.getElementById('urlSheetImportar').value.trim();
+  
+  if (!url) {
+    alert('Por favor, introduce la URL del Google Sheet');
+    return;
+  }
+  
+  if (!url.includes('docs.google.com/spreadsheets')) {
+    alert('La URL no parece ser de un Google Sheet válido');
+    return;
+  }
+  
+  // Preguntar qué hojas importar
+  const importarTodas = confirm('¿Importar todas las hojas del documento?\n\nSí = Importar todas las hojas\nNo = Especificar nombres de hojas');
+  
+  let hojasAImportar = null;
+  if (!importarTodas) {
+    const nombresHojas = prompt('Introduce los nombres de las hojas a importar, separados por comas:\n\nEjemplo: Hoja1, Hoja2, Hoja3');
+    if (!nombresHojas) return;
+    hojasAImportar = nombresHojas.split(',').map(h => h.trim());
+  }
+  
+  // Mostrar loading
+  const boton = event.target || document.querySelector('button[onclick*="importarPreguntasDesdeURL"]');
+  const textoOriginal = boton.innerHTML;
+  boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+  boton.disabled = true;
+  
+  // Llamar a función mejorada
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      alert(resultado);
+      document.getElementById('urlSheetImportar').value = '';
+      actualizarEstadisticasPreguntas();
+      boton.innerHTML = textoOriginal;
+      boton.disabled = false;
+    })
+    .withFailureHandler(function(error) {
+      alert('Error al importar: ' + error.message);
+      boton.innerHTML = textoOriginal;
+      boton.disabled = false;
+    })
+    .importarPreguntasDesdeSheetMejorado(url, hojasAImportar);
+}
+
+// Buscar archivos en carpeta
+function buscarArchivosEnCarpeta() {
+  const nombreCarpeta = document.getElementById('nombreCarpetaDrive').value.trim();
+  
+  if (!nombreCarpeta) {
+    alert('Por favor, introduce el nombre de la carpeta');
+    return;
+  }
+  
+  const contenedor = document.getElementById('listaArchivosEncontrados');
+  contenedor.innerHTML = '<p style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Buscando...</p>';
+  
+  google.script.run
+    .withSuccessHandler(function(archivos) {
+      if (archivos.length === 0) {
+        contenedor.innerHTML = '<p style="color: #666; font-size: 14px;">No se encontraron archivos en la carpeta</p>';
+        return;
+      }
+      
+      let html = '<p style="font-size: 14px; margin-bottom: 10px;">Se encontraron ' + archivos.length + ' archivos:</p>';
+      html += '<div style="border: 1px solid #ddd; border-radius: 5px; padding: 5px;">';
+      
+      archivos.forEach(function(archivo) {
+        html += '<div style="padding: 5px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">';
+        html += '<span style="font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">';
+        html += '<i class="fas fa-file-alt" style="color: #28a745; margin-right: 5px;"></i>';
+        html += archivo.nombre;
+        html += '</span>';
+        html += '<button onclick="importarArchivoSeleccionado(\'' + archivo.url + '\', \'' + archivo.nombre.replace(/'/g, "\\'") + '\')" ';
+        html += 'style="padding: 3px 8px; font-size: 11px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">';
+        html += '<i class="fas fa-download"></i>';
+        html += '</button>';
+        html += '</div>';
+      });
+      
+      html += '</div>';
+      contenedor.innerHTML = html;
+    })
+    .withFailureHandler(function(error) {
+      contenedor.innerHTML = '<p style="color: red; font-size: 14px;">Error: ' + error.message + '</p>';
+    })
+    .buscarArchivosTestEnCarpeta(nombreCarpeta);
+}
+
+// Importar archivo seleccionado
+function importarArchivoSeleccionado(url, nombre) {
+  if (confirm('¿Importar preguntas de "' + nombre + '"?')) {
+    const boton = event.target;
+    const textoOriginal = boton.innerHTML;
+    boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    boton.disabled = true;
+    
+    google.script.run
+      .withSuccessHandler(function(resultado) {
+        alert(resultado);
+        actualizarEstadisticasPreguntas();
+        boton.innerHTML = textoOriginal;
+        boton.disabled = false;
+      })
+      .withFailureHandler(function(error) {
+        alert('Error al importar: ' + error.message);
+        boton.innerHTML = textoOriginal;
+        boton.disabled = false;
+      })
+      .importarPreguntasDesdeSheet(url);
+  }
+}
+
+// Actualizar estadísticas
+function actualizarEstadisticasPreguntas() {
+  google.script.run
+    .withSuccessHandler(function(stats) {
+      document.getElementById('totalPreguntas').textContent = stats.totalPreguntas;
+      document.getElementById('temasConPreguntas').textContent = stats.temasConPreguntas;
+      document.getElementById('ultimaImportacion').textContent = stats.ultimaImportacion || 'Nunca';
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al obtener estadísticas:', error);
+    })
+    .obtenerEstadisticasPreguntas();
+}
+
 </script>
-
-<style>
-/* Estilos para la sección de tests */
-#contenedorTemasTest {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  padding: 15px;
-  margin: 15px 0;
-  display: none;
-}
-
-.lista-temas-test {
-  max-height: 250px;
-  overflow-y: auto;
-  margin-bottom: 10px;
-  padding: 10px;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 4px;
-}
-
-.tema-checkbox {
-  padding: 3px 0;
-}
-
-.tema-checkbox input[type="checkbox"] {
-  margin-right: 5px;
-}
-
-.tema-checkbox label {
-  cursor: pointer;
-  user-select: none;
-}
-
-.tema-checkbox label:hover {
-  color: #007bff;
-}
-
-/* Corregir alineación de radio buttons y checkboxes */
-input[type="radio"],
-input[type="checkbox"] {
-  margin: 0 5px 0 0;
-  vertical-align: middle;
-}
-
-input[type="radio"] + label,
-input[type="checkbox"] + label {
-  display: inline;
-  margin: 0;
-  vertical-align: middle;
-  font-weight: normal;
-}
-
-.radio-option,
-.checkbox-option {
-  margin: 8px 0;
-}
-</style>
