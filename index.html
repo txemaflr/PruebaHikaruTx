@@ -24,6 +24,25 @@
     th { background-color: #007bff; color: white; }
     input, select, button { margin-bottom: 0.5rem; padding: 0.4rem; }
     label { display: block; margin-top: 0.5rem; }
+
+    /* Estilos para la sección de test */
+    .contenedor-administracion {
+      width: 350px;
+      position: fixed;
+      right: 0;
+      top: 100px;
+      background: white;
+      border-left: 1px solid #ddd;
+      padding: 20px;
+      height: calc(100vh - 100px);
+      overflow-y: auto;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    }
+    
+    .test-main-content {
+      margin-right: 370px;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
@@ -271,146 +290,119 @@
 </div>
 
 <!-- Sección Test -->
-<div id="test" class="section">
-  <h2>Gestión de Test</h2>
-  
-  <!-- Contenedor principal con dos columnas -->
-  <div style="display: flex; gap: 20px;">
-    
-    <!-- Columna izquierda: Configuración del test -->
-    <div style="flex: 1;">
-      <div id="panelConfiguracionTest" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h3>Configurar Test</h3>
-        
-        <!-- Selección de oposición -->
-        <div style="margin-bottom: 15px;">
-          <label>Oposición:</label>
-          <select id="comboOposicionTest" onchange="cargarTemasParaTestPorOposicion()" style="width: 100%; padding: 5px;">
-            <option value="">-- Selecciona una oposición --</option>
-          </select>
+    <div id="test" class="section">
+      <div class="test-main-content">
+        <!-- Panel de configuración del test -->
+        <div id="panelConfiguracionTest">
+          <h2>Configuración del Test</h2>
+          
+          <!-- Selección de oposición -->
+          <div style="margin-bottom: 20px;">
+            <label>Selecciona una oposición:</label>
+            <select id="comboOposicionTest" onchange="cargarTemasParaTestPorOposicion()" style="width: 100%; padding: 8px;">
+              <option value="">-- Selecciona una oposición --</option>
+            </select>
+          </div>
+          
+          <!-- Selección de temas -->
+          <div id="seccionTemasTest" style="display: none; margin-bottom: 20px;">
+            <label>Selecciona los temas:</label>
+            <div style="margin: 10px 0;">
+              <button onclick="seleccionarTodosLosTemas()" style="margin-right: 10px;">Seleccionar todos</button>
+              <button onclick="deseleccionarTodosLosTemas()">Deseleccionar todos</button>
+            </div>
+            <div id="arbolTemasTest" style="border: 1px solid #ddd; padding: 10px; max-height: 300px; overflow-y: auto; background: white;">
+              <!-- Aquí se cargarán los temas -->
+            </div>
+          </div>
+          
+          <!-- Configuración del test -->
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3>Opciones del test</h3>
+            
+            <div style="margin-bottom: 15px;">
+              <label>Número de preguntas:</label>
+              <input type="number" id="numeroPreguntasTest" min="5" max="125" value="20" style="width: 100px;">
+              <span style="color: #666; font-size: 14px;">(5-125)</span>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label>Modo:</label>
+              <div>
+                <label style="margin-right: 20px;">
+                  <input type="radio" name="modoTest" value="practica" checked> Práctica
+                </label>
+                <label>
+                  <input type="radio" name="modoTest" value="examen"> Examen
+                </label>
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label>
+                <input type="checkbox" id="checkSoloFalladas"> Solo preguntas falladas
+              </label>
+              <label>
+                <input type="checkbox" id="checkExcluirDominadas"> Excluir preguntas dominadas
+              </label>
+              <label>
+                <input type="checkbox" id="checkMostrarDominadas"> Solo preguntas dominadas
+              </label>
+            </div>
+            
+            <button onclick="prepararTest()" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+              <i class="fas fa-play"></i> Comenzar Test
+            </button>
+          </div>
         </div>
         
-        <!-- Selección de temas -->
-        <div id="seccionTemasTest" style="display: none; margin-bottom: 15px;">
-          <label>Temas (selecciona uno o varios):</label>
-          <div id="arbolTemasTest" style="border: 1px solid #ddd; padding: 10px; max-height: 300px; overflow-y: auto; background: #f9f9f9;">
-            <!-- Aquí se cargarán los temas -->
-          </div>
-          <button type="button" onclick="seleccionarTodosLosTemas()" style="margin-top: 5px;">Seleccionar todos</button>
-          <button type="button" onclick="deseleccionarTodosLosTemas()" style="margin-top: 5px; margin-left: 5px;">Deseleccionar todos</button>
+        <!-- Panel de ejecución del test -->
+        <div id="panelEjecucionTest" style="display: none;">
+          <!-- Aquí se mostrará el test en ejecución -->
         </div>
-        
-        <!-- Número de preguntas -->
-        <div style="margin-bottom: 15px;">
-          <label>Número de preguntas (5-125):</label>
-          <input type="number" id="numeroPreguntasTest" min="5" max="125" value="20" style="width: 100px; padding: 5px;">
-        </div>
-        
-        <!-- Modo de test -->
-        <div style="margin-bottom: 15px;">
-          <label>Modo:</label>
-          <div>
-            <label><input type="radio" name="modoTest" value="practica" checked> Práctica (ver respuestas al responder)</label>
-          </div>
-          <div>
-            <label><input type="radio" name="modoTest" value="examen"> Examen (ver respuestas al final)</label>
-          </div>
-        </div>
-        
-        <!-- Opciones adicionales -->
-        <div style="margin-bottom: 15px;">
-          <label>Opciones:</label>
-          <div>
-            <label><input type="checkbox" id="checkSoloFalladas"> Solo preguntas falladas la última vez</label>
-          </div>
-          <div>
-            <label><input type="checkbox" id="checkExcluirDominadas"> Excluir preguntas dominadas (5 aciertos seguidos)</label>
-          </div>
-          <div>
-            <label><input type="checkbox" id="checkMostrarDominadas"> Mostrar SOLO las dominadas (para repasar)</label>
-          </div>
-        </div>
-        
-        <!-- Botón iniciar -->
-        <button onclick="prepararTest()" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
-          <i class="fas fa-play"></i> Iniciar Test
-        </button>
       </div>
-    </div>
-    
-    <!-- Columna derecha: Administración de preguntas -->
-    <div style="width: 350px;" class="contenedor-administracion">
-      <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h3>
-          <i class="fas fa-cog"></i> Administración de Preguntas
-        </h3>
-        
-        <!-- Botón para expandir/contraer -->
-        <button onclick="togglePanelAdmin()" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
+      
+      <!-- Panel de administración -->
+      <div class="contenedor-administracion">
+        <div style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;" onclick="togglePanelAdmin()">
           <span id="toggleAdminText">Mostrar opciones</span>
           <i id="toggleAdminIcon" class="fas fa-chevron-down" style="float: right;"></i>
-        </button>
+        </div>
         
         <div id="opcionesAdmin" style="display: none;">
-          <!-- Importar desde Google Sheets -->
-          <div style="border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
-            <h4 style="margin-top: 0;">Importar Preguntas</h4>
-            
-            <div style="margin-bottom: 10px;">
-              <label style="font-size: 14px;">URL del Google Sheet:</label>
-              <input type="text" id="urlSheetImportar" placeholder="https://docs.google.com/spreadsheets/d/..." 
-                     style="width: 100%; padding: 5px; font-size: 12px;">
-            </div>
-            
-            <button onclick="importarPreguntasDesdeURL()" 
-                    style="width: 100%; padding: 8px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
-              <i class="fas fa-download"></i> Importar desde URL
-            </button>
-          </div>
-          
-          <!-- Buscar en carpeta de Drive -->
-          <div style="border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
-            <h4 style="margin-top: 0;">Importar desde Carpeta</h4>
-            
-            <div style="margin-bottom: 10px;">
-              <label style="font-size: 14px;">Nombre de la carpeta en Drive:</label>
-              <input type="text" id="nombreCarpetaDrive" placeholder="Ej: Tests Oposiciones" 
-                     value="Tests Oposiciones"
-                     style="width: 100%; padding: 5px; font-size: 12px;">
-            </div>
-            
-            <button onclick="buscarArchivosEnCarpeta()" 
-                    style="width: 100%; padding: 8px; background: #17a2b8; color: white; border: none; border-radius: 5px; cursor: pointer;">
-              <i class="fas fa-folder-open"></i> Buscar archivos
-            </button>
-            
-            <div id="listaArchivosEncontrados" style="margin-top: 10px; max-height: 200px; overflow-y: auto;"></div>
-          </div>
+          <h3>Administración de Preguntas</h3>
           
           <!-- Estadísticas -->
-          <div>
+          <div style="background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
             <h4 style="margin-top: 0;">Estadísticas</h4>
-            <div id="estadisticasPreguntas" style="font-size: 14px; line-height: 1.8;">
-              <p><i class="fas fa-question-circle"></i> Total preguntas: <span id="totalPreguntas">0</span></p>
-              <p><i class="fas fa-list"></i> Temas con preguntas: <span id="temasConPreguntas">0</span></p>
-              <p><i class="fas fa-chart-line"></i> Última importación: <span id="ultimaImportacion">Nunca</span></p>
-            </div>
-            
-            <button onclick="actualizarEstadisticasPreguntas()" 
-                    style="width: 100%; padding: 8px; margin-top: 10px; background: #ffc107; color: #333; border: none; border-radius: 5px; cursor: pointer;">
-              <i class="fas fa-sync"></i> Actualizar estadísticas
+            <p>Total preguntas: <strong id="totalPreguntas">0</strong></p>
+            <p>Temas con preguntas: <strong id="temasConPreguntas">0</strong></p>
+            <p>Última importación: <strong id="ultimaImportacion">-</strong></p>
+          </div>
+          
+          <!-- Importar desde URL -->
+          <div style="margin-bottom: 20px;">
+            <h4>Importar desde Google Sheets</h4>
+            <input type="text" id="urlSheetImportar" placeholder="URL del Google Sheet" style="width: 100%; margin-bottom: 10px;">
+            <button onclick="importarPreguntasDesdeURL()" style="width: 100%;">
+              <i class="fas fa-upload"></i> Importar
             </button>
+          </div>
+          
+          <!-- Buscar en carpeta Drive -->
+          <div>
+            <h4>Buscar en carpeta de Drive</h4>
+            <input type="text" id="nombreCarpetaDrive" placeholder="Nombre de la carpeta" style="width: 100%; margin-bottom: 10px;">
+            <button onclick="buscarArchivosEnCarpeta()" style="width: 100%;">
+              <i class="fas fa-search"></i> Buscar
+            </button>
+            <div id="listaArchivosEncontrados" style="margin-top: 10px;">
+              <!-- Aquí se mostrarán los archivos encontrados -->
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-  
-  <!-- Panel de ejecución del test (oculto inicialmente) -->
-  <div id="panelEjecucionTest" style="display: none; margin-top: 20px;">
-    <!-- Aquí irá el test cuando se ejecute -->
-  </div>
-</div>
 
     <!-- Sección Conceptos -->
     <div id="conceptos" class="section">
