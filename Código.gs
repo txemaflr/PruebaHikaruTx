@@ -52,8 +52,8 @@ function getSectionHTML(section) {
     return isOposicionNombreUnico(nombre); // Función definida en `oposiciones.gs`
   }
   function getOposicionesOrdenadas() {
-    //return getOposicionesOrdenadas(); // Función definida en `oposiciones.gs`
-     return getOposicionesConCache(); // Usa la versión con caché
+    return getOposicionesOrdenadas(); // Función definida en `oposiciones.gs`
+     //return getOposicionesConCache(); // Usa la versión con caché
   }
 
   function addOposicion(nombre) {
@@ -145,8 +145,8 @@ function getSectionHTML(section) {
   }
 
   function getBloquesOrdenados()  {
-    //return getBloquesOrdenados();  // Función definida en `bloques.gs`
-     return getTemasConCache(); // Usa la versión con caché
+    return getBloquesOrdenados();  // Función definida en `bloques.gs`
+    // return getTemasConCache(); // Usa la versión con caché
   }
 //FIN BLOQUES
 
@@ -159,8 +159,8 @@ function getSectionHTML(section) {
   }
 
   function getTemasEnArbolOrdenados() {
-    //return getTemasEnArbolOrdenados(); // Función definida en `temas.gs`
-     return getTemasEnArbolOrdenadosConCache(); // Usa la versión con caché
+    return getTemasEnArbolOrdenados(); // Función definida en `temas.gs`
+    // return getTemasEnArbolOrdenadosConCache(); // Usa la versión con caché
   }
 
 //FIN TEMAS
@@ -229,6 +229,16 @@ function getOposicionesOrdenadas() {
   });
 }
 
+// Tests - Obtener estadísticas
+function obtenerEstadisticasPreguntas() {
+  return obtenerEstadisticasPreguntas(); // Función definida en tests.gs
+}
+
+// Tests - Importar con hojas específicas
+function importarPreguntasDesdeSheetMejorado(urlSheet, hojasEspecificas) {
+  return importarPreguntasDesdeSheetMejorado(urlSheet, hojasEspecificas); // Función definida en tests.gs
+}
+/*
 function getTemasEnArbolOrdenados() {
   return withCache('temas_arbol_ordenados', () => {
     // Llamar a la función original que ya tienes
@@ -248,4 +258,4 @@ function invalidarCacheTemas() {
 function invalidarCacheConceptos() {
   invalidateCache(['conceptos', 'tipos_concepto']);
 }
-
+*/
