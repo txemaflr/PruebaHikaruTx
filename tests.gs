@@ -393,3 +393,142 @@ function formatearTiempo(segundos) {
   const seg = segundos % 60;
   return `${minutos}m ${seg}s`;
 }
+
+// Obtener estadísticas de preguntas
+function obtenerEstadisticasPreguntas() {
+  try {
+    const preguntasSheet = getGoogleSheet('Test_Preguntas');
+    const data = preguntasSheet.getDataRange().getValues();
+    
+    const totalPreguntas = data.length - 1; // menos encabezados
+    
+    // Contar temas únicos
+    const temasUnicos = new Set();
+    for (let i = 1; i < data.length; i++) {
+      const idTema = data[i][1]; // columna id_tema
+      if (idTema) temasUnicos.add(idTema);
+    }
+    
+    // Obtener última fecha de importación
+    let ultimaFecha = null;
+    // Aquí podrías buscar la fecha más reciente si la guardas
+    
+    return {
+      totalPreguntas: totalPreguntas,
+      temasConPreguntas: temasUnicos.size,
+      ultimaImportacion: ultimaFecha ? new Date(ultimaFecha).toLocaleString() : 'Nunca'
+    };
+  } catch (error) {
+    throw new Error('Error al obtener estadísticas: ' + error.message);
+  }
+}
+
+// Función mejorada para importar preguntas con opción de hojas específicas
+function importarPreguntasDesdeSheetMejorado(urlSheet, hojasEspecificas = null) {
+  try {
+    const sourceSpreadsheet = SpreadsheetApp.openByUrl(urlSheet);
+    const sheets = sourceSpreadsheet.getSheets();
+    const preguntasSheet = getGoogleSheet('Test_Preguntas');
+    const preguntasColumns = getColumnIndices('Test_Preguntas');
+    
+    let preguntasImportadas = 0;
+    let hojasImportadas = 0;
+    let temasNoEncontrados = new Set();
+    
+    // Obtener el último ID de pregunta
+    const lastRow = preguntasSheet.getLastRow();
+    let ultimoId = 0;
+    if (lastRow > 1) {
+      const ids = preguntasSheet.getRange(2, preguntasColumns['id_pregunta'] + 1, lastRow - 1, 1)
+        .getValues()
+        .flat()
+        .map(id => parseInt(id) || 0);
+      ultimoId = Math.max(...ids, 0);
+    }
+    
+    // Recorrer las hojas
+    sheets.forEach(sheet => {
+      const sheetName = sheet.getName();
+      
+      // Si se especificaron hojas, verificar si esta hoja está en la lista
+      if (hojasEspecificas && !hojasEspecificas.includes(sheetName)) {
+        console.log('Saltando hoja:', sheetName);
+        return;
+      }
+      
+      console.log('Importando hoja:', sheetName);
+      hojasImportadas++;
+      
+      const data = sheet.getDataRange().getValues();
+      
+      // Buscar la columna nombre_tema
+      const headers = data[0];
+      let columnaNombreTema = -1;
+      
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i] && (headers[i].toLowerCase() === 'nombre_tema' || headers[i].toLowerCase() === 'tema')) {
+          columnaNombreTema = i;
+          break;
+        }
+      }
+      
+      // Usar el nombre de la hoja como tema por defecto
+      const temaDefault = sheetName;
+      
+      // Procesar filas
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        
+        // Verificar que la fila tenga datos válidos
+        if (row[1] && row[5] && row[6] && row[7] && row[8] && row[9]) {
+          const nombreTema = (columnaNombreTema >= 0 && row[columnaNombreTema]) ? 
+                            row[columnaNombreTema] : temaDefault;
+          
+          const idTema = buscarIdTemaPorNombre(nombreTema);
+          
+          if (!idTema) {
+            temasNoEncontrados.add(nombreTema);
+            continue;
+          }
+          
+          ultimoId++;
+          
+          const nuevaPregunta = [];
+          nuevaPregunta[preguntasColumns['id_pregunta']] = ultimoId;
+          nuevaPregunta[preguntasColumns['id_tema']] = idTema;
+          nuevaPregunta[preguntasColumns['titulo']] = row[1];
+          nuevaPregunta[preguntasColumns['descripcion']] = row[2] || '';
+          nuevaPregunta[preguntasColumns['opcion_a']] = row[5];
+          nuevaPregunta[preguntasColumns['opcion_b']] = row[6];
+          nuevaPregunta[preguntasColumns['opcion_c']] = row[7];
+          nuevaPregunta[preguntasColumns['opcion_d']] = row[8];
+          nuevaPregunta[preguntasColumns['respuesta_correcta']] = row[9];
+          nuevaPregunta[preguntasColumns['retroalimentacion']] = row[11] || '';
+          nuevaPregunta[preguntasColumns['fuente_sheet']] = sourceSpreadsheet.getName();
+          nuevaPregunta[preguntasColumns['fuente_hoja']] = sheetName;
+          nuevaPregunta[preguntasColumns['veces_mostrada']] = 0;
+          nuevaPregunta[preguntasColumns['veces_acertada']] = 0;
+          nuevaPregunta[preguntasColumns['veces_fallada']] = 0;
+          nuevaPregunta[preguntasColumns['racha_actual']] = 0;
+          nuevaPregunta[preguntasColumns['ultima_respuesta']] = '';
+          nuevaPregunta[preguntasColumns['activa']] = true;
+          
+          preguntasSheet.appendRow(nuevaPregunta);
+          preguntasImportadas++;
+        }
+      }
+    });
+    
+    let mensaje = `Importación completada:\n`;
+    mensaje += `- ${preguntasImportadas} preguntas importadas\n`;
+    mensaje += `- ${hojasImportadas} hojas procesadas`;
+    
+    if (temasNoEncontrados.size > 0) {
+      mensaje += `\n\nTemas no encontrados: ${Array.from(temasNoEncontrados).join(', ')}`;
+    }
+    
+    return mensaje;
+  } catch (error) {
+    throw new Error(`Error al importar preguntas: ${error.message}`);
+  }
+}
