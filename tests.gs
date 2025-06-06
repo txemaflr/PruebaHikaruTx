@@ -535,66 +535,102 @@ function importarPreguntasDesdeSheetMejorado(urlSheet, hojasEspecificas = null) 
 
 // Obtener preguntas más falladas
 function getPreguntasMasFalladas(idOposicion) {
-  const db = getDatabase();
-  
   try {
-    let query = `
-      SELECT 
-        p.*,
-        t.nombre as nombreTema,
-        COUNT(CASE WHEN rp.es_correcta = 0 THEN 1 END) as fallos,
-        COUNT(CASE WHEN rp.es_correcta = 1 THEN 1 END) as aciertos,
-        COUNT(rp.id) as total_respuestas,
-        ROUND(COUNT(CASE WHEN rp.es_correcta = 0 THEN 1 END) * 100.0 / COUNT(rp.id), 1) as porcentaje_fallo
-      FROM preguntas p
-      LEFT JOIN respuestas_preguntas rp ON p.id = rp.id_pregunta
-      LEFT JOIN temas t ON p.id_tema = t.id
-      WHERE p.activa = 1
-        AND rp.id IS NOT NULL
-    `;
+    const preguntasSheet = getGoogleSheet('Test_Preguntas');
+    const preguntasColumns = getColumnIndices('Test_Preguntas');
+    const preguntasData = preguntasSheet.getDataRange().getValues();
     
-    // Filtrar por oposición si se especifica
-    if (idOposicion) {
-      query += ` AND EXISTS (
-        SELECT 1 FROM vinculaciones_oposicion_tema vot
-        WHERE vot.id_tema = p.id_tema AND vot.id_oposicion = ?
-      )`;
+    // Filtrar y ordenar preguntas
+    let preguntasFalladas = [];
+    
+    for (let i = 1; i < preguntasData.length; i++) {
+      const row = preguntasData[i];
+      const vecesFallada = row[preguntasColumns['veces_fallada']] || 0;
+      const vecesMostrada = row[preguntasColumns['veces_mostrada']] || 0;
+      const activa = row[preguntasColumns['activa']];
+      
+      // Solo incluir preguntas activas que han sido falladas
+      if (activa && vecesFallada > 0) {
+        const porcentajeFallo = vecesMostrada > 0 ? 
+          Math.round((vecesFallada / vecesMostrada) * 100) : 0;
+        
+        // Si se especifica oposición, verificar que el tema pertenezca a ella
+        if (idOposicion) {
+          const idTema = row[preguntasColumns['id_tema']];
+          if (!verificarTemaEnOposicion(idTema, idOposicion)) {
+            continue;
+          }
+        }
+        
+        preguntasFalladas.push({
+          pregunta: {
+            id: row[preguntasColumns['id_pregunta']],
+            titulo: row[preguntasColumns['titulo']],
+            descripcion: row[preguntasColumns['descripcion']],
+            opcion_a: row[preguntasColumns['opcion_a']],
+            opcion_b: row[preguntasColumns['opcion_b']],
+            opcion_c: row[preguntasColumns['opcion_c']],
+            opcion_d: row[preguntasColumns['opcion_d']],
+            respuesta_correcta: row[preguntasColumns['respuesta_correcta']],
+            retroalimentacion: row[preguntasColumns['retroalimentacion']],
+            nombreTema: obtenerNombreTema(row[preguntasColumns['id_tema']])
+          },
+          estadisticas: {
+            fallos: vecesFallada,
+            aciertos: row[preguntasColumns['veces_acertada']] || 0,
+            totalRespuestas: vecesMostrada,
+            porcentajeFallo: porcentajeFallo
+          }
+        });
+      }
     }
     
-    query += `
-      GROUP BY p.id
-      HAVING fallos > 0
-      ORDER BY porcentaje_fallo DESC, fallos DESC
-      LIMIT 100
-    `;
-    
-    const params = idOposicion ? [idOposicion] : [];
-    const preguntas = db.query(query, params);
-    
-    // Formatear respuesta
-    return preguntas.map(p => ({
-      pregunta: {
-        id: p.id,
-        titulo: p.titulo,
-        descripcion: p.descripcion,
-        opcion_a: p.opcion_a,
-        opcion_b: p.opcion_b,
-        opcion_c: p.opcion_c,
-        opcion_d: p.opcion_d,
-        respuesta_correcta: p.respuesta_correcta,
-        retroalimentacion: p.retroalimentacion,
-        nombreTema: p.nombreTema
-      },
-      estadisticas: {
-        fallos: p.fallos,
-        aciertos: p.aciertos,
-        totalRespuestas: p.total_respuestas,
-        porcentajeFallo: p.porcentaje_fallo
+    // Ordenar por porcentaje de fallo y cantidad de fallos
+    preguntasFalladas.sort((a, b) => {
+      if (b.estadisticas.porcentajeFallo !== a.estadisticas.porcentajeFallo) {
+        return b.estadisticas.porcentajeFallo - a.estadisticas.porcentajeFallo;
       }
-    }));
+      return b.estadisticas.fallos - a.estadisticas.fallos;
+    });
+    
+    // Limitar a las 100 más falladas
+    return preguntasFalladas.slice(0, 100);
     
   } catch (error) {
     console.error('Error al obtener preguntas más falladas:', error);
     throw error;
   }
+}
+
+// Verificar si un tema pertenece a una oposición
+function verificarTemaEnOposicion(idTema, idOposicion) {
+  const vinculacionesSheet = getGoogleSheet('Vinculaciones_OT');
+  const vinculacionesColumns = getColumnIndices('Vinculaciones_OT');
+  const data = vinculacionesSheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][vinculacionesColumns['id_tema']] == idTema && 
+        data[i][vinculacionesColumns['id_oposicion']] == idOposicion) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Obtener nombre de un tema por su ID
+function obtenerNombreTema(idTema) {
+  const temasSheet = getGoogleSheet('Temas');
+  const temasColumns = getColumnIndices('Temas');
+  const data = temasSheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][temasColumns['id_tema']] == idTema) {
+      const prenombre = data[i][temasColumns['prenombre']] || '';
+      const nombre = data[i][temasColumns['nombre']] || '';
+      return (prenombre + ' ' + nombre).trim();
+    }
+  }
+  
+  return 'Sin tema asignado';
 }
