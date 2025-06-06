@@ -1,16 +1,9 @@
 <script>
 // Variables globales para test
 var temasDisponiblesTest = [];
-// Variables para el test activo globales
 var testActivo = null;
 var preguntaActual = 0;
-var respuestasTest = []; // Array de objetos {letra: 'A', corregida: false, esCorrecta: null}
-
-// NUEVO: Variables para el temporizador
-var tiempoInicio = null;
-var intervalTemporizador = null;
-var alertas5MinMostrada = false;
-var alerta1MinMostrada = false;
+var respuestasTest = []; // Array de objetos: {letra: 'A', corregida: false, esCorrecta: null}
 
 // Cargar oposiciones cuando se entra a la sección Test
 function inicializarSeccionTest() {
@@ -23,6 +16,10 @@ function cargarOposicionesParaTest() {
   google.script.run
     .withSuccessHandler(function(oposiciones) {
       const combo = document.getElementById('comboOposicionTest');
+      if (!combo) {
+        console.error('No se encontró el combo de oposiciones');
+        return;
+      }
       combo.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
       
       oposiciones.forEach(function(op) {
@@ -36,7 +33,7 @@ function cargarOposicionesParaTest() {
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar oposiciones:', error);
-      alert('Error al cargar oposiciones');
+      alert('Error al cargar oposiciones: ' + error.message);
     })
     .getOposicionesOrdenadas();
 }
@@ -108,7 +105,6 @@ function mostrarArbolTemasParaTest(temas) {
 function manejarSeleccionTema(checkbox, idTema) {
   const seleccionado = checkbox.checked;
   
-  // Buscar el tema en la estructura
   function buscarTema(temas, id) {
     for (let tema of temas) {
       if (tema.id === id) return tema;
@@ -122,7 +118,6 @@ function manejarSeleccionTema(checkbox, idTema) {
   
   const tema = buscarTema(temasDisponiblesTest, idTema);
   
-  // Seleccionar/deseleccionar todos los hijos
   if (tema && tema.hijos) {
     function toggleHijos(hijos) {
       hijos.forEach(function(hijo) {
@@ -153,7 +148,6 @@ function deseleccionarTodosLosTemas() {
 
 // Preparar el test
 function prepararTest() {
-  // Obtener valores ANTES de usarlos
   const idOposicion = document.getElementById('comboOposicionTest').value;
   const numPreguntas = parseInt(document.getElementById('numeroPreguntasTest').value);
   const modoRadio = document.querySelector('input[name="modoTest"]:checked');
@@ -196,7 +190,7 @@ function prepararTest() {
   
   // Ocultar panel de configuración
   document.getElementById('panelConfiguracionTest').style.display = 'none';
-  const panelAdmin = document.querySelector('div[style*="width: 350px"]');
+  const panelAdmin = document.querySelector('.contenedor-administracion');
   if (panelAdmin) panelAdmin.style.display = 'none';
   
   // Mostrar loading
@@ -210,15 +204,6 @@ function prepararTest() {
       testActivo = test;
       preguntaActual = 0;
       respuestasTest = new Array(test.preguntas.length).fill(null);
-      
-      // Iniciar temporizador si es modo examen
-      if (modo === 'examen') {
-        tiempoInicio = new Date();
-        alertas5MinMostrada = false;
-        alerta1MinMostrada = false;
-        iniciarTemporizador();
-      }
-      
       mostrarPregunta();
     })
     .withFailureHandler(function(error) {
@@ -229,108 +214,7 @@ function prepararTest() {
     .generarTest(idOposicion, temasSeleccionados, numPreguntas, modo, opciones);
 }
 
-// NUEVO: Iniciar temporizador para modo examen
-function iniciarTemporizador() {
-  if (intervalTemporizador) clearInterval(intervalTemporizador);
-  
-  intervalTemporizador = setInterval(function() {
-    actualizarTemporizador();
-  }, 1000);
-}
-
-// NUEVO: Actualizar temporizador
-function actualizarTemporizador() {
-  if (!tiempoInicio) return;
-  
-  const ahora = new Date();
-  const tiempoTranscurrido = Math.floor((ahora - tiempoInicio) / 1000);
-  const minutos = Math.floor(tiempoTranscurrido / 60);
-  const segundos = tiempoTranscurrido % 60;
-  
-  // Calcular tiempo total y restante
-  const tiempoTotal = testActivo.preguntas.length * 60; // 1 minuto por pregunta
-  const tiempoRestante = tiempoTotal - tiempoTranscurrido;
-  const minutosRestantes = Math.floor(tiempoRestante / 60);
-  const segundosRestantes = tiempoRestante % 60;
-  
-  const elementoTiempo = document.getElementById('tiempoTranscurrido');
-  if (elementoTiempo) {
-    // Mostrar tiempo transcurrido y restante
-    let textoTiempo = minutos + ':' + (segundos < 10 ? '0' : '') + segundos;
-    
-    // Si quedan menos de 5 minutos, mostrar en rojo
-    if (tiempoRestante <= 300) {
-      textoTiempo += ' <span style="color: #dc3545; font-weight: bold;">(' + 
-                     minutosRestantes + ':' + (segundosRestantes < 10 ? '0' : '') + 
-                     segundosRestantes + ' restantes)</span>';
-    } else {
-      textoTiempo += ' <span style="color: #6c757d; font-size: 14px;">(' + 
-                     minutosRestantes + ':' + (segundosRestantes < 10 ? '0' : '') + 
-                     segundosRestantes + ' restantes)</span>';
-    }
-    
-    elementoTiempo.innerHTML = textoTiempo;
-    
-    // Avisos de tiempo
-    if (tiempoRestante === 300 && testActivo.preguntas.length > 20 && !alertas5MinMostrada) {
-      alertas5MinMostrada = true;
-      mostrarAvisoTiempo('¡Atención! Quedan 5 minutos para finalizar el test', 'warning');
-    } else if (tiempoRestante === 60 && !alerta1MinMostrada) {
-      alerta1MinMostrada = true;
-      mostrarAvisoTiempo('¡ÚLTIMO MINUTO! El test finalizará pronto', 'danger');
-    } else if (tiempoRestante <= 0) {
-      // Tiempo agotado - finalizar automáticamente
-      clearInterval(intervalTemporizador);
-      alert('¡Tiempo agotado! El test se finalizará automáticamente.');
-      finalizarTest();
-    }
-  }
-}
-
-// NUEVO: Mostrar aviso de tiempo con estilo
-function mostrarAvisoTiempo(mensaje, tipo) {
-  // Crear elemento de aviso
-  const aviso = document.createElement('div');
-  aviso.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    background: ${tipo === 'danger' ? '#dc3545' : '#ffc107'};
-    color: ${tipo === 'danger' ? 'white' : '#212529'};
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    font-weight: bold;
-    z-index: 9999;
-    animation: slideIn 0.3s ease-out;
-  `;
-  aviso.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + mensaje;
-  
-  // Añadir animación CSS
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-  
-  document.body.appendChild(aviso);
-  
-  // Quitar aviso después de 5 segundos
-  setTimeout(function() {
-    aviso.style.animation = 'slideOut 0.3s ease-in';
-    setTimeout(function() {
-      aviso.remove();
-    }, 300);
-  }, 5000);
-  
-  // También mostrar en alert para asegurar que el usuario lo vea
-  alert(mensaje);
-}
-
-// Mostrar una pregunta (CORREGIDA)
+// Mostrar una pregunta
 function mostrarPregunta() {
   if (!testActivo || preguntaActual >= testActivo.preguntas.length) {
     finalizarTest();
@@ -342,13 +226,6 @@ function mostrarPregunta() {
   const respuestaGuardada = respuestasTest[preguntaActual];
   
   let html = '<div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
-  
-  // Temporizador para modo examen
-  if (testActivo.modo === 'examen') {
-    html += '<div style="text-align: right; margin-bottom: 10px; font-size: 18px; font-weight: bold;">';
-    html += '<i class="fas fa-clock"></i> <span id="tiempoTranscurrido">0:00</span>';
-    html += '</div>';
-  }
   
   // Progreso
   html += '<div style="margin-bottom: 20px;">';
@@ -369,7 +246,7 @@ function mostrarPregunta() {
   
   // Opciones
   html += '<div style="margin: 20px 0;" id="contenedorOpciones">';
-  ['A', 'B', 'C', 'D'].forEach(function(letra, index) {
+  ['A', 'B', 'C', 'D'].forEach(function(letra) {
     const opcion = pregunta['opcion_' + letra.toLowerCase()];
     html += '<div style="margin: 10px 0; padding: 15px; border: 2px solid #ddd; border-radius: 5px; cursor: pointer;" ';
     html += 'id="opcion' + letra + '" ';
@@ -411,7 +288,7 @@ function mostrarPregunta() {
   }
 }
 
-// Seleccionar respuesta (UNIFICADA Y CORREGIDA)
+// ÚNICA función para seleccionar respuesta
 function seleccionarRespuesta(letra) {
   // Si ya está corregida en modo práctica, no permitir cambios
   if (testActivo.modo === 'practica' && respuestasTest[preguntaActual] && 
@@ -430,7 +307,7 @@ function seleccionarRespuesta(letra) {
   marcarOpcion(letra);
 }
 
-// NUEVA: Función auxiliar para marcar visualmente una opción
+// Función auxiliar para marcar visualmente una opción
 function marcarOpcion(letra) {
   ['A', 'B', 'C', 'D'].forEach(function(l) {
     const elem = document.getElementById('opcion' + l);
@@ -461,7 +338,7 @@ function deseleccionarRespuesta() {
   });
 }
 
-// Función para corregir en modo práctica (CORREGIDA)
+// Función para corregir en modo práctica
 function corregirPregunta() {
   if (!respuestasTest[preguntaActual] || !respuestasTest[preguntaActual].letra) {
     alert('Selecciona una respuesta primero');
@@ -505,7 +382,7 @@ function corregirPregunta() {
     );
 }
 
-// Mostrar corrección (MEJORADA)
+// Mostrar corrección
 function mostrarCorreccion() {
   const pregunta = testActivo.preguntas[preguntaActual];
   const respuestaUsuario = respuestasTest[preguntaActual].letra;
@@ -567,7 +444,7 @@ function siguientePregunta() {
   }
 }
 
-// NUEVA: Función auxiliar para avanzar pregunta
+// Función auxiliar para avanzar pregunta
 function avanzarPregunta() {
   if (preguntaActual < testActivo.preguntas.length - 1) {
     preguntaActual++;
@@ -577,14 +454,8 @@ function avanzarPregunta() {
   }
 }
 
-// Finalizar test (ACTUALIZADA)
+// Finalizar test
 function finalizarTest() {
-  // Detener temporizador si existe
-  if (intervalTemporizador) {
-    clearInterval(intervalTemporizador);
-    intervalTemporizador = null;
-  }
-  
   const sinResponder = respuestasTest.filter(r => !r || !r.letra).length;
   
   if (sinResponder > 0) {
@@ -604,7 +475,7 @@ function finalizarTest() {
   }
 }
 
-// NUEVA: Guardar respuestas del examen
+// Guardar respuestas del examen
 function guardarRespuestasExamen() {
   let respuestasPendientes = 0;
   let respuestasGuardadas = 0;
@@ -729,181 +600,18 @@ function mostrarResultadosTest(resultado) {
   }
   
   html += '<div style="text-align: center; margin-top: 20px;">';
-  html += '<button onclick="volverAConfiguracion()" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin: 5px;">Nuevo Test</button>';
-  html += '<button onclick="mostrarPreguntasMasFalladas()" style="background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin: 5px;">Ver Preguntas Más Falladas</button>';
+  html += '<button onclick="volverAConfiguracion()" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px;">Nuevo Test</button>';
   html += '</div>';
   
   html += '</div>';
   
   document.getElementById('panelEjecucionTest').innerHTML = html;
-}
-
-// ===== NUEVA SECCIÓN: PREGUNTAS MÁS FALLADAS =====
-
-var preguntasFalladasActuales = [];
-var paginaFalladasActual = 0;
-var totalPaginasFalladas = 0;
-
-// Mostrar preguntas más falladas
-function mostrarPreguntasMasFalladas() {
-  document.getElementById('panelEjecucionTest').innerHTML = '<p style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin"></i> Cargando preguntas más falladas...</p>';
-  
-  const idOposicion = document.getElementById('comboOposicionTest').value;
-  
-  google.script.run
-    .withSuccessHandler(function(preguntas) {
-      preguntasFalladasActuales = preguntas;
-      paginaFalladasActual = 0;
-      totalPaginasFalladas = Math.ceil(preguntas.length / 10);
-      mostrarPaginaFalladas();
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al cargar preguntas falladas:', error);
-      alert('Error al cargar preguntas más falladas');
-      volverAConfiguracion();
-    })
-    .getPreguntasMasFalladas(idOposicion);
-}
-
-// Mostrar página de preguntas falladas
-function mostrarPaginaFalladas() {
-  const inicio = paginaFalladasActual * 10;
-  const fin = Math.min(inicio + 10, preguntasFalladasActuales.length);
-  const preguntasPagina = preguntasFalladasActuales.slice(inicio, fin);
-  
-  let html = '<div style="background: white; padding: 20px; border-radius: 8px;">';
-  
-  // Título y navegación
-  html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
-  html += '<h2>Preguntas Más Falladas</h2>';
-  html += '<button onclick="volverAConfiguracion()" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px;">Volver</button>';
-  html += '</div>';
-  
-  // Info de paginación
-  html += '<p style="text-align: center; color: #666; margin-bottom: 20px;">Página ' + (paginaFalladasActual + 1) + ' de ' + totalPaginasFalladas + ' - Total: ' + preguntasFalladasActuales.length + ' preguntas</p>';
-  
-  // Preguntas
-  html += '<div style="max-height: 70vh; overflow-y: auto;">';
-  
-  preguntasPagina.forEach(function(item, index) {
-    const pregunta = item.pregunta;
-    const estadisticas = item.estadisticas;
-    const numeroGlobal = inicio + index + 1;
-    
-    html += '<div style="margin-bottom: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px; border-left: 5px solid #dc3545;">';
-    
-    // Cabecera con estadísticas
-    html += '<div style="display: flex; justify-content: space-between; margin-bottom: 15px;">';
-    html += '<h4 style="margin: 0;">Pregunta #' + numeroGlobal + '</h4>';
-    html += '<div style="text-align: right; font-size: 14px;">';
-    html += '<span style="color: #dc3545;"><i class="fas fa-times-circle"></i> Fallos: ' + estadisticas.fallos + '</span> | ';
-    html += '<span style="color: #28a745;"><i class="fas fa-check-circle"></i> Aciertos: ' + estadisticas.aciertos + '</span> | ';
-    html += '<span style="color: #6c757d;">Tasa error: ' + estadisticas.porcentajeFallo + '%</span>';
-    html += '</div>';
-    html += '</div>';
-    
-    // Título de la pregunta
-    html += '<h5 style="margin-bottom: 15px;">' + pregunta.titulo + '</h5>';
-    
-    if (pregunta.descripcion) {
-      html += '<p style="margin-bottom: 15px;">' + pregunta.descripcion + '</p>';
-    }
-    
-    // Opciones
-    ['A', 'B', 'C', 'D'].forEach(function(letra) {
-      const opcion = pregunta['opcion_' + letra.toLowerCase()];
-      let estilo = 'margin: 5px 0; padding: 10px; border-radius: 5px;';
-      
-      if (letra === pregunta.respuesta_correcta) {
-        estilo += ' background: #e8f5e9; border: 1px solid #4caf50;';
-      } else {
-        estilo += ' background: white; border: 1px solid #ddd;';
-      }
-      
-      html += '<div style="' + estilo + '">';
-      html += '<strong>' + letra + '.</strong> ' + opcion;
-      
-      if (letra === pregunta.respuesta_correcta) {
-        html += ' <span style="color: #4caf50; float: right;">✓ Correcta</span>';
-      }
-      
-      html += '</div>';
-    });
-    
-    // Retroalimentación
-    if (pregunta.retroalimentacion) {
-      html += '<div style="margin-top: 15px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">';
-      html += '<strong>Explicación:</strong> ' + pregunta.retroalimentacion;
-      html += '</div>';
-    }
-    
-    // Tema de la pregunta
-    html += '<div style="margin-top: 10px; font-size: 12px; color: #666;">';
-    html += '<i class="fas fa-folder"></i> Tema: ' + (pregunta.nombreTema || 'Sin tema asignado');
-    html += '</div>';
-    
-    html += '</div>';
-  });
-  
-  html += '</div>';
-  
-  // Botones de paginación
-  html += '<div style="display: flex; justify-content: center; margin-top: 20px; gap: 10px;">';
-  
-  if (paginaFalladasActual > 0) {
-    html += '<button onclick="paginaFalladasAnterior()" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px;">';
-    html += '<i class="fas fa-chevron-left"></i> Anterior';
-    html += '</button>';
-  }
-  
-  // Números de página
-  for (let i = 0; i < totalPaginasFalladas; i++) {
-    const esActual = i === paginaFalladasActual;
-    html += '<button onclick="irAPaginaFalladas(' + i + ')" ';
-    html += 'style="background: ' + (esActual ? '#007bff' : '#e9ecef') + '; ';
-    html += 'color: ' + (esActual ? 'white' : '#495057') + '; ';
-    html += 'padding: 8px 12px; border: none; border-radius: 5px; min-width: 40px;">';
-    html += (i + 1);
-    html += '</button>';
-  }
-  
-  if (paginaFalladasActual < totalPaginasFalladas - 1) {
-    html += '<button onclick="paginaFalladasSiguiente()" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px;">';
-    html += 'Siguiente <i class="fas fa-chevron-right"></i>';
-    html += '</button>';
-  }
-  
-  html += '</div>';
-  
-  html += '</div>';
-  
-  document.getElementById('panelEjecucionTest').innerHTML = html;
-}
-
-// Navegación de páginas falladas
-function paginaFalladasAnterior() {
-  if (paginaFalladasActual > 0) {
-    paginaFalladasActual--;
-    mostrarPaginaFalladas();
-  }
-}
-
-function paginaFalladasSiguiente() {
-  if (paginaFalladasActual < totalPaginasFalladas - 1) {
-    paginaFalladasActual++;
-    mostrarPaginaFalladas();
-  }
-}
-
-function irAPaginaFalladas(pagina) {
-  paginaFalladasActual = pagina;
-  mostrarPaginaFalladas();
 }
 
 // Volver a configuración
 function volverAConfiguracion() {
   document.getElementById('panelConfiguracionTest').style.display = 'block';
-  const panelAdmin = document.querySelector('div[style*="width: 350px"]');
+  const panelAdmin = document.querySelector('.contenedor-administracion');
   if (panelAdmin) panelAdmin.style.display = 'block';
   document.getElementById('panelEjecucionTest').style.display = 'none';
   
@@ -911,13 +619,6 @@ function volverAConfiguracion() {
   testActivo = null;
   preguntaActual = 0;
   respuestasTest = [];
-  
-  // Detener temporizador si existe
-  if (intervalTemporizador) {
-    clearInterval(intervalTemporizador);
-    intervalTemporizador = null;
-  }
-  tiempoInicio = null;
 }
 
 // ===== SECCIÓN DE ADMINISTRACIÓN =====
