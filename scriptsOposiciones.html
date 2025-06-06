@@ -153,7 +153,7 @@
   // Función para mostrar los temas vinculados a una oposición por niveles
   function mostrarTemasParaOposicion(idOposicion, nombreOposicion) {
     google.script.run
-      .withSuccessHandler(data => renderTemasVinculadosOposicion(data, nombreOposicion))
+      .withSuccessHandler(data => renderTemasVinculadosOposicion(data, nombreOposicion, idOposicion))
       .withFailureHandler(error => {
         console.error('Error al cargar los temas vinculados:', error);
         alert('No se pudieron cargar los temas vinculados. Intenta nuevamente.');
@@ -162,7 +162,7 @@
   }
 
 //INICIO-->expandir
-function renderTemasVinculadosOposicion(temasArbol, nombreOposicion) {
+function renderTemasVinculadosOposicion(temasArbol, nombreOposicion,idOposicion) {
   const temasContainer = document.getElementById('temasVinculados');
   let html = `<h3>Temas vinculados a "${nombreOposicion}"</h3>`;
 
@@ -178,7 +178,7 @@ function renderTemasVinculadosOposicion(temasArbol, nombreOposicion) {
           </tr>
         </thead>
         <tbody>
-          ${renderTemasExpandibles(temasArbol)}
+          ${renderTemasExpandibles(temasArbol, 0, "", idOposicion, nombreOposicion)}
         </tbody>
       </table>
     `;
@@ -187,7 +187,7 @@ function renderTemasVinculadosOposicion(temasArbol, nombreOposicion) {
   temasContainer.innerHTML = html;
 }
 
-function renderTemasExpandibles(temas, nivel = 0, parentId = "") {
+function renderTemasExpandibles(temas, nivel = 0, parentId = "", idOposicion = null, nombreOposicion = "") {
   return temas.map((tema, idx) => {
     const rowId = `row-${tema.id}`;
     const parentAttr = parentId ? `data-parent="${parentId}"` : "";
@@ -211,7 +211,7 @@ function renderTemasExpandibles(temas, nivel = 0, parentId = "") {
     `;
 
     if (hasHijos) {
-      row += renderTemasExpandibles(tema.hijos, nivel + 1, tema.id);
+      row += renderTemasExpandibles(tema.hijos, nivel + 1, tema.id, idOposicion, nombreOposicion);
     }
 
     return row;
@@ -258,7 +258,7 @@ function desvincularTemaDeOposicion(idTema, nombreTema, idOposicion, nombreOposi
 
         // Actualizar la tabla de temas vinculados manteniendo el estado del árbol
         google.script.run.withSuccessHandler(temasArbol => {
-          renderTemasVinculadosOposicion(temasArbol, nombreOposicion);
+          renderTemasVinculadosOposicion(temasArbol, nombreOposicion,idOposicion);
           expandIds.forEach(id => {
             const btn = document.getElementById(`btn-toggle-${id}`);
             if (btn && btn.textContent === "+") toggleTemaRow(id);
