@@ -416,5 +416,3 @@ function getTemasDisponiblesEnArbol(idOposicion) {
 
   return ordenarYFormatear(listaFinal.filter(t => !t.idPadre)); // Filtrar raíces para el árbol
 }
-
-
