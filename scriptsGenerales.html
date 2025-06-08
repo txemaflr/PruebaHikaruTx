@@ -3,12 +3,13 @@
  <script>
  function showSection(id) {
     console.log("Cambiando a sección:", id);
-
+/*
     // Ocultar todas
     document.querySelectorAll('.section').forEach(section => {
       section.classList.remove('active');
     });
-
+*/
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     // Mostrar la seleccionada
     const target = document.getElementById(id);
     if (target) {
@@ -69,6 +70,13 @@
     if (typeof cargarDatosTest === 'function') cargarDatosTest();
   }
 /*
+// Lanza el selector de sección **una vez** esté TODO el DOM listo
+  document.addEventListener('DOMContentLoaded', function() {
+    showSection('planificacion');   // Muestro planificación por defecto
+    cargarDatosGenerales();         // Si quieres precargar combos/etc.
+  });
+
+
         // Función para cargar contenido dinámico
         function loadSection(section) {
             google.script.run.withSuccessHandler(updateContent).getSectionHTML(section);
