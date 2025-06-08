@@ -479,13 +479,14 @@ function mostrarPlanificacionHoy() {
 function seleccionarDiaCalendario(dia) {
   const fecha = new Date(mesActualCalendario.getFullYear(), mesActualCalendario.getMonth(), dia);
   planificacionDiaSeleccionado = fecha;
-  
+
+  // convierto a milisegundos
+  const timestamp = fecha.getTime();  
   // Actualizar título
   const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   document.getElementById('tituloDetalleDia').textContent = fecha.toLocaleDateString('es-ES', opciones);
-  
-  // Cargar detalles del día
-  cargarDetalleDia(fecha);
+
+  cargarDetalleDia(timestamp);
 }
 
 // Cargar datos del calendario
@@ -545,132 +546,102 @@ function cargarDatosCalendario() {
     .getDatosCalendarioPlanificacion(año, mes);
 }
 
-// Cargar detalle del día
-function cargarDetalleDia(fecha) {
-  const contenedor = document.getElementById('detalleDiaPlanificacion');
-  contenedor.innerHTML = '<p style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
-  
-  google.script.run
-    .withSuccessHandler(function(datos) {
-      let html = '';
-      
-      if (!datos.planificacion) {
-        // No hay planificación para este día
-        html = '<div style="text-align: center; padding: 20px;">';
-        html += '<i class="fas fa-calendar-times" style="font-size: 48px; color: #ddd; margin-bottom: 10px;"></i>';
-        html += '<p style="color: #666;">No hay planificación para este día</p>';
-        
-        // Si es hoy, mostrar botón para crear
-        const hoy = new Date();
-        if (fecha.toDateString() === hoy.toDateString()) {
-          html += '<button onclick="nuevaPlanificacion()" style="margin-top: 10px; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px;">';
-          html += '<i class="fas fa-plus"></i> Crear planificación';
-          html += '</button>';
+  /** Carga el detalle del día seleccionado en el panel derecho - Chat 08-06-2025 */
+  function cargarDetalleDia(fechaMs) {
+    const contenedor = document.getElementById('detalleDiaPlanificacion');
+    if (!contenedor) {
+      return console.error('No existe el contenedor detalleDiaPlanificacion');
+    }
+    // Muestra spinner mientras llega la respuesta
+    contenedor.innerHTML =
+      '<p style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
+
+    google.script.run
+      .withSuccessHandler(function (datos) {
+        console.log('📥 datos recibidos del servidor:', datos);
+        // Si por alguna razón 'datos' no es un objeto, abortamos
+        if (!datos || typeof datos !== 'object') {
+          contenedor.textContent = 'Error: datos inesperados.';
+          return;
         }
-        
-        html += '</div>';
-      } else {
-        // Hay planificación
-        html += '<div style="margin-bottom: 20px;">';
-        html += '<h5>Tiempo de estudio</h5>';
-        html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">';
-        html += '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">';
-        html += '<div style="font-size: 20px; font-weight: bold; color: #007bff;">' + Math.round(datos.planificacion.tiempoPrevisto / 60) + 'h</div>';
-        html += '<div style="font-size: 11px; color: #666;">Previsto</div>';
-        html += '</div>';
-        html += '<div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">';
-        html += '<div style="font-size: 20px; font-weight: bold; color: #28a745;">' + Math.round(datos.planificacion.tiempoReal / 60) + 'h</div>';
-        html += '<div style="font-size: 11px; color: #666;">Real</div>';
-        html += '</div>';
-        html += '</div>';
-        
-        // Input para actualizar tiempo real
-        if (datos.planificacion.estado === 'activa') {
-          html += '<div style="margin-top: 10px;">';
-          html += '<label style="font-size: 12px;">Actualizar tiempo estudiado:</label>';
-          html += '<div style="display: flex; gap: 5px; align-items: center;">';
-          html += '<input type="number" id="horasReales" min="0" max="12" value="' + Math.floor(datos.planificacion.tiempoReal / 60) + '" style="width: 50px; padding: 5px;">';
-          html += '<span>h</span>';
-          html += '<input type="number" id="minutosReales" min="0" max="59" value="' + (datos.planificacion.tiempoReal % 60) + '" style="width: 50px; padding: 5px; margin-left: 10px;">';
-          html += '<span>min</span>';
-          html += '<button onclick="actualizarTiempoReal(' + datos.planificacion.id + ')" style="margin-left: 10px; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px;">';
-          html += '<i class="fas fa-save"></i>';
-          html += '</button>';
-          html += '</div>';
-          html += '</div>';
-        }
-        
-        html += '</div>';
-        
-        // Temas activos
-        html += '<div style="margin-bottom: 20px;">';
-        html += '<h5>Temas del día (' + datos.temasActivos.length + ')</h5>';
-        
-        datos.temasActivos.forEach((tema, index) => {
-          const progreso = tema.paginasCompletadas / tema.paginasTotales * 100;
-          
-          html += '<div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid ' + (tema.estado === 'completado' ? '#28a745' : '#007bff') + ';">';
-          html += '<div style="display: flex; justify-content: space-between; align-items: start;">';
-          html += '<div style="flex: 1;">';
-          html += '<strong>' + (index + 1) + '. ' + tema.nombreCompleto + '</strong>';
-          html += '<div style="font-size: 12px; color: #666; margin-top: 5px;">';
-          html += 'Bloque: ' + tema.nombreBloque + ' | ';
-          html += tema.paginasCompletadas + '/' + tema.paginasTotales + ' páginas';
-          html += '</div>';
-          
-          // Barra de progreso
-          html += '<div style="margin-top: 5px; background: #e9ecef; height: 6px; border-radius: 3px;">';
-          html += '<div style="background: ' + (tema.estado === 'completado' ? '#28a745' : '#007bff') + '; height: 100%; width: ' + progreso + '%; border-radius: 3px;"></div>';
-          html += '</div>';
-          html += '</div>';
-          
-          // Botón completar
-          if (tema.estado !== 'completado' && datos.planificacion.estado === 'activa') {
-            html += '<button onclick="completarTema(' + tema.idProgreso + ', ' + tema.idTema + ', \'' + tema.nombreCompleto + '\')" ';
-            html += 'style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; font-size: 12px;">';
-            html += '<i class="fas fa-check"></i>';
-            html += '</button>';
-          } else if (tema.estado === 'completado') {
-            html += '<span style="color: #28a745; font-size: 20px;"><i class="fas fa-check-circle"></i></span>';
+       
+        let html = '';
+        if (!datos.planificacion) {
+          // No hay planificación para este día
+          html +=
+            '<div style="text-align:center; padding:20px;">' +
+            '<i class="fas fa-calendar-times" style="font-size:48px; color:#ddd; margin-bottom:10px;"></i>' +
+            '<p style="color:#666;">No hay planificación para este día</p>' +
+            '</div>';
+        } else {
+          // Hay planificación: muestro horas previstas / reales
+          html += '<div style="margin-bottom:20px;">';
+          html += '<h5>Tiempo de estudio</h5>';
+          html +=
+            '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">';
+
+          // Previsto
+          const hPrev = Math.round(datos.planificacion.tiempoPrevisto / 60);
+          html +=
+            '<div style="text-align:center; padding:10px; background:#f8f9fa; border-radius:5px;">' +
+            '<div style="font-size:20px; font-weight:bold;">' +
+            hPrev +
+            'h</div>' +
+            '<div style="font-size:11px; color:#666;">Previsto</div>' +
+            '</div>';
+
+          // Real
+          const hReal = Math.round(datos.planificacion.tiempoReal / 60);
+          html +=
+            '<div style="text-align:center; padding:10px; background:#f8f9fa; border-radius:5px;">' +
+            '<div style="font-size:20px; font-weight:bold;">' +
+            hReal +
+            'h</div>' +
+            '<div style="font-size:11px; color:#666;">Real</div>' +
+            '</div>';
+
+          html += '</div></div>';
+
+          // Si la planificación está activa, permito ajustar el tiempo real
+          if (datos.planificacion.estado === 'activa') {
+            const horas = Math.floor(datos.planificacion.tiempoReal / 60);
+            const minutos = datos.planificacion.tiempoReal % 60;
+
+            html += '<div style="margin-top:10px;">';
+            html += '<label style="font-size:12px;">Actualizar tiempo estudiado:</label>';
+            html +=
+              '<div style="display:flex; gap:5px; align-items:center;">' +
+              // Campo horas
+              '<input type="number" id="horasReales" min="0" value="' +
+              horas +
+              '" style="width:50px; padding:5px;">' +
+              '<span>h</span>' +
+              // Campo minutos
+              '<input type="number" id="minutosReales" min="0" value="' +
+              minutos +
+              '" style="width:50px; padding:5px;">' +
+              '<span>min</span>' +
+              // Botón guardar
+              '<button onclick="actualizarTiempoReal(' +
+              datos.planificacion.id +
+              ')" style="margin-left:10px; padding:5px 10px; background:#007bff; color:white; border:none; border-radius:3px;">' +
+              '<i class="fas fa-save"></i> Guardar' +
+              '</button>' +
+              '</div>';
+            html += '</div>';
           }
-          
-          html += '</div>';
-          html += '</div>';
-        });
-        
-        html += '</div>';
-        
-        // Repasos programados
-        if (datos.repasos.length > 0) {
-          html += '<div>';
-          html += '<h5>Repasos programados (' + datos.repasos.length + ')</h5>';
-          
-          datos.repasos.forEach(repaso => {
-            html += '<div style="margin-bottom: 8px; padding: 8px; background: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;">';
-            html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
-            html += '<div>';
-            html += '<strong>Repaso ' + repaso.numeroRepaso + '°</strong><br>';
-            html += '<small>' + repaso.nombreTema + '</small>';
-            html += '</div>';
-            html += '<button onclick="realizarRepaso(' + repaso.id + ', ' + repaso.idTema + ')" style="padding: 5px 10px; background: #ffc107; color: #212529; border: none; border-radius: 3px; font-size: 12px;">';
-            html += '<i class="fas fa-play"></i> Test';
-            html += '</button>';
-            html += '</div>';
-            html += '</div>';
-          });
-          
-          html += '</div>';
         }
-      }
-      
-      contenedor.innerHTML = html;
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al cargar detalle del día:', error);
-      contenedor.innerHTML = '<p style="color: red;">Error al cargar los datos</p>';
-    })
-    .getDetalleDiaPlanificacion(fecha);
-}
+
+        // Inyecto la construcción final
+        contenedor.innerHTML = html;
+      })
+      .withFailureHandler(function (err) {
+        console.error('🛑 Error al cargar detalle del día:', err);
+        contenedor.innerHTML =
+          '<p style="color:red; text-align:center;">Error al cargar los datos</p>';
+      })
+      .getDetalleDiaPlanificacion(fechaMs);
+  }
 
 // Actualizar tiempo real estudiado
 function actualizarTiempoReal(idPlanificacion) {
