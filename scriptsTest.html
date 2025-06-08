@@ -4,6 +4,16 @@ var temasDisponiblesTest = [];
 var testActivo = null;
 var preguntaActual = 0;
 var respuestasTest = []; // Array de objetos: {letra: 'A', corregida: false, esCorrecta: null}
+// Variables para temporizador (AÑADIR después de las variables existentes)
+var tiempoInicio = null;
+var intervalTemporizador = null;
+var avisosRealizados = {
+  cincoMinutos: false,
+  unMinuto: false
+};
+// Variables para importación
+var hojasDisponibles = [];
+var hojasSeleccionadas = [];
 
 // Cargar oposiciones cuando se entra a la sección Test
 function inicializarSeccionTest() {
@@ -204,6 +214,8 @@ function prepararTest() {
       testActivo = test;
       preguntaActual = 0;
       respuestasTest = new Array(test.preguntas.length).fill(null);
+      // Iniciar temporizador
+      iniciarTemporizador();
       mostrarPregunta();
     })
     .withFailureHandler(function(error) {
@@ -226,12 +238,17 @@ function mostrarPregunta() {
   const respuestaGuardada = respuestasTest[preguntaActual];
   
   let html = '<div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+  // Temporizador
+  html += '<div id="temporizadorTest" style="text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">Calculando tiempo...</div>';
   
   // Progreso
   html += '<div style="margin-bottom: 20px;">';
   html += '<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">';
   html += '<span>Pregunta ' + (preguntaActual + 1) + ' de ' + totalPreguntas + '</span>';
   html += '<span>Modo: ' + testActivo.modo + '</span>';
+  if (testActivo.esRepaso) {
+  html += ' | <span style="color: #ffc107; font-weight: bold;"><i class="fas fa-redo"></i> Test de Repaso</span>';
+  }
   html += '</div>';
   html += '<div style="background: #e0e0e0; height: 10px; border-radius: 5px;">';
   html += '<div style="background: #007bff; height: 100%; width: ' + ((preguntaActual + 1) / totalPreguntas * 100) + '%; border-radius: 5px;"></div>';
@@ -456,6 +473,11 @@ function avanzarPregunta() {
 
 // Finalizar test
 function finalizarTest() {
+  // Detener temporizador
+  if (intervalTemporizador) {
+    clearInterval(intervalTemporizador);
+    intervalTemporizador = null;
+  }
   const sinResponder = respuestasTest.filter(r => !r || !r.letra).length;
   
   if (sinResponder > 0) {
@@ -520,6 +542,10 @@ function guardarRespuestasExamen() {
 function finalizarTestReal() {
   google.script.run
     .withSuccessHandler(function(resultado) {
+      // Si es un test de repaso, actualizar el repaso
+      if (testActivo.esRepaso && testActivo.idRepaso) {
+        actualizarRepasoCompletado(testActivo.idRepaso, resultado);
+      }
       mostrarResultadosTest(resultado);
     })
     .withFailureHandler(function(error) {
@@ -610,6 +636,11 @@ function mostrarResultadosTest(resultado) {
 
 // Volver a configuración
 function volverAConfiguracion() {
+  // Detener temporizador
+  if (intervalTemporizador) {
+    clearInterval(intervalTemporizador);
+    intervalTemporizador = null;
+  }
   document.getElementById('panelConfiguracionTest').style.display = 'block';
   const panelAdmin = document.querySelector('.contenedor-administracion');
   if (panelAdmin) panelAdmin.style.display = 'block';
@@ -622,7 +653,7 @@ function volverAConfiguracion() {
 }
 
 // ===== SECCIÓN DE ADMINISTRACIÓN =====
-
+/*
 // Panel de administración
 function togglePanelAdmin() {
   const panel = document.getElementById('opcionesAdmin');
@@ -641,8 +672,8 @@ function togglePanelAdmin() {
     icono.className = 'fas fa-chevron-down';
   }
 }
-
-// Importar preguntas desde URL
+*/
+// Importar preguntas desde URL (REEMPLAZAR la existente)
 function importarPreguntasDesdeURL() {
   const url = document.getElementById('urlSheetImportar').value.trim();
   
@@ -656,37 +687,110 @@ function importarPreguntasDesdeURL() {
     return;
   }
   
-  // Preguntar qué hojas importar
-  const importarTodas = confirm('¿Importar todas las hojas del documento?\n\nSí = Importar todas las hojas\nNo = Especificar nombres de hojas');
-  
-  let hojasAImportar = null;
-  if (!importarTodas) {
-    const nombresHojas = prompt('Introduce los nombres de las hojas a importar, separados por comas:\n\nEjemplo: Hoja1, Hoja2, Hoja3');
-    if (!nombresHojas) return;
-    hojasAImportar = nombresHojas.split(',').map(h => h.trim());
-  }
-  
-  // Mostrar loading
   const boton = event.target || document.querySelector('button[onclick*="importarPreguntasDesdeURL"]');
   const textoOriginal = boton.innerHTML;
-  boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+  boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando hojas...';
   boton.disabled = true;
   
-  // Llamar a función mejorada
   google.script.run
-    .withSuccessHandler(function(resultado) {
-      alert(resultado);
-      document.getElementById('urlSheetImportar').value = '';
-      actualizarEstadisticasPreguntas();
+    .withSuccessHandler(function(hojas) {
+      hojasDisponibles = hojas;
+      mostrarSelectorHojas(url);
       boton.innerHTML = textoOriginal;
       boton.disabled = false;
     })
     .withFailureHandler(function(error) {
-      alert('Error al importar: ' + error.message);
+      alert('Error al obtener hojas: ' + error.message);
       boton.innerHTML = textoOriginal;
       boton.disabled = false;
     })
-    .importarPreguntasDesdeSheetMejorado(url, hojasAImportar);
+    .obtenerHojasDeSpreadsheet(url);
+}
+
+// AÑADIR estas funciones nuevas:
+function mostrarSelectorHojas(url) {
+  let html = '<div id="modalSelectorHojas" style="';
+  html += 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; ';
+  html += 'background: rgba(0,0,0,0.5); z-index: 9999; ';
+  html += 'display: flex; align-items: center; justify-content: center;">';
+  
+  html += '<div style="background: white; padding: 30px; border-radius: 10px; ';
+  html += 'max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">';
+  
+  html += '<h3>Seleccionar hojas a importar</h3>';
+  html += '<p style="color: #666; font-size: 14px;">Se encontraron ' + hojasDisponibles.length + ' hojas en el documento</p>';
+  
+  html += '<div style="margin: 15px 0;">';
+  html += '<button onclick="seleccionarTodasLasHojas()" style="margin-right: 10px;">Seleccionar todas</button>';
+  html += '<button onclick="deseleccionarTodasLasHojas()">Deseleccionar todas</button>';
+  html += '</div>';
+  
+  html += '<div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; max-height: 300px; overflow-y: auto;">';
+  hojasDisponibles.forEach(function(hoja, index) {
+    html += '<label style="display: block; padding: 5px; cursor: pointer;">';
+    html += '<input type="checkbox" class="checkHojaImportar" value="' + index + '" style="margin-right: 10px;">';
+    html += hoja.nombre + ' (' + hoja.filas + ' filas)';
+    html += '</label>';
+  });
+  html += '</div>';
+  
+  html += '<div style="margin-top: 20px; text-align: right;">';
+  html += '<button onclick="cancelarImportacion()" style="margin-right: 10px;">Cancelar</button>';
+  html += '<button onclick="procederConImportacion(\'' + url + '\')" style="background: #28a745; color: white;">Importar seleccionadas</button>';
+  html += '</div>';
+  
+  html += '</div>';
+  html += '</div>';
+  
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function seleccionarTodasLasHojas() {
+  document.querySelectorAll('.checkHojaImportar').forEach(check => check.checked = true);
+}
+
+function deseleccionarTodasLasHojas() {
+  document.querySelectorAll('.checkHojaImportar').forEach(check => check.checked = false);
+}
+
+function cancelarImportacion() {
+  const modal = document.getElementById('modalSelectorHojas');
+  if (modal) modal.remove();
+}
+
+function procederConImportacion(url) {
+  hojasSeleccionadas = [];
+  document.querySelectorAll('.checkHojaImportar:checked').forEach(function(check) {
+    const index = parseInt(check.value);
+    hojasSeleccionadas.push(hojasDisponibles[index].nombre);
+  });
+  
+  if (hojasSeleccionadas.length === 0) {
+    alert('Selecciona al menos una hoja para importar');
+    return;
+  }
+  
+  cancelarImportacion();
+  
+  const contenedorLoading = document.createElement('div');
+  contenedorLoading.id = 'loadingImportacion';
+  contenedorLoading.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); ';
+  contenedorLoading.style.cssText += 'background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 9999;';
+  contenedorLoading.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Importando ' + hojasSeleccionadas.length + ' hojas...</p>';
+  document.body.appendChild(contenedorLoading);
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      document.getElementById('loadingImportacion').remove();
+      alert(resultado);
+      document.getElementById('urlSheetImportar').value = '';
+      actualizarEstadisticasPreguntas();
+    })
+    .withFailureHandler(function(error) {
+      document.getElementById('loadingImportacion').remove();
+      alert('Error al importar: ' + error.message);
+    })
+    .importarPreguntasDesdeSheetMejorado(url, hojasSeleccionadas);
 }
 
 // Buscar archivos en carpeta
@@ -770,4 +874,143 @@ function actualizarEstadisticasPreguntas() {
     })
     .obtenerEstadisticasPreguntas();
 }
+
+// Iniciar temporizador
+function iniciarTemporizador() {
+  tiempoInicio = new Date();
+  avisosRealizados = {
+    cincoMinutos: false,
+    unMinuto: false
+  };
+  
+  if (intervalTemporizador) {
+    clearInterval(intervalTemporizador);
+  }
+  
+  intervalTemporizador = setInterval(actualizarTemporizador, 1000);
+}
+
+// Actualizar temporizador
+function actualizarTemporizador() {
+  if (!tiempoInicio || !testActivo) return;
+  
+  const ahora = new Date();
+  const tiempoTranscurrido = Math.floor((ahora - tiempoInicio) / 1000);
+  const tiempoTotal = testActivo.preguntas.length * 60;
+  const tiempoRestante = tiempoTotal - tiempoTranscurrido;
+  
+  const elementoTiempo = document.getElementById('temporizadorTest');
+  if (elementoTiempo) {
+    const minutos = Math.floor(Math.abs(tiempoRestante) / 60);
+    const segundos = Math.abs(tiempoRestante) % 60;
+    
+    let textoTiempo = '';
+    if (tiempoRestante >= 0) {
+      textoTiempo = `Tiempo restante: ${minutos}:${segundos.toString().padStart(2, '0')}`;
+      elementoTiempo.style.color = tiempoRestante <= 60 ? '#dc3545' : (tiempoRestante <= 300 ? '#ffc107' : '#28a745');
+    } else {
+      textoTiempo = `Tiempo excedido: -${minutos}:${segundos.toString().padStart(2, '0')}`;
+      elementoTiempo.style.color = '#dc3545';
+    }
+    
+    elementoTiempo.textContent = textoTiempo;
+  }
+  
+  // Avisos
+  if (tiempoRestante <= 300 && tiempoRestante > 299 && !avisosRealizados.cincoMinutos && testActivo.preguntas.length > 20) {
+    avisosRealizados.cincoMinutos = true;
+    mostrarAvisoTiempo('¡Atención! Quedan 5 minutos para finalizar el test', 'warning');
+  }
+  
+  if (tiempoRestante <= 60 && tiempoRestante > 59 && !avisosRealizados.unMinuto) {
+    avisosRealizados.unMinuto = true;
+    mostrarAvisoTiempo('¡ÚLTIMO MINUTO! El test está a punto de finalizar', 'danger');
+  }
+}
+
+// Mostrar aviso de tiempo
+function mostrarAvisoTiempo(mensaje, tipo) {
+  const aviso = document.createElement('div');
+  aviso.className = `aviso-tiempo ${tipo}`;
+  aviso.innerHTML = `
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>${mensaje}</span>
+  `;
+  aviso.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    background: ${tipo === 'danger' ? '#dc3545' : '#ffc107'};
+    color: ${tipo === 'danger' ? 'white' : '#212529'};
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    font-weight: bold;
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
+    max-width: 300px;
+  `;
+  
+  if (!document.getElementById('avisoTiempoStyles')) {
+    const style = document.createElement('style');
+    style.id = 'avisoTiempoStyles';
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(aviso);
+  
+  // Sonido opcional
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmFgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+    audio.volume = 0.5;
+    audio.play();
+  } catch (e) {}
+  
+  setTimeout(() => {
+    aviso.style.animation = 'slideOut 0.3s ease-in';
+    setTimeout(() => aviso.remove(), 300);
+  }, 5000);
+}
+
+// Funciones para el modal de administración
+function togglePanelAdminModal() {
+  const modal = document.querySelector('.contenedor-administracion-modal');
+  const overlay = document.querySelector('.overlay-admin');
+  
+  if (modal && overlay) {
+    modal.classList.add('visible');
+    overlay.classList.add('visible');
+    
+    // Cargar estadísticas al abrir
+    actualizarEstadisticasPreguntas();
+  }
+}
+
+function cerrarPanelAdminModal() {
+  const modal = document.querySelector('.contenedor-administracion-modal');
+  const overlay = document.querySelector('.overlay-admin');
+  
+  if (modal && overlay) {
+    modal.classList.remove('visible');
+    overlay.classList.remove('visible');
+  }
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    cerrarPanelAdminModal();
+  }
+});
+
 </script>
