@@ -9,6 +9,8 @@
   <?!= include('scriptsConceptos') ?>
   <?!= include('scriptsEstudio') ?>
   <?!= include('scriptsTest') ?>
+  <?!= include('scriptsPlanificacion') ?>
+  <?!= include('scriptsRepasos') ?>
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
     header { background-color: #007bff; color: white; padding: 1rem 2rem; text-align: center; }
@@ -25,36 +27,198 @@
     input, select, button { margin-bottom: 0.5rem; padding: 0.4rem; }
     label { display: block; margin-top: 0.5rem; }
 
-    /* Estilos para la sección de test */
-    .contenedor-administracion {
-      width: 350px;
-      position: fixed;
-      right: 0;
-      top: 100px;
-      background: white;
-      border-left: 1px solid #ddd;
-      padding: 20px;
-      height: calc(100vh - 100px);
-      overflow-y: auto;
-      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-    }
-    
-    .test-main-content {
-      margin-right: 370px;
-      padding: 20px;
-    }
+/* En la sección <style> del index.html, añade: */
+
+.contenedor-administracion {
+  width: 350px;
+  position: fixed;
+  right: 0;
+  top: 100px; /* Ajusta según tu diseño */
+  background: white;
+  border-left: 1px solid #ddd;
+  padding: 20px;
+  height: calc(100vh - 100px);
+  overflow-y: auto;
+  box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+  z-index: 100;
+}
+
+.test-main-content {
+  margin-right: 370px;
+  padding: 20px;
+}
+
+/* Cuando el panel esté oculto */
+.test-main-content.full-width {
+  margin-right: 20px;
+}
+
+/* Para dispositivos móviles */
+@media (max-width: 768px) {
+  .contenedor-administracion {
+    position: relative;
+    width: 100%;
+    height: auto;
+    margin-top: 20px;
+  }
+  
+  .test-main-content {
+    margin-right: 0;
+  }
+}
+/* Botón flotante de administración */
+.boton-admin-flotante {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  background: #007bff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.boton-admin-flotante:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  background: #0056b3;
+}
+
+.boton-admin-flotante i {
+  font-size: 24px;
+}
+
+/* Mostrar solo cuando estamos en la sección Test */
+.section:not(#test) .boton-admin-flotante {
+  display: none;
+}
+
+/* Modal de administración */
+.contenedor-administracion-modal {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  z-index: 1001;
+  animation: modalFadeIn 0.3s ease;
+}
+
+.contenedor-administracion-modal.visible {
+  display: block;
+}
+
+/* Overlay oscuro */
+.overlay-admin {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  animation: overlayFadeIn 0.3s ease;
+}
+
+.overlay-admin.visible {
+  display: block;
+}
+
+/* Animaciones */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Quitar el panel lateral anterior */
+.contenedor-administracion {
+  display: none !important;
+}
+
+/* Ajustar el contenido principal para usar todo el ancho */
+.test-main-content {
+  margin-right: 20px !important;
+  padding: 20px;
+}
+
+/* Estilo mejorado para la lista de archivos */
+#listaArchivosEncontrados {
+  border: 1px solid #e9ecef;
+  border-radius: 5px;
+  padding: 10px;
+  background: #f8f9fa;
+}
+
+#listaArchivosEncontrados > div > div {
+  background: white;
+  margin-bottom: 5px;
+  border-radius: 5px;
+  transition: background 0.2s;
+}
+
+#listaArchivosEncontrados > div > div:hover {
+  background: #e9ecef;
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+  .contenedor-administracion-modal {
+    width: 95%;
+    max-height: 90vh;
+    padding: 20px;
+  }
+  
+  .boton-admin-flotante {
+    width: 50px;
+    height: 50px;
+    bottom: 20px;
+    right: 20px;
+  }
+  
+  .boton-admin-flotante i {
+    font-size: 20px;
+  }
+}
   </style>
 </head>
 <body>
   <h1>Gestión de Temario</h1>
   <nav>
+    <button onclick="showSection('planificacion')">Planificación</button>
+    <button onclick="showSection('repasos')">Repasos</button>
+    <button onclick="showSection('test')">Test</button>
+    <button onclick="showSection('estudio')">Estudio</button>
+    <button onclick="showSection('conceptos')">Conceptos</button>
     <button onclick="showSection('oposiciones')">Oposiciones</button>
     <button onclick="showSection('bloques')">Bloques</button>
-    <button onclick="showSection('temas')">Temas</button>
-    <button onclick="showSection('test')">Test</button>
-    <button onclick="showSection('conceptos')">Conceptos</button>
-    <button onclick="showSection('estudio')">Estudio</button>
-    <button onclick="showSection('repasos')">Repasos</button>
+    <button onclick="showSection('temas')">Temas</button>    
   </nav>
   <div class="container">
 
@@ -363,42 +527,62 @@
       </div>
       
       <!-- Panel de administración -->
-      <div class="contenedor-administracion">
-        <div style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;" onclick="togglePanelAdmin()">
-          <span id="toggleAdminText">Mostrar opciones</span>
-          <i id="toggleAdminIcon" class="fas fa-chevron-down" style="float: right;"></i>
+      <!-- Botón flotante de administración -->
+      <div class="boton-admin-flotante" onclick="togglePanelAdminModal()">
+        <i class="fas fa-cog"></i>
+      </div>
+
+      <!-- Overlay oscuro -->
+      <div class="overlay-admin" onclick="cerrarPanelAdminModal()"></div>
+
+      <!-- Panel de administración como modal -->
+      <div class="contenedor-administracion-modal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="margin: 0;">Administración de Preguntas</h3>
+          <button onclick="cerrarPanelAdminModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
         </div>
         
-        <div id="opcionesAdmin" style="display: none;">
-          <h3>Administración de Preguntas</h3>
-          
-          <!-- Estadísticas -->
-          <div style="background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-            <h4 style="margin-top: 0;">Estadísticas</h4>
-            <p>Total preguntas: <strong id="totalPreguntas">0</strong></p>
-            <p>Temas con preguntas: <strong id="temasConPreguntas">0</strong></p>
-            <p>Última importación: <strong id="ultimaImportacion">-</strong></p>
+        <!-- Estadísticas -->
+        <div style="background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+          <h4 style="margin-top: 0;">Estadísticas</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+            <div>
+              <div style="font-size: 24px; font-weight: bold; color: #007bff;" id="totalPreguntas">0</div>
+              <div style="font-size: 12px; color: #666;">Total preguntas</div>
+            </div>
+            <div>
+              <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="temasConPreguntas">0</div>
+              <div style="font-size: 12px; color: #666;">Temas con preguntas</div>
+            </div>
+            <div>
+              <div style="font-size: 16px; font-weight: bold; color: #6c757d;" id="ultimaImportacion">-</div>
+              <div style="font-size: 12px; color: #666;">Última importación</div>
+            </div>
           </div>
-          
-          <!-- Importar desde URL -->
-          <div style="margin-bottom: 20px;">
-            <h4>Importar desde Google Sheets</h4>
-            <input type="text" id="urlSheetImportar" placeholder="URL del Google Sheet" style="width: 100%; margin-bottom: 10px;">
-            <button onclick="importarPreguntasDesdeURL()" style="width: 100%;">
+        </div>
+        
+        <!-- Importar desde URL -->
+        <div style="margin-bottom: 20px;">
+          <h4>Importar desde Google Sheets</h4>
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="urlSheetImportar" placeholder="URL del Google Sheet" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+            <button onclick="importarPreguntasDesdeURL()" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
               <i class="fas fa-upload"></i> Importar
             </button>
           </div>
-          
-          <!-- Buscar en carpeta Drive -->
-          <div>
-            <h4>Buscar en carpeta de Drive</h4>
-            <input type="text" id="nombreCarpetaDrive" placeholder="Nombre de la carpeta" style="width: 100%; margin-bottom: 10px;">
-            <button onclick="buscarArchivosEnCarpeta()" style="width: 100%;">
+        </div>
+        
+        <!-- Buscar en carpeta Drive -->
+        <div>
+          <h4>Buscar en carpeta de Drive</h4>
+          <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <input type="text" id="nombreCarpetaDrive" placeholder="Nombre de la carpeta" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+            <button onclick="buscarArchivosEnCarpeta()" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
               <i class="fas fa-search"></i> Buscar
             </button>
-            <div id="listaArchivosEncontrados" style="margin-top: 10px;">
-              <!-- Aquí se mostrarán los archivos encontrados -->
-            </div>
+          </div>
+          <div id="listaArchivosEncontrados" style="max-height: 200px; overflow-y: auto;">
+            <!-- Aquí se mostrarán los archivos encontrados -->
           </div>
         </div>
       </div>
@@ -457,10 +641,256 @@
     </div>
 
     <!-- Sección Repasos -->
-    <div id="repasos" class="section">
-      <h2>Gestión de Repasos</h2>
-      <p>Contenido en desarrollo...</p>
+<div id="repasos" class="section">
+  <h2>Gestión de Repasos</h2>
+  
+  <div style="display: flex; gap: 20px;">
+    <!-- Panel principal -->
+    <div style="flex: 1;">
+      <!-- Filtros -->
+      <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+        <h4 style="margin-top: 0;">Filtros</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+          <div>
+            <label style="font-size: 14px;">Estado:</label>
+            <select id="filtroEstadoRepaso" onchange="aplicarFiltrosRepasos()" style="width: 100%; padding: 8px;">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="completado">Completados</option>
+              <option value="omitido">Omitidos</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 14px;">Número de repaso:</label>
+            <select id="filtroNumeroRepaso" onchange="aplicarFiltrosRepasos()" style="width: 100%; padding: 8px;">
+              <option value="">Todos</option>
+              <option value="1">1° Repaso</option>
+              <option value="2">2° Repaso</option>
+              <option value="3">3° Repaso</option>
+              <option value="4">4° Repaso</option>
+              <option value="5">5° Repaso</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 14px;">Período:</label>
+            <select id="filtroPeriodoRepaso" onchange="aplicarFiltrosRepasos()" style="width: 100%; padding: 8px;">
+              <option value="">Todos</option>
+              <option value="hoy">Hoy</option>
+              <option value="semana">Esta semana</option>
+              <option value="mes">Este mes</option>
+              <option value="vencidos">Vencidos</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 14px;">Buscar tema:</label>
+            <input type="text" id="buscarTemaRepaso" placeholder="Nombre del tema..." onkeyup="aplicarFiltrosRepasos()" style="width: 100%; padding: 8px;">
+          </div>
+        </div>
+      </div>
+      
+      <!-- Tabla de repasos -->
+      <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h4 style="margin: 0;">Lista de Repasos</h4>
+          <div>
+            <span id="contadorRepasos" style="margin-right: 15px; color: #666;"></span>
+            <button onclick="exportarRepasos()" style="background: #6c757d; color: white; padding: 5px 10px; border: none; border-radius: 5px; font-size: 12px;">
+              <i class="fas fa-download"></i> Exportar
+            </button>
+          </div>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; min-width: 800px;">
+            <thead>
+              <tr style="background: #f8f9fa;">
+                <th style="padding: 10px; text-align: left;">Tema</th>
+                <th style="padding: 10px; text-align: center; width: 80px;">Repaso</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Fecha Prog.</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Fecha Compl.</th>
+                <th style="padding: 10px; text-align: center; width: 80px;">Nota</th>
+                <th style="padding: 10px; text-align: center; width: 80px;">Tiempo</th>
+                <th style="padding: 10px; text-align: center; width: 100px;">Estado</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tablaRepasosBody">
+              <!-- Se llenará dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Paginación -->
+        <div id="paginacionRepasos" style="display: flex; justify-content: center; margin-top: 20px; gap: 5px;">
+          <!-- Se llenará dinámicamente -->
+        </div>
+      </div>
     </div>
+    
+    <!-- Panel lateral - Estadísticas -->
+    <div style="width: 300px;">
+      <!-- Resumen general -->
+      <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+        <h4 style="margin-top: 0;">Resumen General</h4>
+        <div style="display: grid; gap: 15px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #e3f2fd; border-radius: 5px;">
+            <span>Total repasos</span>
+            <strong id="totalRepasos" style="font-size: 20px; color: #007bff;">0</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #fff3cd; border-radius: 5px;">
+            <span>Pendientes</span>
+            <strong id="repasosPendientes" style="font-size: 20px; color: #ffc107;">0</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #d4edda; border-radius: 5px;">
+            <span>Completados</span>
+            <strong id="repasosCompletados" style="font-size: 20px; color: #28a745;">0</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8d7da; border-radius: 5px;">
+            <span>Vencidos</span>
+            <strong id="repasosVencidos" style="font-size: 20px; color: #dc3545;">0</strong>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Próximos repasos -->
+      <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h4 style="margin-top: 0;">Próximos 7 días</h4>
+        <div id="proximosRepasos" style="max-height: 300px; overflow-y: auto;">
+          <!-- Se llenará dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sección Planificación -->
+<div id="planificacion" class="section">
+  <div style="display: flex; gap: 20px;">
+    <!-- Panel principal - Calendario -->
+    <div style="flex: 1;">
+      <h2>Planificación de Estudio</h2>
+      
+      <!-- Controles del calendario -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <button onclick="cambiarMesCalendario(-1)" style="padding: 5px 10px;">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span id="mesActualCalendario" style="margin: 0 15px; font-weight: bold; font-size: 18px;"></span>
+          <button onclick="cambiarMesCalendario(1)" style="padding: 5px 10px;">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+        <div>
+          <button onclick="mostrarPlanificacionHoy()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 5px;">
+            <i class="fas fa-calendar-day"></i> Hoy
+          </button>
+          <button onclick="nuevaPlanificacion()" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px; margin-left: 10px;">
+            <i class="fas fa-plus"></i> Nueva Planificación
+          </button>
+        </div>
+      </div>
+      
+      <!-- Calendario -->
+      <div id="calendarioPlanificacion" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;">
+        <!-- Aquí se generará el calendario dinámicamente -->
+      </div>
+    </div>
+    
+    <!-- Panel lateral - Detalle del día -->
+    <div style="width: 350px;">
+      <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;">
+        <h3 id="tituloDetalleDia">Selecciona un día</h3>
+        <div id="detalleDiaPlanificacion">
+          <p style="text-align: center; color: #666; padding: 40px 0;">
+            <i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>
+            Selecciona un día del calendario para ver los detalles
+          </p>
+        </div>
+      </div>
+      
+      <!-- Estadísticas -->
+      <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-top: 20px;">
+        <h4>Estadísticas del Mes</h4>
+        <div id="estadisticasMesPlanificacion">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+              <div style="font-size: 24px; font-weight: bold; color: #007bff;" id="diasEstudiadosMes">0</div>
+              <div style="font-size: 12px; color: #666;">Días estudiados</div>
+            </div>
+            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+              <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="horasTotalesMes">0h</div>
+              <div style="font-size: 12px; color: #666;">Horas totales</div>
+            </div>
+            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+              <div style="font-size: 24px; font-weight: bold; color: #ffc107;" id="temasCompletadosMes">0</div>
+              <div style="font-size: 12px; color: #666;">Temas completados</div>
+            </div>
+            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+              <div style="font-size: 24px; font-weight: bold; color: #dc3545;" id="repasosPendientesMes">0</div>
+              <div style="font-size: 12px; color: #666;">Repasos pendientes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Nueva Planificación -->
+  <div id="modalNuevaPlanificacion" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 30px; border-radius: 10px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">Nueva Planificación de Estudio</h3>
+        <button onclick="cerrarModalNuevaPlanificacion()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+      
+      <!-- Paso 1: Selección de oposición -->
+      <div id="paso1Planificacion">
+        <h4>Paso 1: Selecciona la oposición</h4>
+        <select id="oposicionPlanificacion" onchange="cargarTemasPlanificacion()" style="width: 100%; padding: 10px; margin-bottom: 20px;">
+          <option value="">-- Selecciona una oposición --</option>
+        </select>
+      </div>
+      
+      <!-- Paso 2: Selección de temas -->
+      <div id="paso2Planificacion" style="display: none;">
+        <h4>Paso 2: Selecciona los temas a estudiar</h4>
+        <p style="color: #666; font-size: 14px;">Selecciona 3 temas de diferentes bloques. Puedes añadir un 4º tema si es de Geografía o Callejero.</p>
+        
+        <div id="temasSeleccionadosPlanificacion" style="margin-bottom: 20px;">
+          <h5>Temas seleccionados:</h5>
+          <div id="listaTemasSeleccionados" style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; min-height: 100px;">
+            <p style="color: #999; text-align: center;">No hay temas seleccionados</p>
+          </div>
+        </div>
+        
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; max-height: 300px; overflow-y: auto;">
+          <h5>Temas disponibles:</h5>
+          <div id="arbolTemasPlanificacion">
+            <!-- Se cargará dinámicamente -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Paso 3: Configuración de tiempo -->
+      <div id="paso3Planificacion" style="display: none;">
+        <h4>Paso 3: Configuración de tiempo diario</h4>
+        <label>¿Cuántas horas planeas estudiar cada día?</label>
+        <input type="number" id="horasDiariasPlanificacion" min="1" max="12" value="4" style="width: 100px; padding: 8px; margin: 10px;">
+        <span>horas</span>
+      </div>
+      
+      <!-- Botones de acción -->
+      <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+        <button id="btnAnteriorPaso" onclick="anteriorPasoPlanificacion()" style="display: none;">Anterior</button>
+        <div>
+          <button onclick="cerrarModalNuevaPlanificacion()" style="margin-right: 10px;">Cancelar</button>
+          <button id="btnSiguientePaso" onclick="siguientePasoPlanificacion()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 5px;" disabled>Siguiente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
   </div>
 </body>
 </html>
