@@ -634,3 +634,92 @@ function obtenerNombreTema(idTema) {
   
   return 'Sin tema asignado';
 }
+
+// Obtener hojas de un spreadsheet
+function obtenerHojasDeSpreadsheet(url) {
+  try {
+    const spreadsheet = SpreadsheetApp.openByUrl(url);
+    const sheets = spreadsheet.getSheets();
+    
+    return sheets.map(sheet => ({
+      nombre: sheet.getName(),
+      filas: sheet.getLastRow()
+    }));
+  } catch (error) {
+    throw new Error('Error al acceder al documento: ' + error.message);
+  }
+}
+
+// Obtener preguntas más falladas ordenadas por fecha de último fallo
+function getPreguntasMasFailladasRecientes(idOposicion) {
+  try {
+    const preguntasSheet = getGoogleSheet('Test_Preguntas');
+    const preguntasColumns = getColumnIndices('Test_Preguntas');
+    const preguntasData = preguntasSheet.getDataRange().getValues();
+    
+    // Filtrar y ordenar preguntas
+    let preguntasFalladas = [];
+    
+    for (let i = 1; i < preguntasData.length; i++) {
+      const row = preguntasData[i];
+      const vecesFallada = row[preguntasColumns['veces_fallada']] || 0;
+      const vecesMostrada = row[preguntasColumns['veces_mostrada']] || 0;
+      const activa = row[preguntasColumns['activa']];
+      const ultimaRespuesta = row[preguntasColumns['ultima_respuesta']];
+      
+      // Solo incluir preguntas activas que han sido falladas
+      if (activa && vecesFallada > 0) {
+        const porcentajeFallo = vecesMostrada > 0 ? 
+          Math.round((vecesFallada / vecesMostrada) * 100) : 0;
+        
+        // Si se especifica oposición, verificar que el tema pertenezca a ella
+        if (idOposicion) {
+          const idTema = row[preguntasColumns['id_tema']];
+          if (!verificarTemaEnOposicion(idTema, idOposicion)) {
+            continue;
+          }
+        }
+        
+        preguntasFalladas.push({
+          pregunta: {
+            id: row[preguntasColumns['id_pregunta']],
+            titulo: row[preguntasColumns['titulo']],
+            descripcion: row[preguntasColumns['descripcion']],
+            opcion_a: row[preguntasColumns['opcion_a']],
+            opcion_b: row[preguntasColumns['opcion_b']],
+            opcion_c: row[preguntasColumns['opcion_c']],
+            opcion_d: row[preguntasColumns['opcion_d']],
+            respuesta_correcta: row[preguntasColumns['respuesta_correcta']],
+            retroalimentacion: row[preguntasColumns['retroalimentacion']],
+            nombreTema: obtenerNombreTema(row[preguntasColumns['id_tema']])
+          },
+          estadisticas: {
+            fallos: vecesFallada,
+            aciertos: row[preguntasColumns['veces_acertada']] || 0,
+            totalRespuestas: vecesMostrada,
+            porcentajeFallo: porcentajeFallo,
+            ultimaRespuesta: ultimaRespuesta
+          },
+          ordenFecha: ultimaRespuesta ? new Date(ultimaRespuesta).getTime() : 0
+        });
+      }
+    }
+    
+    // Ordenar primero por porcentaje de fallo, luego por fecha más reciente
+    preguntasFalladas.sort((a, b) => {
+      // Primero por porcentaje de fallo (mayor primero)
+      if (Math.abs(b.estadisticas.porcentajeFallo - a.estadisticas.porcentajeFallo) > 5) {
+        return b.estadisticas.porcentajeFallo - a.estadisticas.porcentajeFallo;
+      }
+      // Si son similares en porcentaje, ordenar por fecha más reciente
+      return b.ordenFecha - a.ordenFecha;
+    });
+    
+    // Limitar a las 200 más falladas
+    return preguntasFalladas.slice(0, 200);
+    
+  } catch (error) {
+    console.error('Error al obtener preguntas más falladas:', error);
+    throw error;
+  }
+}
