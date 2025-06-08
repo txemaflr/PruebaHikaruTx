@@ -38,8 +38,15 @@
         case 'estudio':
           if (typeof cargarDatosEstudio === 'function') cargarDatosEstudio();
           break;
+        case 'planificacion':
+          if (typeof inicializarSeccionPlanificacion === 'function') {
+            inicializarSeccionPlanificacion();
+          }
+          break;
         case 'repasos':
-          // Puedes añadir lógica aquí más adelante
+          if (typeof inicializarSeccionRepasos === 'function') {
+            inicializarSeccionRepasos();
+          }
           break;
       }
     } else {
@@ -49,7 +56,7 @@
 
   // Al cargar la página
   window.onload = function () {
-    showSection('oposiciones'); // Sección por defecto
+    showSection('planificacion'); // Sección por defecto
   // Precargar datos para todas las secciones
 
 };
