@@ -15,7 +15,7 @@ function include(filename) {
 
 // Función para obtener el HTML de una sección
 function getSectionHTML(section) {
-  var validSections = ['oposiciones', 'bloques', 'temas', 'test', 'conceptos', 'estudio', 'repasos'];
+  var validSections = ['oposiciones', 'bloques', 'temas', 'test', 'conceptos', 'estudio', 'repasos', 'planificacion'];
   if (!validSections.includes(section)) section = 'bienvenido';
   return HtmlService.createHtmlOutput('<h2>' + section.charAt(0).toUpperCase() + section.slice(1) + '</h2>').getContent();
   var html;
@@ -40,6 +40,9 @@ function getSectionHTML(section) {
       break;
     case 'repasos':
       html = HtmlService.createHtmlOutput('<h2>Repasos</h2>').getContent();
+      break;
+    case 'planificacion':
+      html = HtmlService.createHtmlOutput('<h2>Planificación</h2>').getContent();
       break;
     default:
       html = HtmlService.createHtmlOutput('<h2>Bienvenido</h2>').getContent();
