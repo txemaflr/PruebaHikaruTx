@@ -2,15 +2,7 @@
 <html>
 <head>
   <title>Gestión de Temario</title>
-  <?!= include('scriptsGenerales') ?>
-  <?!= include('scriptsOposiciones') ?>
-  <?!= include('scriptsBloques') ?>
-  <?!= include('scriptsTemas') ?>
-  <?!= include('scriptsConceptos') ?>
-  <?!= include('scriptsEstudio') ?>
-  <?!= include('scriptsTest') ?>
-  <?!= include('scriptsPlanificacion') ?>
-  <?!= include('scriptsRepasos') ?>
+
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
     header { background-color: #007bff; color: white; padding: 1rem 2rem; text-align: center; }
@@ -206,6 +198,8 @@
     font-size: 20px;
   }
 }
+.section { display: none; }
+    .section.active { display: block; }
   </style>
 </head>
 <body>
@@ -892,5 +886,14 @@
 </div>
 
   </div>
+    <?!= include('scriptsGenerales') ?>
+  <?!= include('scriptsOposiciones') ?>
+  <?!= include('scriptsBloques') ?>
+  <?!= include('scriptsTemas') ?>
+  <?!= include('scriptsConceptos') ?>
+  <?!= include('scriptsEstudio') ?>
+  <?!= include('scriptsTest') ?>
+  <?!= include('scriptsPlanificacion') ?>
+  <?!= include('scriptsRepasos') ?>
 </body>
 </html>
