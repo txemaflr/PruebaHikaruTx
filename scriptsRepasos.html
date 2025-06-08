@@ -1,0 +1,266 @@
+<script>
+// Variables globales para repasos
+var repasosActuales = [];
+var repasosFiltrados = [];
+var paginaActualRepasos = 1;
+var repasosPorPagina = 10;
+
+// Inicializar sección de repasos
+function inicializarSeccionRepasos() {
+  console.log('Inicializando sección Repasos...');
+  cargarRepasos();
+}
+
+// Cargar todos los repasos
+function cargarRepasos() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      repasosActuales = data.repasos;
+      repasosFiltrados = [...repasosActuales];
+      
+      // Actualizar estadísticas
+      actualizarEstadisticasRepasos(data.estadisticas);
+      
+      // Actualizar próximos repasos
+      mostrarProximosRepasos(data.proximos);
+      
+      // Aplicar filtros y mostrar tabla
+      aplicarFiltrosRepasos();
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar repasos:', error);
+      alert('Error al cargar repasos');
+    })
+    .getRepasosCompletos();
+}
+
+// Aplicar filtros
+function aplicarFiltrosRepasos() {
+  const filtroEstado = document.getElementById('filtroEstadoRepaso').value;
+  const filtroNumero = document.getElementById('filtroNumeroRepaso').value;
+  const filtroPeriodo = document.getElementById('filtroPeriodoRepaso').value;
+  const buscarTema = document.getElementById('buscarTemaRepaso').value.toLowerCase();
+  
+  repasosFiltrados = repasosActuales.filter(repaso => {
+    // Filtro por estado
+    if (filtroEstado && repaso.estado !== filtroEstado) return false;
+    
+    // Filtro por número de repaso
+    if (filtroNumero && repaso.numeroRepaso != filtroNumero) return false;
+    
+    // Filtro por período
+    if (filtroPeriodo) {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const fechaProgramada = new Date(repaso.fechaProgramada);
+      fechaProgramada.setHours(0, 0, 0, 0);
+      
+      switch (filtroPeriodo) {
+        case 'hoy':
+          if (fechaProgramada.getTime() !== hoy.getTime()) return false;
+          break;
+        case 'semana':
+          const inicioSemana = new Date(hoy);
+          inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+          const finSemana = new Date(inicioSemana);
+          finSemana.setDate(inicioSemana.getDate() + 6);
+          if (fechaProgramada < inicioSemana || fechaProgramada > finSemana) return false;
+          break;
+        case 'mes':
+          if (fechaProgramada.getMonth() !== hoy.getMonth() || 
+              fechaProgramada.getFullYear() !== hoy.getFullYear()) return false;
+          break;
+        case 'vencidos':
+          if (repaso.estado !== 'pendiente' || fechaProgramada >= hoy) return false;
+          break;
+      }
+    }
+    
+    // Filtro por búsqueda de tema
+    if (buscarTema && !repaso.nombreTema.toLowerCase().includes(buscarTema)) return false;
+    
+    return true;
+  });
+  
+  // Reiniciar paginación
+  paginaActualRepasos = 1;
+  mostrarTablaRepasos();
+}
+
+// Mostrar tabla de repasos
+function mostrarTablaRepasos() {
+  const tbody = document.getElementById('tablaRepasosBody');
+  const inicio = (paginaActualRepasos - 1) * repasosPorPagina;
+  const fin = inicio + repasosPorPagina;
+  const repasosPagina = repasosFiltrados.slice(inicio, fin);
+  
+  // Actualizar contador
+  document.getElementById('contadorRepasos').textContent = 
+    'Mostrando ' + (inicio + 1) + '-' + Math.min(fin, repasosFiltrados.length) + 
+    ' de ' + repasosFiltrados.length + ' repasos';
+  
+  // Limpiar tabla
+  tbody.innerHTML = '';
+  
+  if (repasosPagina.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #666;">No se encontraron repasos con los filtros aplicados</td></tr>';
+    return;
+  }
+  
+  // Llenar tabla
+  repasosPagina.forEach(repaso => {
+    const tr = document.createElement('tr');
+    
+    // Tema
+    tr.innerHTML += '<td style="padding: 10px;">' + 
+                   '<strong>' + repaso.nombreTema + '</strong><br>' +
+                   '<small style="color: #666;">Bloque: ' + (repaso.nombreBloque || 'Sin bloque') + '</small>' +
+                   '</td>';
+    
+    // Número de repaso
+    tr.innerHTML += '<td style="padding: 10px; text-align: center;">' +
+                   '<span style="background: #e9ecef; padding: 3px 8px; border-radius: 3px; font-weight: bold;">' +
+                   repaso.numeroRepaso + '°</span></td>';
+    
+    // Fecha programada
+    const fechaProg = new Date(repaso.fechaProgramada);
+    tr.innerHTML += '<td style="padding: 10px; text-align: center;">' + 
+                   fechaProg.toLocaleDateString('es-ES') + '</td>';
+    
+    // Fecha completado
+    if (repaso.fechaCompletado) {
+      const fechaCompl = new Date(repaso.fechaCompletado);
+      tr.innerHTML += '<td style="padding: 10px; text-align: center;">' + 
+                     fechaCompl.toLocaleDateString('es-ES') + '</td>';
+    } else {
+      tr.innerHTML += '<td style="padding: 10px; text-align: center;">-</td>';
+    }
+    
+    // Nota
+    if (repaso.notaTest) {
+      const color = repaso.notaTest >= 80 ? '#28a745' : (repaso.notaTest >= 50 ? '#ffc107' : '#dc3545');
+      tr.innerHTML += '<td style="padding: 10px; text-align: center;">' +
+                     '<span style="color: ' + color + '; font-weight: bold;">' + 
+                     repaso.notaTest + '%</span></td>';
+    } else {
+      tr.innerHTML += '<td style="padding: 10px; text-align: center;">-</td>';
+    }
+    
+    // Tiempo
+    if (repaso.tiempoTestMinutos) {
+      tr.innerHTML += '<td style="padding: 10px; text-align: center;">' + 
+                     repaso.tiempoTestMinutos + ' min</td>';
+    } else {
+      tr.innerHTML += '<td style="padding: 10px; text-align: center;">-</td>';
+    }
+    
+    // Estado
+    let estadoHTML = '';
+    switch (repaso.estado) {
+      case 'pendiente':
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const vencido = fechaProg < hoy;
+        estadoHTML = '<span style="color: ' + (vencido ? '#dc3545' : '#ffc107') + '; font-weight: bold;">' +
+                    '<i class="fas fa-' + (vencido ? 'exclamation-triangle' : 'clock') + '"></i> ' +
+                    (vencido ? 'Vencido' : 'Pendiente') + '</span>';
+        break;
+      case 'completado':
+        estadoHTML = '<span style="color: #28a745; font-weight: bold;">' +
+                    '<i class="fas fa-check-circle"></i> Completado</span>';
+        break;
+      case 'omitido':
+        estadoHTML = '<span style="color: #6c757d; font-weight: bold;">' +
+                    '<i class="fas fa-ban"></i> Omitido</span>';
+        break;
+    }
+    tr.innerHTML += '<td style="padding: 10px; text-align: center;">' + estadoHTML + '</td>';
+    
+    // Acciones
+    let accionesHTML = '<td style="padding: 10px; text-align: center;">';
+    if (repaso.estado === 'pendiente') {
+      accionesHTML += '<button onclick="realizarRepasoDesdeTabla(' + repaso.id + ', ' + repaso.idTema + ')" ' +
+                     'style="padding: 5px 10px; background: #007bff; color: white; border: none; ' +
+                     'border-radius: 3px; font-size: 12px; margin-right: 5px;">' +
+                     '<i class="fas fa-play"></i> Test</button>';
+      accionesHTML += '<button onclick="omitirRepaso(' + repaso.id + ')" ' +
+                     'style="padding: 5px 10px; background: #6c757d; color: white; border: none; ' +
+                     'border-radius: 3px; font-size: 12px;">' +
+                     '<i class="fas fa-ban"></i></button>';
+    } else if (repaso.estado === 'completado' && repaso.idTest) {
+      accionesHTML += '<button onclick="verResultadosTest(' + repaso.idTest + ')" ' +
+                     'style="padding: 5px 10px; background: #6c757d; color: white; border: none; ' +
+                     'border-radius: 3px; font-size: 12px;">' +
+                     '<i class="fas fa-chart-bar"></i> Ver</button>';
+    }
+    accionesHTML += '</td>';
+    tr.innerHTML += accionesHTML;
+    
+    tbody.appendChild(tr);
+  });
+  
+  // Actualizar paginación
+  actualizarPaginacionRepasos();
+}
+
+// Actualizar paginación
+function actualizarPaginacionRepasos() {
+  const totalPaginas = Math.ceil(repasosFiltrados.length / repasosPorPagina);
+  const contenedor = document.getElementById('paginacionRepasos');
+  
+  if (totalPaginas <= 1) {
+    contenedor.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  
+  // Botón anterior
+  if (paginaActualRepasos > 1) {
+    html += '<button onclick="cambiarPaginaRepasos(' + (paginaActualRepasos - 1) + ')" ' +
+           'style="padding: 5px 10px; background: #6c757d; color: white; border: none; ' +
+           'border-radius: 3px; cursor: pointer;">Anterior</button>';
+  }
+  
+  // Números de página
+  for (let i = 1; i <= totalPaginas; i++) {
+    if (i === paginaActualRepasos) {
+      html += '<span style="padding: 5px 10px; background: #007bff; color: white; ' +
+             'border-radius: 3px;">' + i + '</span>';
+    } else {
+      html += '<button onclick="cambiarPaginaRepasos(' + i + ')" ' +
+             'style="padding: 5px 10px; background: #e9ecef; border: none; ' +
+             'border-radius: 3px; cursor: pointer;">' + i + '</button>';
+    }
+  }
+  
+  // Botón siguiente
+  if (paginaActualRepasos < totalPaginas) {
+    html += '<button onclick="cambiarPaginaRepasos(' + (paginaActualRepasos + 1) + ')" ' +
+           'style="padding: 5px 10px; background: #6c757d; color: white; border: none; ' +
+           'border-radius: 3px; cursor: pointer;">Siguiente</button>';
+  }
+  
+  contenedor.innerHTML = html;
+}
+
+// Cambiar página
+function cambiarPaginaRepasos(pagina) {
+  paginaActualRepasos = pagina;
+  mostrarTablaRepasos();
+}
+
+// Actualizar estadísticas
+function actualizarEstadisticasRepasos(estadisticas) {
+  document.getElementById('totalRepasos').textContent = estadisticas.total;
+  document.getElementById('repasosPendientes').textContent = estadisticas.pendientes;
+  document.getElementById('repasosCompletados').textContent = estadisticas.completados;
+  document.getElementById('repasosVencidos').textContent = estadisticas.vencidos;
+}
+
+// Mostrar próximos repasos
+function mostrarProximosRepasos(proximos) {
+  const contenedor = document.getElementById('proximosRepasos');
+  
+  if (proximos.length === 0) {
+    contenedor.innerHTML
