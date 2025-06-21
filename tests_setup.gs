@@ -228,3 +228,72 @@ function eliminarHojasPlanificacion() {
   
   return 'Hojas de planificación eliminadas';
 }
+
+// Crear hoja de configuración de planificación
+function crearHojaConfiguracionPlanificacion() {
+  const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
+  
+  let configSheet = spreadsheet.getSheetByName('Configuracion_Planificacion');
+  if (!configSheet) {
+    configSheet = spreadsheet.insertSheet('Configuracion_Planificacion');
+    configSheet.getRange(1, 1, 1, 8).setValues([[
+      'id_config',
+      'id_oposicion', 
+      'vuelta_actual',
+      'min_por_pagina_v1',
+      'min_por_pagina_v2', 
+      'min_por_pagina_v3',
+      'min_por_pagina_v4_mas',
+      'fecha_actualizacion'
+    ]]);
+    
+    // Formato de encabezados
+    configSheet.getRange(1, 1, 1, 8)
+      .setBackground('#4a86e8')
+      .setFontColor('#ffffff')
+      .setFontWeight('bold');
+    
+    // Añadir configuración por defecto para oposición 1
+    configSheet.getRange(2, 1, 1, 8).setValues([[
+      1, 1, 1, 30, 20, 15, 10, new Date()
+    ]]);
+    
+    console.log('Hoja Configuracion_Planificacion creada');
+  }
+  
+  return 'Configuración de planificación creada';
+}
+
+// Función para calcular páginas totales manualmente
+function ejecutarCalculoPaginasTotales() {
+  try {
+    console.log('🔧 Iniciando cálculo de páginas totales...');
+    
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const data = temasSheet.getDataRange().getValues();
+    
+    let actualizados = 0;
+    
+    // Primero: temas que tienen pag_desde y pag_hasta
+    for (let i = 1; i < data.length; i++) {
+      const pagDesde = data[i][temasColumns['pag_desde']];
+      const pagHasta = data[i][temasColumns['pag_hasta']];
+      const pagTotales = data[i][temasColumns['pag_totales']];
+      
+      if ((!pagTotales || pagTotales <= 0) && pagDesde && pagHasta && pagDesde > 0 && pagHasta > 0) {
+        const nuevasPagTotales = pagHasta - pagDesde + 1;
+        temasSheet.getRange(i + 1, temasColumns['pag_totales'] + 1).setValue(nuevasPagTotales);
+        actualizados++;
+        console.log('✅ Tema actualizado:', data[i][temasColumns['nombre']], '->', nuevasPagTotales, 'páginas');
+      }
+    }
+    
+    console.log('🎉 Terminado. Temas actualizados:', actualizados);
+    return '✅ Cálculo completado. ' + actualizados + ' temas actualizados.';
+    
+  } catch (error) {
+    console.error('❌ Error:', error);
+    return '❌ Error: ' + error.message;
+  }
+}
