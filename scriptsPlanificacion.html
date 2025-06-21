@@ -1,174 +1,528 @@
+
 <script>
-// Variables globales para planificación
-var mesActualCalendario = new Date();
-var planificacionDiaSeleccionado = null;
-// Variables para el modal de nueva planificación
-var pasoActualPlanificacion = 1;
-var temasSeleccionadosPlan = [];
-var bloquesSeleccionados = [];
+// scriptsPlanificacion.html - VERSIÓN LIMPIA
+// Variables globales
+var mesActual = new Date();
+var diaSeleccionado = null;
+// Variables del modal
+var pasoActual = 1;
+var temasSeleccionados = [];
+var tiempoTotalDisponible = 240; // minutos
+var tiempoUsado = 0;
+var bloquesActivos = [];
+var configuracionActual = null;
+
+// Inicializar sección de planificación
+function inicializarSeccionPlanificacion() {
+  console.log('🔧 Inicializando planificación limpia...');
+  renderizarCalendario();
+  // Auto-seleccionar día actual
+  const hoy = new Date();
+  if (mesActual.getMonth() === hoy.getMonth() && mesActual.getFullYear() === hoy.getFullYear()) {
+    seleccionarDia(hoy.getDate());
+  }
+}
+
+// Renderizar calendario
+function renderizarCalendario() {
+  const año = mesActual.getFullYear();
+  const mes = mesActual.getMonth();
+  
+  // Actualizar título
+  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  document.getElementById('tituloMes').textContent = meses[mes] + ' ' + año;
+  
+  // Calcular primer día (lunes = 0)
+  let primerDia = new Date(año, mes, 1).getDay();
+  primerDia = primerDia === 0 ? 6 : primerDia - 1; // Ajustar para lunes = 0
+  
+  const diasEnMes = new Date(año, mes + 1, 0).getDate();
+  const hoy = new Date();
+  
+  // Generar HTML del calendario
+  let html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">';
+  
+  // Encabezados de días
+  const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  diasSemana.forEach(dia => {
+    html += '<div style="text-align: center; font-weight: bold; padding: 8px; color: #666; font-size: 12px;">' + dia + '</div>';
+  });
+  
+  // Días vacíos al inicio
+  for (let i = 0; i < primerDia; i++) {
+    html += '<div></div>';
+  }
+  
+  //Días del mes
+  for (let dia = 1; dia <= diasEnMes; dia++) {
+    const fecha = new Date(año, mes, dia);
+    const esHoy = fecha.toDateString() === hoy.toDateString();
+    const esSeleccionado = diaSeleccionado === dia;
+    
+    // Estilos del día
+    let estilos = 'min-height: 80px; border: 1px solid #ddd; border-radius: 5px; padding: 5px; cursor: pointer; ';
+    estilos += 'display: flex; flex-direction: column; justify-content: space-between; ';
+    
+    if (esHoy) {
+      estilos += 'border: 2px solid #2196f3; background: #e3f2fd; ';
+    } else if (esSeleccionado) {
+      estilos += 'background: #f0f0f0; ';
+    } else {
+      estilos += 'background: white; ';
+    }
+    
+    html += '<div onclick="seleccionarDia(' + dia + ')" style="' + estilos + '">';
+    
+    // Número del día
+    html += '<div style="font-weight: bold; color: ' + (esHoy ? '#2196f3' : '#333') + ';">' + dia + '</div>';
+    
+    // Contenido del día (placeholder por ahora)
+    html += '<div id="contenido-' + año + '-' + mes + '-' + dia + '" style="font-size: 10px; flex: 1;"></div>';
+    
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  
+  document.getElementById('calendario').innerHTML = html;
+}
+
+// Cambiar mes
+function cambiarMes(direccion) {
+  mesActual.setMonth(mesActual.getMonth() + direccion);
+  diaSeleccionado = null; // Reset selección
+  renderizarCalendario();
+  limpiarDetalleDia();
+}
+
+// Ir a hoy
+function irAHoy() {
+  mesActual = new Date();
+  renderizarCalendario();
+  seleccionarDia(new Date().getDate());
+}
+
+// Seleccionar día
+function seleccionarDia(dia) {
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  const esDiaPasado = fechaSeleccionada < hoy;
+  
+  diaSeleccionado = dia;
+  renderizarCalendario(); // Re-renderizar para mostrar selección
+  
+  // Actualizar detalle del día
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
+  
+  if (esDiaPasado) {
+    document.getElementById('tituloDetalleDia').textContent = tituloFecha + ' (Solo lectura)';
+    document.getElementById('contenidoDetalleDia').innerHTML = 
+      '<div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-bottom: 15px;">' +
+      '<strong>ℹ️ Día pasado:</strong> Solo puedes consultar la información, no modificar.' +
+      '</div>' +
+      '<p style="color: #999;">Detalle del día en desarrollo...</p>';
+  } else {
+    document.getElementById('tituloDetalleDia').textContent = tituloFecha;
+    document.getElementById('contenidoDetalleDia').innerHTML = 
+      '<p style="color: #999;">Día seleccionado: ' + dia + '. Detalle en desarrollo...</p>';
+  }
+}
+
+// Limpiar detalle del día
+function limpiarDetalleDia() {
+  document.getElementById('tituloDetalleDia').textContent = 'Selecciona un día';
+  document.getElementById('contenidoDetalleDia').innerHTML = '<p style="text-align: center; color: #666; padding: 40px 0;"><i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>Selecciona un día del calendario</p>';
+}
 
 // Abrir modal de nueva planificación
 function nuevaPlanificacion() {
+  // Validar que hay un día seleccionado
+  if (!diaSeleccionado) {
+    alert('⚠️ Primero selecciona un día del calendario');
+    return;
+  }
+  
+  // Validar que no es día pasado
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), diaSeleccionado);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  if (fechaSeleccionada < hoy) {
+    alert('⚠️ No puedes crear planificaciones para días pasados');
+    return;
+  }
+  
+  // Reset variables
+  pasoActual = 1;
+  temasSeleccionados = [];
+  tiempoUsado = 0;
+  bloquesActivos = [];
+  
+  // Establecer fecha seleccionada
+  const fechaStr = fechaSeleccionada.getFullYear() + '-' + 
+    String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(fechaSeleccionada.getDate()).padStart(2, '0');
+  document.getElementById('fechaPlanificacion').value = fechaStr;
+  
+  // Mostrar modal
   document.getElementById('modalNuevaPlanificacion').style.display = 'flex';
-  pasoActualPlanificacion = 1;
-  temasSeleccionadosPlan = [];
-  bloquesSeleccionados = [];
-  mostrarPasoPlanificacion(1);
-  cargarOposicionesPlanificacion();
+  
+  // Cargar oposiciones
+  cargarOposiciones();
+  
+  // Mostrar paso 1
+  mostrarPaso(1);
+  
+  // Verificar repasos del día seleccionado
+  verificarRepasosDelDia();
 }
 
 // Cerrar modal
-function cerrarModalNuevaPlanificacion() {
+function cerrarModal() {
   document.getElementById('modalNuevaPlanificacion').style.display = 'none';
-  // Limpiar formulario
-  document.getElementById('oposicionPlanificacion').value = '';
-  document.getElementById('horasDiariasPlanificacion').value = '4';
-  temasSeleccionadosPlan = [];
-  bloquesSeleccionados = [];
 }
 
-// Cargar oposiciones
-function cargarOposicionesPlanificacion() {
+// Mostrar paso específico
+function mostrarPaso(numeroPaso) {
+  pasoActual = numeroPaso;
+  
+  // Ocultar todos los pasos
+  document.getElementById('paso1').style.display = 'none';
+  document.getElementById('paso2').style.display = 'none';
+  document.getElementById('paso3').style.display = 'none';
+  
+  // Mostrar paso actual
+  document.getElementById('paso' + numeroPaso).style.display = 'block';
+  
+  // Actualizar indicadores visuales
+  actualizarIndicadoresPasos();
+  
+  // Actualizar botones
+  document.getElementById('btnAnterior').style.display = numeroPaso > 1 ? 'inline-block' : 'none';
+  document.getElementById('btnSiguiente').textContent = numeroPaso === 3 ? 'Crear Planificación' : 'Siguiente ▶';
+  
+  // Acciones específicas por paso
+  if (numeroPaso === 2) {
+    cargarConfiguracionActual();
+    mostrarRepasosEnPasoDos();
+    actualizarTiempoDisponible();
+  } else if (numeroPaso === 3) {
+    // Actualizar tiempo disponible real para planificación (sin repasos)
+    const horasUsuario = parseFloat(document.getElementById('horasEstudio').value) || 4;
+    tiempoTotalDisponible = horasUsuario * 60; // Solo tiempo de estudio
+    
+    cargarArbolTemas();
+    actualizarResumenTiempo();
+  }
+
+}
+
+// Actualizar indicadores de pasos
+function actualizarIndicadoresPasos() {
+  for (let i = 1; i <= 3; i++) {
+    const indicador = document.getElementById('indicadorPaso' + i);
+    const circulo = indicador.querySelector('div');
+    const texto = indicador.querySelector('span');
+    
+    if (i < pasoActual) {
+      // Paso completado
+      circulo.style.background = '#28a745';
+      circulo.style.color = 'white';
+      texto.style.color = '#28a745';
+    } else if (i === pasoActual) {
+      // Paso actual
+      circulo.style.background = '#007bff';
+      circulo.style.color = 'white';
+      texto.style.color = '#007bff';
+    } else {
+      // Paso pendiente
+      circulo.style.background = '#ddd';
+      circulo.style.color = '#999';
+      texto.style.color = '#999';
+    }
+  }
+}
+
+// Paso siguiente
+function pasoSiguiente() {
+  if (pasoActual === 1) {
+    // Validar paso 1
+    if (!document.getElementById('fechaPlanificacion').value) {
+      alert('⚠️ Selecciona una fecha');
+      return;
+    }
+    if (!document.getElementById('oposicionPlanificacion').value) {
+      alert('⚠️ Selecciona una oposición');
+      return;
+    }
+    mostrarPaso(2);
+    
+  } else if (pasoActual === 2) {
+    // Validar paso 2
+    const horas = parseFloat(document.getElementById('horasEstudio').value);
+    if (!horas || horas < 0.5) {
+      alert('⚠️ Introduce un tiempo de estudio válido (mínimo 0.5 horas)');
+      return;
+    }
+    mostrarPaso(3);
+    
+  } else if (pasoActual === 3) {
+    // Crear planificación
+    crearPlanificacion();
+  }
+}
+
+// Paso anterior
+function pasoAnterior() {
+  if (pasoActual > 1) {
+    mostrarPaso(pasoActual - 1);
+  }
+}
+
+// Cargar oposiciones (conectado al backend)
+function cargarOposiciones() {
+  const select = document.getElementById('oposicionPlanificacion');
+  select.innerHTML = '<option value="">-- Cargando oposiciones... --</option>';
+  
   google.script.run
     .withSuccessHandler(function(oposiciones) {
-      const select = document.getElementById('oposicionPlanificacion');
       select.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
       
-      oposiciones.forEach(function(op) {
+      oposiciones.forEach(function(oposicion) {
         const option = document.createElement('option');
-        option.value = op.id;
-        option.textContent = op.nombre;
+        option.value = oposicion.id;
+        option.textContent = oposicion.nombre;
         select.appendChild(option);
       });
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar oposiciones:', error);
+      select.innerHTML = '<option value="">-- Error al cargar --</option>';
     })
-    .getOposicionesOrdenadas();
+    .getOposicionesParaPlanificacion();
 }
 
-// Cargar temas de la oposición seleccionada
-function cargarTemasPlanificacion() {
-  const idOposicion = document.getElementById('oposicionPlanificacion').value;
-  
-  if (!idOposicion) {
-    document.getElementById('btnSiguientePaso').disabled = true;
+// Verificar repasos del día con indicador de carga
+function verificarRepasosDelDia() {
+  const fecha = document.getElementById('fechaPlanificacion').value;
+  if (!fecha) {
+    document.getElementById('alertaRepasos').style.display = 'none';
     return;
   }
   
-  document.getElementById('btnSiguientePaso').disabled = false;
+  // Mostrar indicador de carga
+  const alertaDiv = document.getElementById('alertaRepasos');
+  const listaDiv = document.getElementById('listaRepasos');
   
-  // Cargar temas cuando se pase al paso 2
+  alertaDiv.style.display = 'block';
+  listaDiv.innerHTML = '<p style="margin: 0;"><i class="fas fa-spinner fa-spin"></i> Comprobando repasos programados...</p>';
+  
+  const fechaMs = new Date(fecha + 'T00:00:00').getTime();
+  
+  google.script.run
+    .withSuccessHandler(function(repasos) {
+      if (repasos && repasos.length > 0) {
+        let html = '<ul style="margin: 0; padding-left: 20px;">';
+        repasos.forEach(function(repaso) {
+          html += '<li><strong>R' + repaso.numeroRepaso + ':</strong> ' + repaso.nombreTema + ' <span style="color: #856404;">(30 min)</span></li>';
+        });
+        html += '</ul>';
+        html += '<p style="margin: 10px 0 0 0; font-weight: bold; color: #856404;">Total tiempo repasos: ' + (repasos.length * 30) + ' minutos</p>';
+        
+        listaDiv.innerHTML = html;
+        alertaDiv.style.display = 'block';
+        
+        // Guardar info de repasos para el paso 2
+        window.repasosDelDia = repasos;
+      } else {
+        alertaDiv.style.display = 'none';
+        window.repasosDelDia = [];
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar repasos:', error);
+      alertaDiv.style.display = 'none';
+      window.repasosDelDia = [];
+    })
+    .getRepasosDelDia(fechaMs);
 }
 
-// Mostrar paso específico
-function mostrarPasoPlanificacion(paso) {
-  // Ocultar todos los pasos
-  document.getElementById('paso1Planificacion').style.display = 'none';
-  document.getElementById('paso2Planificacion').style.display = 'none';
-  document.getElementById('paso3Planificacion').style.display = 'none';
-  
-  // Mostrar paso actual
-  document.getElementById('paso' + paso + 'Planificacion').style.display = 'block';
-  
-  // Actualizar botones
-  document.getElementById('btnAnteriorPaso').style.display = paso > 1 ? 'inline-block' : 'none';
-  document.getElementById('btnSiguientePaso').textContent = paso === 3 ? 'Crear Planificación' : 'Siguiente';
-  
-  // Si es paso 2, cargar temas
-  if (paso === 2) {
-    cargarTemasParaPlanificar();
-  }
-}
-
-// Siguiente paso
-function siguientePasoPlanificacion() {
-  if (pasoActualPlanificacion === 1) {
-    if (!document.getElementById('oposicionPlanificacion').value) {
-      alert('Selecciona una oposición');
-      return;
-    }
-    pasoActualPlanificacion = 2;
-    mostrarPasoPlanificacion(2);
-  } else if (pasoActualPlanificacion === 2) {
-    if (temasSeleccionadosPlan.length < 3) {
-      alert('Debes seleccionar al menos 3 temas de diferentes bloques');
-      return;
-    }
-    pasoActualPlanificacion = 3;
-    mostrarPasoPlanificacion(3);
-  } else if (pasoActualPlanificacion === 3) {
-    crearNuevaPlanificacion();
-  }
-}
-
-// Paso anterior
-function anteriorPasoPlanificacion() {
-  if (pasoActualPlanificacion > 1) {
-    pasoActualPlanificacion--;
-    mostrarPasoPlanificacion(pasoActualPlanificacion);
-  }
-}
-
-// Cargar temas para planificar
-function cargarTemasParaPlanificar() {
+// Cargar configuración actual (conectado al backend)
+function cargarConfiguracionActual() {
   const idOposicion = document.getElementById('oposicionPlanificacion').value;
-  const contenedor = document.getElementById('arbolTemasPlanificacion');
-  contenedor.innerHTML = '<p>Cargando temas...</p>';
+  if (!idOposicion) return;
+  
+  google.script.run
+    .withSuccessHandler(function(config) {
+      configuracionActual = config;
+      
+      document.getElementById('vueltaActual').textContent = config.vueltaActual;
+      
+      const minutosPorPagina = getMinutosPorPaginaLocal(config);
+      document.getElementById('minutosPorPagina').textContent = minutosPorPagina;
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar configuración:', error);
+      // Valores por defecto
+      document.getElementById('vueltaActual').textContent = '1';
+      document.getElementById('minutosPorPagina').textContent = '30';
+    })
+    .getConfiguracionOposicion(idOposicion);
+}
+
+// Función auxiliar para calcular minutos por página localmente
+function getMinutosPorPaginaLocal(config) {
+  switch (config.vueltaActual) {
+    case 1: return config.minPorPagV1;
+    case 2: return config.minPorPagV2;
+    case 3: return config.minPorPagV3;
+    default: return config.minPorPagV4;
+  }
+}
+
+// Modificar actualizarTiempoDisponible para incluir repasos
+function actualizarTiempoDisponible() {
+  const horas = parseFloat(document.getElementById('horasEstudio').value) || 0;
+  const tiempoEstudio = horas * 60;
+  const tiempoRepasos = window.repasosDelDia ? window.repasosDelDia.length * 30 : 0;
+  const tiempoTotal = tiempoEstudio + tiempoRepasos;
+  
+  tiempoTotalDisponible = tiempoEstudio; // Solo el tiempo de estudio para la planificación
+  
+  document.getElementById('tiempoEstudio').textContent = tiempoEstudio + ' min';
+  document.getElementById('tiempoTotalConRepasos').textContent = tiempoTotal + ' min';
+  
+  if (pasoActual === 3) {
+    actualizarResumenTiempo();
+  }
+}
+
+// Mostrar repasos en el paso 2
+function mostrarRepasosEnPasoDos() {
+  const infoDiv = document.getElementById('infoRepasosStepDos');
+  const detalleDiv = document.getElementById('detalleRepasosStepDos');
+  
+  if (window.repasosDelDia && window.repasosDelDia.length > 0) {
+    const tiempoRepasos = window.repasosDelDia.length * 30;
+    
+    let html = '<div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">';
+    html += '<div>';
+    html += '<ul style="margin: 0; padding-left: 20px;">';
+    window.repasosDelDia.forEach(function(repaso) {
+      html += '<li>' + repaso.nombreTema + ' <span style="color: #856404;">(30 min)</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+    html += '<div style="text-align: center; background: #ffc107; color: white; padding: 10px; border-radius: 5px; min-width: 80px;">';
+    html += '<div style="font-size: 20px; font-weight: bold;">' + tiempoRepasos + ' min</div>';
+    html += '<div style="font-size: 12px;">Total</div>';
+    html += '</div>';
+    html += '</div>';
+    
+    detalleDiv.innerHTML = html;
+    infoDiv.style.display = 'block';
+    
+    // Actualizar el cálculo de tiempo
+    document.getElementById('tiempoRepasos').textContent = tiempoRepasos + ' min';
+    actualizarTiempoDisponible();
+  } else {
+    infoDiv.style.display = 'none';
+    document.getElementById('tiempoRepasos').textContent = '0 min';
+    actualizarTiempoDisponible();
+  }
+}
+
+// Cargar árbol de temas (CORREGIDO - tiempo estudio MENOS repasos)
+function cargarArbolTemas() {
+  const idOposicion = document.getElementById('oposicionPlanificacion').value;
+  const contenedor = document.getElementById('arbolTemas');
+  
+  if (!idOposicion) {
+    contenedor.innerHTML = '<p style="text-align: center; color: #666;">Selecciona una oposición para cargar los temas</p>';
+    return;
+  }
+  
+  // Calcular tiempo disponible REAL (estudio - repasos)
+  const horasUsuario = parseFloat(document.getElementById('horasEstudio').value) || 4;
+  const tiempoEstudio = horasUsuario * 60; // Minutos de estudio
+  const tiempoRepasos = window.repasosDelDia ? window.repasosDelDia.length * 30 : 0; // Minutos de repasos
+  const tiempoEstudioDisponible = tiempoEstudio; // Solo tiempo para temas nuevos (sin repasos)
+  
+  console.log('⏱️ Tiempo estudio:', tiempoEstudio, 'min');
+  console.log('⏱️ Tiempo repasos:', tiempoRepasos, 'min');
+  console.log('⏱️ Tiempo disponible para temas:', tiempoEstudioDisponible, 'min');
+  
+  // Mostrar loading
+  contenedor.innerHTML = '<p style="text-align: center; color: #666;"><i class="fas fa-spinner fa-spin"></i> Cargando árbol de temas...</p>';
   
   google.script.run
     .withSuccessHandler(function(data) {
-      mostrarTemasConBloques(data.temas, data.bloques);
+      console.log('✅ Árbol de temas recibido:', data);
+      
+      // Guardar árbol global para validaciones
+      window.arbolCompletoGlobal = data.arbol;
+      
+      if (!data || !data.arbol || data.arbol.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: #999;">No hay temas principales vinculados a esta oposición</p>';
+        return;
+      }
+      
+      // Renderizar árbol real
+      renderizarArbolPorBloques(data.arbol, data.minutosPorPagina, data.bloques);
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar temas:', error);
-      contenedor.innerHTML = '<p style="color: red;">Error al cargar temas</p>';
+      console.error('❌ Error al cargar árbol:', error);
+      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error al cargar temas: ' + error.message + '</p>';
     })
-    .getTemasYBloquesPlanificacion(idOposicion);
+    .getArbolTemasConEstados(idOposicion, tiempoEstudioDisponible); // ← TIEMPO SIN REPASOS
 }
 
-// Mostrar temas organizados por bloques
-function mostrarTemasConBloques(temas, bloques) {
-  const contenedor = document.getElementById('arbolTemasPlanificacion');
+// Renderizar árbol agrupado por bloques (CORREGIDO)
+function renderizarArbolPorBloques(arbolTemas, minutosPorPagina, bloquesInfo) {
+  const contenedor = document.getElementById('arbolTemas');
+  
+  if (!arbolTemas || arbolTemas.length === 0) {
+    contenedor.innerHTML = '<p style="text-align: center; color: #666;">No hay temas vinculados a esta oposición</p>';
+    return;
+  }
+  
+  // Agrupar temas por bloque (USANDO DATOS REALES)
+  const temasPorBloque = agruparTemasPorBloque(arbolTemas, bloquesInfo);
+  
   let html = '';
   
-  // Agrupar temas por bloque
-  const temasPorBloque = {};
-  temas.forEach(tema => {
-    if (!tema.id_padre) { // Solo temas padre
-      const idBloque = tema.id_bloque || 'sin_bloque';
-      if (!temasPorBloque[idBloque]) {
-        temasPorBloque[idBloque] = [];
-      }
-      temasPorBloque[idBloque].push(tema);
+  // Renderizar cada bloque
+  Object.keys(temasPorBloque).forEach(nombreBloque => {
+    const temasDelBloque = temasPorBloque[nombreBloque];
+    const esEspecial = esBloqueBloqueEspecial(nombreBloque);
+    
+    html += '<div style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
+    
+    // Header del bloque (colapsable)
+    html += '<div onclick="toggleBloque(\'' + nombreBloque + '\')" style="padding: 15px; background: #f8f9fa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">';
+    html += '<div>';
+    html += '<h6 style="margin: 0; font-weight: bold;">' + nombreBloque;
+    if (esEspecial) {
+      html += ' <span style="background: #ffc107; color: #212529; padding: 2px 8px; border-radius: 3px; font-size: 11px; margin-left: 8px;">ESPECIAL</span>';
     }
-  });
-  
-  // Mostrar por bloques
-  Object.keys(temasPorBloque).forEach(idBloque => {
-    const bloque = bloques.find(b => b.id == idBloque);
-    const nombreBloque = bloque ? bloque.nombre : 'Sin bloque';
+    html += '</h6>';
+    html += '<small style="color: #666;">' + temasDelBloque.length + ' temas principales</small>';
+    html += '</div>';
+    html += '<i id="icono-' + nombreBloque + '" style="transition: transform 0.3s;">▼</i>';
+    html += '</div>';
     
-    html += '<div style="margin-bottom: 20px;">';
-    html += '<h6 style="background: #f8f9fa; padding: 8px; margin: 0; border-radius: 5px;">' + nombreBloque + '</h6>';
-    html += '<div style="padding: 10px;">';
+    // Contenido del bloque (inicialmente visible)
+    html += '<div id="bloque-' + nombreBloque + '" style="padding: 15px;">';
     
-    temasPorBloque[idBloque].forEach(tema => {
-      const yaSeleccionado = temasSeleccionadosPlan.some(t => t.id === tema.id);
-      const bloqueYaSeleccionado = bloquesSeleccionados.includes(idBloque) && !yaSeleccionado;
-      
-      html += '<div style="padding: 5px;">';
-      html += '<label style="cursor: pointer; opacity: ' + (bloqueYaSeleccionado ? '0.5' : '1') + ';">';
-      html += '<input type="checkbox" ';
-      html += 'value="' + tema.id + '" ';
-      html += 'data-bloque="' + idBloque + '" ';
-      html += 'onchange="toggleTemaPlanificacion(this, ' + tema.id + ', \'' + idBloque + '\', \'' + nombreBloque + '\')" ';
-      html += (yaSeleccionado ? 'checked ' : '');
-      html += (bloqueYaSeleccionado ? 'disabled ' : '');
-      html += '> ';
-      html += (tema.prenombre || '') + ' ' + tema.nombre;
-      html += '</label>';
-      html += '</div>';
+    // Renderizar cada tema del bloque
+    temasDelBloque.forEach(tema => {
+      html += renderizarNodoTema(tema, 0, nombreBloque);
     });
     
     html += '</div>';
@@ -178,623 +532,420 @@ function mostrarTemasConBloques(temas, bloques) {
   contenedor.innerHTML = html;
 }
 
-// Toggle selección de tema con validaciones
-function toggleTemaPlanificacion(checkbox, idTema, idBloque, nombreBloque) {
-  const idOposicion = document.getElementById('oposicionPlanificacion').value;
+// Agrupar temas por bloque (USANDO DATOS REALES)
+function agruparTemasPorBloque(arbolTemas, bloquesInfo) {
+  const temasPorBloque = {};
   
-  if (checkbox.checked) {
-    // Intentar agregar tema
+  arbolTemas.forEach(tema => {
+    const idBloque = tema.idBloque;
+    const nombreBloque = bloquesInfo[idBloque] || 'Sin Bloque';
     
-    // Verificar si ya hay 3 temas y este no es geografía/callejero
-    if (temasSeleccionadosPlan.length >= 3) {
-      // Verificar si es bloque especial
-      google.script.run
-        .withSuccessHandler(function(especiales) {
-          const esGeografia = idBloque == especiales.geografia;
-          const esCallejero = idBloque == especiales.callejero;
-          
-          if (!esGeografia && !esCallejero) {
-            alert('Ya has seleccionado 3 temas. Solo puedes añadir un 4º tema si es de Geografía o Callejero.');
-            checkbox.checked = false;
-            return;
-          }
-          
-          // Verificar que no haya geografía y callejero juntos
-          if (esGeografia || esCallejero) {
-            const tieneGeografia = temasSeleccionadosPlan.some(t => t.idBloque == especiales.geografia);
-            const tieneCallejero = temasSeleccionadosPlan.some(t => t.idBloque == especiales.callejero);
-            
-            if ((esGeografia && tieneCallejero) || (esCallejero && tieneGeografia)) {
-              alert('No puedes seleccionar Geografía y Callejero al mismo tiempo.');
-              checkbox.checked = false;
-              return;
-            }
-          }
-          
-          agregarTemaPlanificacion(idTema, idBloque, nombreBloque, checkbox);
-        })
-        .withFailureHandler(function(error) {
-          console.error('Error al verificar bloques especiales:', error);
-          checkbox.checked = false;
-        })
-        .getBloquesEspeciales();
-    } else {
-      // Menos de 3 temas, agregar directamente
-      agregarTemaPlanificacion(idTema, idBloque, nombreBloque, checkbox);
+    if (!temasPorBloque[nombreBloque]) {
+      temasPorBloque[nombreBloque] = [];
     }
-  } else {
-    // Quitar tema
-    quitarTemaPlanificacion(idTema);
-  }
+    
+    temasPorBloque[nombreBloque].push(tema);
+  });
+  
+  console.log('📊 Temas agrupados por bloque:', temasPorBloque);
+  return temasPorBloque;
 }
 
-// Agregar tema a la selección
-function agregarTemaPlanificacion(idTema, idBloque, nombreBloque, checkbox) {
-  // Verificar si el bloque ya está seleccionado (excepto geografía/callejero)
-  google.script.run
-    .withSuccessHandler(function(especiales) {
-      const esEspecial = idBloque == especiales.geografia || idBloque == especiales.callejero;
-      
-      if (!esEspecial && bloquesSeleccionados.includes(idBloque)) {
-        alert('Ya has seleccionado un tema de este bloque. Selecciona temas de diferentes bloques.');
+// Renderizar nodo de tema con checkbox padre/hijo
+function renderizarNodoTema(nodo, nivel, nombreBloque) {
+  const margenIzquierdo = nivel * 20;
+  const iconoEstado = getIconoEstado(nodo.estado);
+  const colorFondo = getColorFondo(nodo.estado);
+  
+  let html = '';
+  
+  // Contenedor del nodo
+  html += '<div style="margin-left: ' + margenIzquierdo + 'px; margin-bottom: 8px;">';
+  
+  // Fila del tema
+  html += '<div style="display: flex; align-items: center; padding: 10px; background: ' + colorFondo + '; border: 1px solid #e0e0e0; border-radius: 6px;">';
+  
+  // Checkbox (para hojas seleccionables O padres seleccionables)
+  if (nodo.seleccionable || nodo.seleccionablePadre) {
+    const yaSeleccionado = temasSeleccionados.some(t => t.id === nodo.id);
+    const tipoSeleccion = nodo.seleccionablePadre ? 'padre' : 'hijo';
+    
+    html += '<input type="checkbox" ';
+    html += 'onchange="toggleSeleccionTemaConValidacion(this, ' + nodo.id + ', ' + nodo.tiempoMinutos + ', \'' + nombreBloque + '\', \'' + tipoSeleccion + '\')" ';
+    html += (yaSeleccionado ? 'checked ' : '');
+    html += 'style="margin-right: 10px; transform: scale(1.2);" ';
+    html += 'title="' + (nodo.seleccionablePadre ? 'Seleccionar tema completo (' + nodo.tiempoTexto + ')' : 'Seleccionar subtema') + '">';
+  } else {
+    html += '<span style="width: 24px; margin-right: 10px; text-align: center; font-size: 16px;">' + iconoEstado + '</span>';
+  }
+  
+  // Contenido del tema
+  html += '<div style="flex: 1;">';
+  html += '<div style="font-weight: ' + (nivel === 0 ? 'bold' : 'normal') + '; color: ' + getColorTexto(nodo.estado) + ';">';
+  html += nodo.nombreCompleto;
+  html += '</div>';
+  
+  if (nodo.paginas > 0) {
+    html += '<small style="color: #666; font-size: 11px;">';
+    html += nodo.paginas + ' págs • ' + nodo.tiempoTexto;
+    html += '</small>';
+  }
+  html += '</div>';
+  
+  // Badge de estado
+  html += '<div style="margin-left: 10px;">';
+  html += '<span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: ' + getColorBadge(nodo.estado) + '; color: white; font-weight: bold;">';
+  html += getTextoEstado(nodo.estado);
+  html += '</span>';
+  html += '</div>';
+  
+  html += '</div>';
+  
+  // Renderizar hijos si existen
+  if (nodo.hijos && nodo.hijos.length > 0) {
+    nodo.hijos.forEach(hijo => {
+      html += renderizarNodoTema(hijo, nivel + 1, nombreBloque);
+    });
+  }
+  
+  html += '</div>';
+  
+  return html;
+}
+
+// Toggle selección con validación de orden (FUNCIÓN COMPLETA)
+function toggleSeleccionTemaConValidacion(checkbox, idTema, tiempoMinutos, nombreBloque, tipoSeleccion) {
+  if (checkbox.checked) {
+    // Validar orden consecutivo
+    const nodoSeleccionado = { id: idTema };
+    const validacionOrden = validarOrdenConsecutivo(nodoSeleccionado, window.arbolCompletoGlobal);
+    
+    if (!validacionOrden.esConsecutivo) {
+      const confirmar = confirm('⚠️ ' + validacionOrden.mensaje + '\n\n¿Quieres continuar seleccionando este tema?');
+      if (!confirmar) {
         checkbox.checked = false;
         return;
       }
-      
-      // Obtener información completa del tema
-      google.script.run
-        .withSuccessHandler(function(tema) {
-          // Agregar tema
-          temasSeleccionadosPlan.push({
-            id: idTema,
-            idBloque: idBloque,
-            nombreBloque: nombreBloque,
-            nombre: tema.nombre,
-            prenombre: tema.prenombre,
-            paginas: (tema.pag_hasta - tema.pag_desde + 1) || 0
-          });
-          
-          if (!bloquesSeleccionados.includes(idBloque)) {
-            bloquesSeleccionados.push(idBloque);
-          }
-          
-          actualizarListaTemasSeleccionados();
-          actualizarEstadoCheckboxes();
-        })
-        .withFailureHandler(function(error) {
-          console.error('Error al obtener información del tema:', error);
-          checkbox.checked = false;
-        })
-        .getTemaById(idTema);
-    })
-    .getBloquesEspeciales();
-}
-
-// Quitar tema de la selección
-function quitarTemaPlanificacion(idTema) {
-  const index = temasSeleccionadosPlan.findIndex(t => t.id === idTema);
-  if (index > -1) {
-    const tema = temasSeleccionadosPlan[index];
-    temasSeleccionadosPlan.splice(index, 1);
-    
-    // Verificar si hay más temas del mismo bloque
-    const masDelMismoBloque = temasSeleccionadosPlan.some(t => t.idBloque === tema.idBloque);
-    if (!masDelMismoBloque) {
-      const indexBloque = bloquesSeleccionados.indexOf(tema.idBloque);
-      if (indexBloque > -1) {
-        bloquesSeleccionados.splice(indexBloque, 1);
-      }
     }
     
-    actualizarListaTemasSeleccionados();
-    actualizarEstadoCheckboxes();
-  }
-}
-
-// Actualizar lista visual de temas seleccionados
-function actualizarListaTemasSeleccionados() {
-  const contenedor = document.getElementById('listaTemasSeleccionados');
-  
-  if (temasSeleccionadosPlan.length === 0) {
-    contenedor.innerHTML = '<p style="color: #999; text-align: center;">No hay temas seleccionados</p>';
-    document.getElementById('btnSiguientePaso').disabled = true;
-    return;
-  }
-  
-  let html = '<div style="display: grid; gap: 10px;">';
-  let tiempoTotal = 0;
-  
-  temasSeleccionadosPlan.forEach((tema, index) => {
-    const tiempoEstimado = tema.paginas * 30; // 30 min por página
-    tiempoTotal += tiempoEstimado;
-    
-    html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">';
-    html += '<div>';
-    html += '<strong>' + (index + 1) + '. ' + (tema.prenombre || '') + ' ' + tema.nombre + '</strong><br>';
-    html += '<small style="color: #666;">Bloque: ' + tema.nombreBloque + ' | ';
-    html += tema.paginas + ' páginas | ' + Math.round(tiempoEstimado / 60) + 'h estimadas</small>';
-    html += '</div>';
-    html += '<button onclick="quitarTemaSeleccionado(' + tema.id + ')" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">';
-    html += '<i class="fas fa-times"></i>';
-    html += '</button>';
-    html += '</div>';
-  });
-  
-  html += '</div>';
-  html += '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; text-align: right;">';
-  html += '<strong>Tiempo total estimado: ' + Math.round(tiempoTotal / 60) + ' horas</strong>';
-  html += '</div>';
-  
-  contenedor.innerHTML = html;
-  
-  // Habilitar siguiente si hay al menos 3 temas
-  document.getElementById('btnSiguientePaso').disabled = temasSeleccionadosPlan.length < 3;
-}
-
-// Actualizar estado de checkboxes según bloques seleccionados
-function actualizarEstadoCheckboxes() {
-  const checkboxes = document.querySelectorAll('#arbolTemasPlanificacion input[type="checkbox"]');
-  
-  google.script.run
-    .withSuccessHandler(function(especiales) {
-      checkboxes.forEach(checkbox => {
-        const idBloque = checkbox.getAttribute('data-bloque');
-        const esEspecial = idBloque == especiales.geografia || idBloque == especiales.callejero;
-        const yaSeleccionado = temasSeleccionadosPlan.some(t => t.id == checkbox.value);
-        
-        if (!yaSeleccionado && !esEspecial && bloquesSeleccionados.includes(idBloque)) {
-          checkbox.disabled = true;
-          checkbox.parentElement.style.opacity = '0.5';
-        } else {
-          checkbox.disabled = false;
-          checkbox.parentElement.style.opacity = '1';
-        }
-      });
-    })
-    .getBloquesEspeciales();
-}
-
-// Quitar tema desde la lista visual
-function quitarTemaSeleccionado(idTema) {
-  const checkbox = document.querySelector('#arbolTemasPlanificacion input[value="' + idTema + '"]');
-  if (checkbox) {
-    checkbox.checked = false;
-    quitarTemaPlanificacion(idTema);
-  }
-}
-
-// Crear nueva planificación
-function crearNuevaPlanificacion() {
-  const idOposicion = document.getElementById('oposicionPlanificacion').value;
-  const horasDiarias = parseInt(document.getElementById('horasDiariasPlanificacion').value);
-  
-  if (!idOposicion || temasSeleccionadosPlan.length < 3) {
-    alert('Error: Datos incompletos');
-    return;
-  }
-  
-  // Mostrar loading
-  document.getElementById('btnSiguientePaso').disabled = true;
-  document.getElementById('btnSiguientePaso').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
-  
-  const datosPlanificacion = {
-    idOposicion: idOposicion,
-    temas: temasSeleccionadosPlan,
-    minutosPrevistos: horasDiarias * 60,
-    fecha: new Date()
-  };
-  
-  google.script.run
-    .withSuccessHandler(function(resultado) {
-      alert('Planificación creada exitosamente');
-      cerrarModalNuevaPlanificacion();
-      // Recargar calendario
-      renderizarCalendario();
-      mostrarPlanificacionHoy();
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al crear planificación:', error);
-      alert('Error al crear planificación: ' + error.message);
-      document.getElementById('btnSiguientePaso').disabled = false;
-      document.getElementById('btnSiguientePaso').innerHTML = 'Crear Planificación';
-    })
-    .crearPlanificacionCompleta(datosPlanificacion);
-}
-
-
-// Inicializar sección de planificación
-function inicializarSeccionPlanificacion() {
-  console.log('Inicializando sección Planificación...');
-  renderizarCalendario();
-  actualizarEstadisticasMes();
-}
-
-// Renderizar calendario
-function renderizarCalendario() {
-  const año = mesActualCalendario.getFullYear();
-  const mes = mesActualCalendario.getMonth();
-  
-  // Actualizar título del mes
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  document.getElementById('mesActualCalendario').textContent = meses[mes] + ' ' + año;
-  
-  // Obtener primer día y días totales del mes
-  const primerDia = new Date(año, mes, 1).getDay();
-  const diasEnMes = new Date(año, mes + 1, 0).getDate();
-  
-  // Crear estructura del calendario
-  let html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;">';
-  
-  // Encabezados de días
-  const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  dias.forEach(dia => {
-    html += '<div style="text-align: center; font-weight: bold; padding: 10px; color: #666;">' + dia + '</div>';
-  });
-  
-  // Días vacíos al inicio
-  for (let i = 0; i < primerDia; i++) {
-    html += '<div></div>';
-  }
-  
-  // Días del mes
-  const hoy = new Date();
-  for (let dia = 1; dia <= diasEnMes; dia++) {
-    const fecha = new Date(año, mes, dia);
-    const esHoy = fecha.toDateString() === hoy.toDateString();
-    
-    html += '<div onclick="seleccionarDiaCalendario(' + dia + ')" ';
-    html += 'style="min-height: 80px; border: 1px solid #ddd; border-radius: 5px; padding: 5px; cursor: pointer; ';
-    html += 'background: ' + (esHoy ? '#e3f2fd' : 'white') + '; position: relative;" ';
-    html += 'onmouseover="this.style.background=\'#f8f9fa\'" ';
-    html += 'onmouseout="this.style.background=\'' + (esHoy ? '#e3f2fd' : 'white') + '\'">';
-    html += '<div style="font-weight: bold; margin-bottom: 5px;">' + dia + '</div>';
-    html += '<div id="contenidoDia-' + año + '-' + mes + '-' + dia + '" style="font-size: 11px;"></div>';
-    html += '</div>';
-  }
-  
-  html += '</div>';
-  
-  document.getElementById('calendarioPlanificacion').innerHTML = html;
-  
-  // Cargar datos del mes
-  cargarDatosCalendario();
-}
-
-// Cambiar mes del calendario
-function cambiarMesCalendario(direccion) {
-  mesActualCalendario.setMonth(mesActualCalendario.getMonth() + direccion);
-  renderizarCalendario();
-  actualizarEstadisticasMes();
-}
-
-// Mostrar planificación de hoy
-function mostrarPlanificacionHoy() {
-  mesActualCalendario = new Date();
-  renderizarCalendario();
-  seleccionarDiaCalendario(new Date().getDate());
-}
-
-// Seleccionar día del calendario
-function seleccionarDiaCalendario(dia) {
-  const fecha = new Date(mesActualCalendario.getFullYear(), mesActualCalendario.getMonth(), dia);
-  planificacionDiaSeleccionado = fecha;
-
-  // convierto a milisegundos
-  const timestamp = fecha.getTime();  
-  // Actualizar título
-  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  document.getElementById('tituloDetalleDia').textContent = fecha.toLocaleDateString('es-ES', opciones);
-
-  cargarDetalleDia(timestamp);
-}
-
-// Cargar datos del calendario
-function cargarDatosCalendario() {
-  const año = mesActualCalendario.getFullYear();
-  const mes = mesActualCalendario.getMonth();
-  
-  google.script.run
-    .withSuccessHandler(function(datos) {
-      // Limpiar calendario
-      for (let dia = 1; dia <= 31; dia++) {
-        const elemento = document.getElementById('contenidoDia-' + año + '-' + mes + '-' + dia);
-        if (elemento) {
-          elemento.innerHTML = '';
-        }
-      }
-      
-      // Añadir planificaciones
-      datos.planificaciones.forEach(plan => {
-        const fecha = new Date(plan.fecha);
-        const dia = fecha.getDate();
-        const elemento = document.getElementById('contenidoDia-' + año + '-' + mes + '-' + dia);
-        
-        if (elemento) {
-          let html = '<div style="padding: 2px; background: #007bff; color: white; border-radius: 3px; margin-bottom: 2px; font-size: 10px;">';
-          html += '<i class="fas fa-book"></i> ' + plan.temasActivos + ' temas';
-          html += '</div>';
-          
-          if (plan.tiempoReal > 0) {
-            const cumplimiento = (plan.tiempoReal / plan.tiempoPrevisto) * 100;
-            const color = cumplimiento >= 80 ? '#28a745' : (cumplimiento >= 50 ? '#ffc107' : '#dc3545');
-            html += '<div style="padding: 2px; background: ' + color + '; color: white; border-radius: 3px; font-size: 10px;">';
-            html += Math.round(cumplimiento) + '% completado';
-            html += '</div>';
-          }
-          
-          elemento.innerHTML = html;
-        }
-      });
-      
-      // Añadir repasos programados
-      datos.repasos.forEach(repaso => {
-        const fecha = new Date(repaso.fechaProgramada);
-        const dia = fecha.getDate();
-        const elemento = document.getElementById('contenidoDia-' + año + '-' + mes + '-' + dia);
-        
-        if (elemento) {
-          elemento.innerHTML += '<div style="padding: 2px; background: #6c757d; color: white; border-radius: 3px; margin-bottom: 2px; font-size: 10px;">';
-          elemento.innerHTML += '<i class="fas fa-redo"></i> R' + repaso.numeroRepaso;
-          elemento.innerHTML += '</div>';
-        }
-      });
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al cargar datos del calendario:', error);
-    })
-    .getDatosCalendarioPlanificacion(año, mes);
-}
-
-  /** Carga el detalle del día seleccionado en el panel derecho - Chat 08-06-2025 */
-  function cargarDetalleDia(fechaMs) {
-    const contenedor = document.getElementById('detalleDiaPlanificacion');
-    if (!contenedor) {
-      return console.error('No existe el contenedor detalleDiaPlanificacion');
+    // Validar límites normales
+    const validacion = validarSeleccionTema(tiempoMinutos, nombreBloque);
+    if (!validacion.valido) {
+      checkbox.checked = false;
+      alert('⚠️ ' + validacion.mensaje);
+      return;
     }
-    // Muestra spinner mientras llega la respuesta
-    contenedor.innerHTML =
-      '<p style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
-
-    google.script.run
-      .withSuccessHandler(function (datos) {
-        console.log('📥 datos recibidos del servidor:', datos);
-        // Si por alguna razón 'datos' no es un objeto, abortamos
-        if (!datos || typeof datos !== 'object') {
-          contenedor.textContent = 'Error: datos inesperados.';
-          return;
-        }
-       
-        let html = '';
-        if (!datos.planificacion) {
-          // No hay planificación para este día
-          html +=
-            '<div style="text-align:center; padding:20px;">' +
-            '<i class="fas fa-calendar-times" style="font-size:48px; color:#ddd; margin-bottom:10px;"></i>' +
-            '<p style="color:#666;">No hay planificación para este día</p>' +
-            '</div>';
-        } else {
-          // Hay planificación: muestro horas previstas / reales
-          html += '<div style="margin-bottom:20px;">';
-          html += '<h5>Tiempo de estudio</h5>';
-          html +=
-            '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">';
-
-          // Previsto
-          const hPrev = Math.round(datos.planificacion.tiempoPrevisto / 60);
-          html +=
-            '<div style="text-align:center; padding:10px; background:#f8f9fa; border-radius:5px;">' +
-            '<div style="font-size:20px; font-weight:bold;">' +
-            hPrev +
-            'h</div>' +
-            '<div style="font-size:11px; color:#666;">Previsto</div>' +
-            '</div>';
-
-          // Real
-          const hReal = Math.round(datos.planificacion.tiempoReal / 60);
-          html +=
-            '<div style="text-align:center; padding:10px; background:#f8f9fa; border-radius:5px;">' +
-            '<div style="font-size:20px; font-weight:bold;">' +
-            hReal +
-            'h</div>' +
-            '<div style="font-size:11px; color:#666;">Real</div>' +
-            '</div>';
-
-          html += '</div></div>';
-
-          // Si la planificación está activa, permito ajustar el tiempo real
-          if (datos.planificacion.estado === 'activa') {
-            const horas = Math.floor(datos.planificacion.tiempoReal / 60);
-            const minutos = datos.planificacion.tiempoReal % 60;
-
-            html += '<div style="margin-top:10px;">';
-            html += '<label style="font-size:12px;">Actualizar tiempo estudiado:</label>';
-            html +=
-              '<div style="display:flex; gap:5px; align-items:center;">' +
-              // Campo horas
-              '<input type="number" id="horasReales" min="0" value="' +
-              horas +
-              '" style="width:50px; padding:5px;">' +
-              '<span>h</span>' +
-              // Campo minutos
-              '<input type="number" id="minutosReales" min="0" value="' +
-              minutos +
-              '" style="width:50px; padding:5px;">' +
-              '<span>min</span>' +
-              // Botón guardar
-              '<button onclick="actualizarTiempoReal(' +
-              datos.planificacion.id +
-              ')" style="margin-left:10px; padding:5px 10px; background:#007bff; color:white; border:none; border-radius:3px;">' +
-              '<i class="fas fa-save"></i> Guardar' +
-              '</button>' +
-              '</div>';
-            html += '</div>';
-          }
-        }
-
-        // Inyecto la construcción final
-        contenedor.innerHTML = html;
-      })
-      .withFailureHandler(function (err) {
-        console.error('🛑 Error al cargar detalle del día:', err);
-        contenedor.innerHTML =
-          '<p style="color:red; text-align:center;">Error al cargar los datos</p>';
-      })
-      .getDetalleDiaPlanificacion(fechaMs);
-  }
-
-// Actualizar tiempo real estudiado
-function actualizarTiempoReal(idPlanificacion) {
-  const horas = parseInt(document.getElementById('horasReales').value) || 0;
-  const minutos = parseInt(document.getElementById('minutosReales').value) || 0;
-  const tiempoTotal = horas * 60 + minutos;
-  
-  google.script.run
-    .withSuccessHandler(function() {
-      // Recargar detalle del día
-      cargarDetalleDia(planificacionDiaSeleccionado);
-      // Actualizar calendario
-      renderizarCalendario();
-      // Actualizar estadísticas
-      actualizarEstadisticasMes();
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al actualizar tiempo:', error);
-      alert('Error al actualizar tiempo');
-    })
-    .actualizarTiempoRealPlanificacion(idPlanificacion, tiempoTotal);
-}
-
-// Completar tema
-function completarTema(idProgreso, idTema, nombreTema) {
-  if (!confirm('¿Marcar "' + nombreTema + '" como completado?\n\nEsto generará automáticamente los 5 repasos programados.')) {
-    return;
-  }
-  
-  google.script.run
-    .withSuccessHandler(function(resultado) {
-      alert('Tema completado. Se han programado ' + resultado.repasosCreados + ' repasos.');
-      
-      // Recargar detalle del día
-      cargarDetalleDia(planificacionDiaSeleccionado);
-      // Actualizar calendario
-      renderizarCalendario();
-      // Actualizar estadísticas
-      actualizarEstadisticasMes();
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al completar tema:', error);
-      alert('Error al completar tema: ' + error.message);
-    })
-    .completarTemaYGenerarRepasos(idProgreso, idTema);
-}
-
-// Realizar repaso (generar y abrir test)
-function realizarRepaso(idRepaso, idTema) {
-  const boton = event.target;
-  const textoOriginal = boton.innerHTML;
-  boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-  boton.disabled = true;
-  
-  google.script.run
-    .withSuccessHandler(function(resultado) {
-      // Guardar datos del test en sessionStorage para pasarlos a la sección Test
-      sessionStorage.setItem('testRepaso', JSON.stringify({
-        idTest: resultado.idTest,
-        idHistorial: resultado.idHistorial,
-        idRepaso: idRepaso,
-        modo: 'examen',
-        preguntas: resultado.preguntas,
-        tiempoInicio: new Date().getTime()
-      }));
-      
-      // Cambiar a la sección Test
-      showSection('test');
-      
-      // Iniciar el test directamente
-      setTimeout(function() {
-        iniciarTestDeRepaso();
+    
+    // Agregar tema
+    temasSeleccionados.push({
+      id: idTema,
+      tiempo: tiempoMinutos,
+      bloque: nombreBloque,
+      tipo: tipoSeleccion
+    });
+    
+    if (!bloquesActivos.includes(nombreBloque)) {
+      bloquesActivos.push(nombreBloque);
+    }
+    
+    tiempoUsado += tiempoMinutos;
+    
+    // Mostrar mensaje informativo para temas padre
+    if (tipoSeleccion === 'padre') {
+      setTimeout(() => {
+        alert('✅ Tema padre seleccionado completo.\nSe estudiará todo el tema en ' + formatearTiempo(tiempoMinutos) + '.');
       }, 100);
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al generar test de repaso:', error);
-      alert('Error al generar test de repaso: ' + error.message);
-      boton.innerHTML = textoOriginal;
-      boton.disabled = false;
-    })
-    .generarTestRepaso(idRepaso, idTema);
+    }
+    
+  } else {
+    // Quitar tema
+    const index = temasSeleccionados.findIndex(t => t.id === idTema);
+    if (index > -1) {
+      const tema = temasSeleccionados[index];
+      temasSeleccionados.splice(index, 1);
+      tiempoUsado -= tema.tiempo;
+      
+      // Verificar si quitar bloque
+      const masDelMismoBloque = temasSeleccionados.some(t => t.bloque === nombreBloque);
+      if (!masDelMismoBloque) {
+        const indexBloque = bloquesActivos.indexOf(nombreBloque);
+        if (indexBloque > -1) {
+          bloquesActivos.splice(indexBloque, 1);
+        }
+      }
+    }
+  }
+  
+  actualizarResumenTiempo();
 }
 
-// Función para iniciar test de repaso desde sessionStorage
-function iniciarTestDeRepaso() {
-  const datosTest = sessionStorage.getItem('testRepaso');
-  if (!datosTest) return;
+// Formatear tiempo localmente
+function formatearTiempo(minutos) {
+  if (!minutos || minutos <= 0) return '0m';
   
-  const test = JSON.parse(datosTest);
-  sessionStorage.removeItem('testRepaso');
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
   
-  // Asignar a variables globales de test
-  testActivo = {
-    idHistorial: test.idHistorial,
-    idRepaso: test.idRepaso,
-    modo: test.modo,
-    preguntas: test.preguntas,
-    tiempoInicio: test.tiempoInicio,
-    esRepaso: true
-  };
-  
-  preguntaActual = 0;
-  respuestasTest = new Array(test.preguntas.length).fill(null);
-  
-  // Ocultar panel de configuración
-  document.getElementById('panelConfiguracionTest').style.display = 'none';
-  const panelAdmin = document.querySelector('.contenedor-administracion-modal');
-  if (panelAdmin) panelAdmin.style.display = 'none';
-  
-  // Mostrar panel de ejecución
-  document.getElementById('panelEjecucionTest').style.display = 'block';
-  
-  // Iniciar temporizador
-  iniciarTemporizador();
-  
-  // Mostrar primera pregunta
-  mostrarPregunta();
+  if (horas > 0) {
+    return horas + 'h ' + mins + 'm';
+  } else {
+    return mins + 'm';
+  }
 }
 
-// Actualizar estadísticas del mes
-function actualizarEstadisticasMes() {
-  const año = mesActualCalendario.getFullYear();
-  const mes = mesActualCalendario.getMonth();
+// Funciones auxiliares para estilos
+function getIconoEstado(estado) {
+  switch (estado) {
+    case 'completado': return '✅';
+    case 'en_progreso': return '🔄';
+    default: return '⭕';
+  }
+}
+
+function getColorFondo(estado) {
+  switch (estado) {
+    case 'completado': return '#e8f5e9';
+    case 'en_progreso': return '#fff3e0';
+    default: return '#ffffff';
+  }
+}
+
+function getColorTexto(estado) {
+  switch (estado) {
+    case 'completado': return '#2e7d32';
+    case 'en_progreso': return '#ef6c00';
+    default: return '#333333';
+  }
+}
+
+function getColorBadge(estado) {
+  switch (estado) {
+    case 'completado': return '#4caf50';
+    case 'en_progreso': return '#ff9800';
+    default: return '#9e9e9e';
+  }
+}
+
+function getTextoEstado(estado) {
+  switch (estado) {
+    case 'completado': return 'OK';
+    case 'en_progreso': return 'PROG';
+    default: return 'PEND';
+  }
+}
+
+// Verificar si es bloque especial
+function esBloqueBloqueEspecial(nombreBloque) {
+  const nombre = nombreBloque.toLowerCase();
+  return nombre.includes('geografía') || nombre.includes('geografia') || nombre.includes('callejero');
+}
+
+// Toggle colapsar bloque
+function toggleBloque(nombreBloque) {
+  const contenido = document.getElementById('bloque-' + nombreBloque);
+  const icono = document.getElementById('icono-' + nombreBloque);
   
-  google.script.run
-    .withSuccessHandler(function(stats) {
-      document.getElementById('diasEstudiadosMes').textContent = stats.diasEstudiados;
-      document.getElementById('horasTotalesMes').textContent = Math.round(stats.minutosEstudiados / 60) + 'h';
-      document.getElementById('temasCompletadosMes').textContent = stats.temasCompletados;
-      document.getElementById('repasosPendientesMes').textContent = stats.repasosPendientes;
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al cargar estadísticas:', error);
-    })
-    .getEstadisticasMesPlanificacion(año, mes);
+  if (contenido.style.display === 'none') {
+    contenido.style.display = 'block';
+    icono.textContent = '▼';
+  } else {
+    contenido.style.display = 'none';
+    icono.textContent = '▶';
+  }
 }
 
-// Nueva planificación (placeholder)
-function nuevaPlanificacion() {
-  // TODO: Implementar modal de nueva planificación
-  alert('Función en desarrollo: Nueva planificación');
+// Toggle selección de tema
+function toggleSeleccionTema(checkbox, idTema, tiempoMinutos, nombreBloque) {
+  if (checkbox.checked) {
+    // Validar selección
+    const validacion = validarSeleccionTema(tiempoMinutos, nombreBloque);
+    if (!validacion.valido) {
+      checkbox.checked = false;
+      alert('⚠️ ' + validacion.mensaje);
+      return;
+    }
+    
+    // Agregar tema
+    temasSeleccionados.push({
+      id: idTema,
+      tiempo: tiempoMinutos,
+      bloque: nombreBloque
+    });
+    
+    if (!bloquesActivos.includes(nombreBloque)) {
+      bloquesActivos.push(nombreBloque);
+    }
+    
+    tiempoUsado += tiempoMinutos;
+    
+  } else {
+    // Quitar tema
+    const index = temasSeleccionados.findIndex(t => t.id === idTema);
+    if (index > -1) {
+      const tema = temasSeleccionados[index];
+      temasSeleccionados.splice(index, 1);
+      tiempoUsado -= tema.tiempo;
+      
+      // Verificar si quitar bloque
+      const masDelMismoBloque = temasSeleccionados.some(t => t.bloque === nombreBloque);
+      if (!masDelMismoBloque) {
+        const indexBloque = bloquesActivos.indexOf(nombreBloque);
+        if (indexBloque > -1) {
+          bloquesActivos.splice(indexBloque, 1);
+        }
+      }
+    }
+  }
+  
+  actualizarResumenTiempo();
 }
 
-// Actualizar repaso como completado
-function actualizarRepasoCompletado(idRepaso, resultadoTest) {
-  google.script.run
-    .withSuccessHandler(function() {
-      console.log('Repaso actualizado correctamente');
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al actualizar repaso:', error);
-    })
-    .marcarRepasoCompletado(idRepaso, resultadoTest.porcentaje, resultadoTest.tiempoSegundos);
+// Validar selección de tema
+function validarSeleccionTema(tiempoMinutos, nombreBloque) {
+  // Verificar tiempo disponible
+  if (tiempoUsado + tiempoMinutos > tiempoTotalDisponible) {
+    return {
+      valido: false,
+      mensaje: 'Excede el tiempo disponible (' + Math.round((tiempoUsado + tiempoMinutos - tiempoTotalDisponible)) + ' min de más)'
+    };
+  }
+  
+  // Verificar límite de bloques
+  if (!bloquesActivos.includes(nombreBloque)) {
+    const esEspecial = esBloqueBloqueEspecial(nombreBloque);
+    
+    if (!esEspecial && bloquesActivos.filter(b => !esBloqueBloqueEspecial(b)).length >= 3) {
+      return {
+        valido: false,
+        mensaje: 'Máximo 3 bloques normales permitidos'
+      };
+    }
+    
+    if (bloquesActivos.length >= 4) {
+      return {
+        valido: false,
+        mensaje: 'Máximo 4 bloques total (3 normales + 1 especial)'
+      };
+    }
+  }
+  
+  return { valido: true };
+}
+
+// Actualizar resumen de tiempo
+function actualizarResumenTiempo() {
+  const tiempoRestante = tiempoTotalDisponible - tiempoUsado;
+  
+  document.getElementById('tiempoTotal').textContent = tiempoTotalDisponible;
+  document.getElementById('tiempoSeleccionado').textContent = tiempoUsado;
+  document.getElementById('tiempoRestante').textContent = tiempoRestante;
+  document.getElementById('bloquesUsados').textContent = bloquesActivos.length + '/3';
+  
+  // Cambiar colores según estado
+  const elementoRestante = document.getElementById('tiempoRestante');
+  if (tiempoRestante < 0) {
+    elementoRestante.style.color = '#dc3545';
+  } else if (tiempoRestante < 30) {
+    elementoRestante.style.color = '#ffc107';
+  } else {
+    elementoRestante.style.color = '#28a745';
+  }
+}
+
+// Crear planificación
+function crearPlanificacion() {
+  alert('🚧 Crear planificación - En desarrollo...');
+}
+
+// Event listener para cambio de horas
+document.addEventListener('DOMContentLoaded', function() {
+  // Solo añadir el listener si el elemento existe
+  setTimeout(function() {
+    const horasInput = document.getElementById('horasEstudio');
+    if (horasInput) {
+      horasInput.addEventListener('input', actualizarTiempoDisponible);
+    }
+  }, 100);
+});
+
+// Event listeners para el modal
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    // Listener para cambio de fecha
+    const fechaInput = document.getElementById('fechaPlanificacion');
+    if (fechaInput) {
+      fechaInput.addEventListener('change', verificarRepasosDelDia);
+    }
+    
+    // Listener para cambio de oposición
+    const oposicionSelect = document.getElementById('oposicionPlanificacion');
+    if (oposicionSelect) {
+      oposicionSelect.addEventListener('change', function() {
+        if (pasoActual >= 2) {
+          cargarConfiguracionActual();
+        }
+      });
+    }
+    
+    // Listener para cambio de horas
+    const horasInput = document.getElementById('horasEstudio');
+    if (horasInput) {
+      horasInput.addEventListener('input', actualizarTiempoDisponible);
+    }
+  }, 100);
+});
+
+// Validar orden consecutivo de temas
+function validarOrdenConsecutivo(nodoSeleccionado, arbolCompleto) {
+  // Buscar el nodo en el árbol completo para obtener contexto
+  function encontrarNodoEnArbol(arbol, idBuscado) {
+    for (let tema of arbol) {
+      if (tema.id === idBuscado) return { nodo: tema, padre: null };
+      
+      if (tema.hijos && tema.hijos.length > 0) {
+        const resultado = encontrarNodoEnArbol(tema.hijos, idBuscado);
+        if (resultado.nodo) return { nodo: resultado.nodo, padre: tema };
+      }
+    }
+    return { nodo: null, padre: null };
+  }
+  
+  const { nodo, padre } = encontrarNodoEnArbol(arbolCompleto, nodoSeleccionado.id);
+  
+  if (!padre) return { esConsecutivo: true }; // Tema padre, no hay orden que validar
+  
+  // Obtener hermanos del mismo padre
+  const hermanos = padre.hijos.sort((a, b) => {
+    const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+    const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+    return numA - numB;
+  });
+  
+  // Encontrar posición del nodo actual
+  const posicionActual = hermanos.findIndex(h => h.id === nodoSeleccionado.id);
+  
+  // Verificar si hay hermanos anteriores sin completar/seleccionar
+  const hermanosPreviosSinCompletar = [];
+  for (let i = 0; i < posicionActual; i++) {
+    const hermano = hermanos[i];
+    const yaSeleccionado = temasSeleccionados.some(t => t.id === hermano.id);
+    const completado = hermano.estado === 'completado';
+    
+    if (!yaSeleccionado && !completado) {
+      hermanosPreviosSinCompletar.push(hermano);
+    }
+  }
+  
+  if (hermanosPreviosSinCompletar.length > 0) {
+    return {
+      esConsecutivo: false,
+      mensaje: 'Te estás saltando el orden. Temas anteriores pendientes: ' + 
+               hermanosPreviosSinCompletar.map(h => h.prenombre || h.nombre).join(', '),
+      temasSaltados: hermanosPreviosSinCompletar
+    };
+  }
+  
+  return { esConsecutivo: true };
 }
 
 </script>
