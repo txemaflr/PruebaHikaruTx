@@ -1,978 +1,475 @@
-// planificacion.gs - Funciones del backend para planificación
+// planificacion.gs - VERSIÓN LIMPIA
+// Funciones de planificación completamente nuevas
 
-// Obtener bloques especiales (geografía y callejero)
-function getBloquesEspeciales() {
-  const bloquesSheet = getGoogleSheet('Bloques');
-  const bloquesColumns = getColumnIndices('Bloques');
-  const data = bloquesSheet.getDataRange().getValues();
-  
-  const especiales = {
-    geografia: null,
-    callejero: null
-  };
-  
-  for (let i = 1; i < data.length; i++) {
-    const nombre = data[i][bloquesColumns['nombre']].toLowerCase();
-    const id = data[i][bloquesColumns['id_bloque']];
-    
-    if (nombre === 'geografía' || nombre === 'geografia') {
-      especiales.geografia = id;
-    } else if (nombre === 'callejero') {
-      especiales.callejero = id;
-    }
-  }
-  
-  return especiales;
-}
+// TODO: Implementar funciones limpias
+// planificacion.gs - FUNCIONES BÁSICAS LIMPIAS
 
-// Verificar si una planificación existe para hoy
-function getPlanificacionHoy() {
-  const planSheet = getGoogleSheet('Planificacion_Diaria');
-  const planColumns = getColumnIndices('Planificacion_Diaria');
-  const data = planSheet.getDataRange().getValues();
-  
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  
-  for (let i = 1; i < data.length; i++) {
-    const fecha = new Date(data[i][planColumns['fecha']]);
-    fecha.setHours(0, 0, 0, 0);
-    
-    if (fecha.getTime() === hoy.getTime() && data[i][planColumns['estado']] === 'activa') {
-      return {
-        id: data[i][planColumns['id_planificacion']],
-        idOposicion: data[i][planColumns['id_oposicion']],
-        tiempoPrevisto: data[i][planColumns['tiempo_previsto_minutos']],
-        tiempoReal: data[i][planColumns['tiempo_real_minutos']],
-        estado: data[i][planColumns['estado']]
-      };
-    }
-  }
-  
-  return null;
-}
-
-// Obtener temas activos de una planificación
-function getTemasActivosPlanificacion(idPlanificacion) {
-  const temasSheet = getGoogleSheet('Planificacion_Temas');
-  const temasColumns = getColumnIndices('Planificacion_Temas');
-  const data = temasSheet.getDataRange().getValues();
-  
-  const temasActivos = [];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][temasColumns['id_planificacion']] === idPlanificacion && 
-        data[i][temasColumns['estado']] === 'activo') {
-      temasActivos.push({
-        id: data[i][temasColumns['id_planificacion_tema']],
-        idTemaPadre: data[i][temasColumns['id_tema_padre']],
-        idTemaActual: data[i][temasColumns['id_tema_actual']],
-        numeroSlot: data[i][temasColumns['numero_slot']],
-        idBloque: data[i][temasColumns['id_bloque']],
-        tiempoEstimado: data[i][temasColumns['tiempo_estimado_minutos']]
-      });
-    }
-  }
-  
-  return temasActivos;
-}
-
-// Obtener temas y bloques para planificación
-function getTemasYBloquesPlanificacion(idOposicion) {
+// Obtener oposiciones para el modal
+function getOposicionesParaPlanificacion() {
   try {
-    // Obtener temas vinculados
-    const temas = getTemasVinculadosEnArbol(idOposicion);
+    const oposicionesSheet = getGoogleSheet('Oposiciones');
+    const oposicionesColumns = getColumnIndices('Oposiciones');
+    const data = oposicionesSheet.getDataRange().getValues();
     
-    // Obtener todos los bloques
-    const bloquesSheet = getGoogleSheet('Bloques');
-    const bloquesColumns = getColumnIndices('Bloques');
-    const bloquesData = bloquesSheet.getDataRange().getValues();
-    
-    const bloques = [];
-    for (let i = 1; i < bloquesData.length; i++) {
-      bloques.push({
-        id: bloquesData[i][bloquesColumns['id_bloque']],
-        nombre: bloquesData[i][bloquesColumns['nombre']]
+    const oposiciones = [];
+    for (let i = 1; i < data.length; i++) {
+      oposiciones.push({
+        id: data[i][oposicionesColumns['id_oposicion']],
+        nombre: data[i][oposicionesColumns['nombre']]
       });
     }
     
-    return {
-      temas: temas,
-      bloques: bloques
-    };
-  } catch (error) {
-    console.error('Error al obtener temas y bloques:', error);
-    throw error;
-  }
-}
-
-// Obtener información de un tema por ID
-function getTemaById(idTema) {
-  const temasSheet = getGoogleSheet('Temas');
-  const temasColumns = getColumnIndices('Temas');
-  const data = temasSheet.getDataRange().getValues();
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][temasColumns['id_tema']] == idTema) {
-      return {
-        id: data[i][temasColumns['id_tema']],
-        nombre: data[i][temasColumns['nombre']],
-        prenombre: data[i][temasColumns['prenombre']],
-        pag_desde: data[i][temasColumns['pag_desde']],
-        pag_hasta: data[i][temasColumns['pag_hasta']],
-        id_bloque: data[i][temasColumns['id_bloque']]
-      };
-    }
-  }
-  
-  throw new Error('Tema no encontrado');
-}
-
-// Crear planificación completa
-function crearPlanificacionCompleta(datos) {
-  try {
-    const db = getDatabase();
-    db.startTransaction();
-    
-    try {
-      // 1. Crear registro en Planificacion_Diaria
-      const planSheet = getGoogleSheet('Planificacion_Diaria');
-      const planColumns = getColumnIndices('Planificacion_Diaria');
-      
-      const idPlanificacion = generateUniqueId(planSheet, planColumns['id_planificacion'] + 1);
-      
-      const nuevaPlanificacion = [];
-      nuevaPlanificacion[planColumns['id_planificacion']] = idPlanificacion;
-      nuevaPlanificacion[planColumns['id_oposicion']] = datos.idOposicion;
-      nuevaPlanificacion[planColumns['fecha']] = new Date();
-      nuevaPlanificacion[planColumns['tiempo_previsto_minutos']] = datos.minutosPrevistos;
-      nuevaPlanificacion[planColumns['tiempo_real_minutos']] = 0;
-      nuevaPlanificacion[planColumns['estado']] = 'activa';
-      nuevaPlanificacion[planColumns['fecha_creacion']] = new Date();
-      
-      planSheet.appendRow(nuevaPlanificacion);
-      
-      // 2. Crear registros en Planificacion_Temas
-      const temasSheet = getGoogleSheet('Planificacion_Temas');
-      const temasColumns = getColumnIndices('Planificacion_Temas');
-      
-      datos.temas.forEach((tema, index) => {
-        const primerHijo = obtenerPrimerTemaHijo(tema.id);
-        const tiempoEstimado = tema.paginas * 30;
-        
-        const nuevoTemaPlan = [];
-        nuevoTemaPlan[temasColumns['id_planificacion_tema']] = generateUniqueId(temasSheet, temasColumns['id_planificacion_tema'] + 1);
-        nuevoTemaPlan[temasColumns['id_planificacion']] = idPlanificacion;
-        nuevoTemaPlan[temasColumns['id_tema_padre']] = tema.id;
-        nuevoTemaPlan[temasColumns['id_tema_actual']] = primerHijo ? primerHijo.id : tema.id;
-        nuevoTemaPlan[temasColumns['numero_slot']] = index + 1;
-        nuevoTemaPlan[temasColumns['id_bloque']] = tema.idBloque;
-        nuevoTemaPlan[temasColumns['fecha_inicio']] = new Date();
-        nuevoTemaPlan[temasColumns['fecha_completado']] = '';
-        nuevoTemaPlan[temasColumns['estado']] = 'activo';
-        nuevoTemaPlan[temasColumns['tiempo_estimado_minutos']] = tiempoEstimado;
-        nuevoTemaPlan[temasColumns['tiempo_real_minutos']] = 0;
-        
-        temasSheet.appendRow(nuevoTemaPlan);
-        
-        // 3. Crear registro en Progreso_Temas para el tema actual
-        crearProgresoTema(idPlanificacion, primerHijo ? primerHijo.id : tema.id);
-      });
-      
-      db.commitTransaction();
-      
-      return {
-        success: true,
-        idPlanificacion: idPlanificacion,
-        mensaje: 'Planificación creada correctamente'
-      };
-      
-    } catch (error) {
-      db.rollbackTransaction();
-      throw error;
-    }
+    return oposiciones.sort((a, b) => a.nombre.localeCompare(b.nombre));
     
   } catch (error) {
-    console.error('Error al crear planificación:', error);
-    throw error;
+    console.error('Error al obtener oposiciones:', error);
+    return [];
   }
 }
 
-// Obtener primer tema hijo
-function obtenerPrimerTemaHijo(idTemaPadre) {
-  const temasSheet = getGoogleSheet('Temas');
-  const temasColumns = getColumnIndices('Temas');
-  const data = temasSheet.getDataRange().getValues();
-  
-  // Buscar hijos directos
-  const hijos = [];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][temasColumns['id_padre']] == idTemaPadre) {
-      hijos.push({
-        id: data[i][temasColumns['id_tema']],
-        prenombre: data[i][temasColumns['prenombre']] || '',
-        nombre: data[i][temasColumns['nombre']],
-        orden: data[i][temasColumns['prenombre']] || data[i][temasColumns['nombre']]
-      });
-    }
-  }
-  
-  if (hijos.length === 0) {
-    return null; // El tema padre no tiene hijos
-  }
-  
-  // Ordenar por prenombre
-  hijos.sort((a, b) => {
-    // Intentar ordenar numéricamente si es posible
-    const numA = parseFloat(a.orden.replace(/[^\d.]/g, ''));
-    const numB = parseFloat(b.orden.replace(/[^\d.]/g, ''));
-    
-    if (!isNaN(numA) && !isNaN(numB)) {
-      return numA - numB;
-    }
-    
-    return a.orden.localeCompare(b.orden);
-  });
-  
-  return hijos[0];
-}
-
-// Crear registro de progreso para un tema
-function crearProgresoTema(idPlanificacion, idTema) {
-  const progresoSheet = getGoogleSheet('Progreso_Temas');
-  const progresoColumns = getColumnIndices('Progreso_Temas');
-  
-  const tema = getTemaById(idTema);
-  const paginas = (tema.pag_hasta - tema.pag_desde + 1) || 0;
-  
-  const nuevoProgreso = [];
-  nuevoProgreso[progresoColumns['id_progreso']] = generateUniqueId(progresoSheet, progresoColumns['id_progreso'] + 1);
-  nuevoProgreso[progresoColumns['id_tema']] = idTema;
-  nuevoProgreso[progresoColumns['id_planificacion']] = idPlanificacion;
-  nuevoProgreso[progresoColumns['fecha_inicio']] = new Date();
-  nuevoProgreso[progresoColumns['fecha_completado']] = '';
-  nuevoProgreso[progresoColumns['estado']] = 'en_progreso';
-  nuevoProgreso[progresoColumns['paginas_completadas']] = 0;
-  nuevoProgreso[progresoColumns['tiempo_dedicado_minutos']] = 0;
-  
-  progresoSheet.appendRow(nuevoProgreso);
-}
-
-// Obtener datos del calendario para un mes específico
-function getDatosCalendarioPlanificacion(año, mes) {
+// Obtener configuración de planificación para una oposición
+function getConfiguracionOposicion(idOposicion) {
   try {
-    const inicioMes = new Date(año, mes, 1);
-    const finMes = new Date(año, mes + 1, 0);
+    const configSheet = getGoogleSheet('Configuracion_Planificacion');
+    const configColumns = getColumnIndices('Configuracion_Planificacion');
+    const data = configSheet.getDataRange().getValues();
     
-    // Obtener planificaciones del mes
-    const planSheet = getGoogleSheet('Planificacion_Diaria');
-    const planColumns = getColumnIndices('Planificacion_Diaria');
-    const planData = planSheet.getDataRange().getValues();
-    
-    const planificaciones = [];
-    
-    for (let i = 1; i < planData.length; i++) {
-      const fecha = new Date(planData[i][planColumns['fecha']]);
-      
-      if (fecha >= inicioMes && fecha <= finMes) {
-        // Contar temas activos
-        const temasActivos = getTemasActivosPlanificacion(planData[i][planColumns['id_planificacion']]);
-        
-        planificaciones.push({
-          fecha: fecha,
-          tiempoPrevisto: planData[i][planColumns['tiempo_previsto_minutos']],
-          tiempoReal: planData[i][planColumns['tiempo_real_minutos']],
-          temasActivos: temasActivos.length,
-          estado: planData[i][planColumns['estado']]
-        });
-      }
-    }
-    
-    // Obtener repasos del mes
-    const repasosSheet = getGoogleSheet('Repasos_Programados');
-    const repasosColumns = getColumnIndices('Repasos_Programados');
-    const repasosData = repasosSheet.getDataRange().getValues();
-    
-    const repasos = [];
-    
-    for (let i = 1; i < repasosData.length; i++) {
-      const fecha = new Date(repasosData[i][repasosColumns['fecha_programada']]);
-      
-      if (fecha >= inicioMes && fecha <= finMes && repasosData[i][repasosColumns['estado']] === 'pendiente') {
-        repasos.push({
-          fechaProgramada: fecha,
-          numeroRepaso: repasosData[i][repasosColumns['numero_repaso']],
-          idTema: repasosData[i][repasosColumns['id_tema']]
-        });
-      }
-    }
-    
-    return {
-      planificaciones: planificaciones,
-      repasos: repasos
-    };
-    
-  } catch (error) {
-    console.error('Error al obtener datos del calendario:', error);
-    throw error;
-  }
-}
-
-// Obtener detalle del día
-function getDetalleDiaPlanificacion(fecha) {
-  try {
-    // Normalizar fecha
-    fecha = new Date(fecha);
-    fecha.setHours(0, 0, 0, 0);
-    
-    // Buscar planificación del día
-    const planSheet = getGoogleSheet('Planificacion_Diaria');
-    const planColumns = getColumnIndices('Planificacion_Diaria');
-    const planData = planSheet.getDataRange().getValues();
-    
-    let planificacion = null;
-    
-    for (let i = 1; i < planData.length; i++) {
-      const fechaPlan = new Date(planData[i][planColumns['fecha']]);
-      fechaPlan.setHours(0, 0, 0, 0);
-      
-      if (fechaPlan.getTime() === fecha.getTime()) {
-        planificacion = {
-          id: planData[i][planColumns['id_planificacion']],
-          tiempoPrevisto: planData[i][planColumns['tiempo_previsto_minutos']],
-          tiempoReal: planData[i][planColumns['tiempo_real_minutos']],
-          estado: planData[i][planColumns['estado']]
+    // Buscar configuración existente
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][configColumns['id_oposicion']] == idOposicion) {
+        return {
+          vueltaActual: data[i][configColumns['vuelta_actual']],
+          minPorPagV1: data[i][configColumns['min_por_pagina_v1']],
+          minPorPagV2: data[i][configColumns['min_por_pagina_v2']],
+          minPorPagV3: data[i][configColumns['min_por_pagina_v3']],
+          minPorPagV4: data[i][configColumns['min_por_pagina_v4_mas']]
         };
-        break;
       }
     }
     
-    if (!planificacion) {
-      return { planificacion: null, temasActivos: [], repasos: [] };
-    }
+    // Si no existe, crear configuración por defecto
+    return crearConfiguracionPorDefecto(idOposicion);
     
-    // Obtener temas activos con su progreso
-    const temasActivos = [];
-    const planTemasSheet = getGoogleSheet('Planificacion_Temas');
-    const planTemasColumns = getColumnIndices('Planificacion_Temas');
-    const planTemasData = planTemasSheet.getDataRange().getValues();
+  } catch (error) {
+    console.error('Error al obtener configuración:', error);
+    return {
+      vueltaActual: 1,
+      minPorPagV1: 30,
+      minPorPagV2: 20,
+      minPorPagV3: 15,
+      minPorPagV4: 10
+    };
+  }
+}
+
+// Crear configuración por defecto
+function crearConfiguracionPorDefecto(idOposicion) {
+  try {
+    const configSheet = getGoogleSheet('Configuracion_Planificacion');
+    const configColumns = getColumnIndices('Configuracion_Planificacion');
     
-    const progresoSheet = getGoogleSheet('Progreso_Temas');
-    const progresoColumns = getColumnIndices('Progreso_Temas');
-    const progresoData = progresoSheet.getDataRange().getValues();
+    const idConfig = generateUniqueId(configSheet, configColumns['id_config'] + 1);
     
-    for (let i = 1; i < planTemasData.length; i++) {
-      if (planTemasData[i][planTemasColumns['id_planificacion']] === planificacion.id) {
-        const idTemaActual = planTemasData[i][planTemasColumns['id_tema_actual']];
-        const tema = getTemaById(idTemaActual);
-        
-        // Buscar progreso
-        let progreso = null;
-        for (let j = 1; j < progresoData.length; j++) {
-          if (progresoData[j][progresoColumns['id_tema']] === idTemaActual && 
-              progresoData[j][progresoColumns['id_planificacion']] === planificacion.id) {
-            progreso = {
-              id: progresoData[j][progresoColumns['id_progreso']],
-              estado: progresoData[j][progresoColumns['estado']],
-              paginasCompletadas: progresoData[j][progresoColumns['paginas_completadas']] || 0
-            };
-            break;
-          }
-        }
-        
-        // Obtener nombre del bloque
-        const bloque = getBloquePorId(planTemasData[i][planTemasColumns['id_bloque']]);
-        
-        temasActivos.push({
-          idProgreso: progreso ? progreso.id : null,
-          idTema: idTemaActual,
-          nombreCompleto: (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre,
-          nombreBloque: bloque ? bloque.nombre : 'Sin bloque',
-          paginasTotales: (tema.pag_hasta - tema.pag_desde + 1) || 0,
-          paginasCompletadas: progreso ? progreso.paginasCompletadas : 0,
-          estado: progreso ? progreso.estado : 'pendiente',
-          numeroSlot: planTemasData[i][planTemasColumns['numero_slot']]
-        });
-      }
-    }
+    const nuevaConfig = [];
+    nuevaConfig[configColumns['id_config']] = idConfig;
+    nuevaConfig[configColumns['id_oposicion']] = idOposicion;
+    nuevaConfig[configColumns['vuelta_actual']] = 1;
+    nuevaConfig[configColumns['min_por_pagina_v1']] = 30;
+    nuevaConfig[configColumns['min_por_pagina_v2']] = 20;
+    nuevaConfig[configColumns['min_por_pagina_v3']] = 15;
+    nuevaConfig[configColumns['min_por_pagina_v4_mas']] = 10;
+    nuevaConfig[configColumns['fecha_actualizacion']] = new Date();
     
-    // Obtener repasos del día
+    configSheet.appendRow(nuevaConfig);
+    
+    return {
+      vueltaActual: 1,
+      minPorPagV1: 30,
+      minPorPagV2: 20,
+      minPorPagV3: 15,
+      minPorPagV4: 10
+    };
+    
+  } catch (error) {
+    console.error('Error al crear configuración por defecto:', error);
+    return {
+      vueltaActual: 1,
+      minPorPagV1: 30,
+      minPorPagV2: 20,
+      minPorPagV3: 15,
+      minPorPagV4: 10
+    };
+  }
+}
+
+// Calcular minutos por página según vuelta
+function getMinutosPorPagina(config) {
+  switch (config.vueltaActual) {
+    case 1: return config.minPorPagV1;
+    case 2: return config.minPorPagV2;
+    case 3: return config.minPorPagV3;
+    default: return config.minPorPagV4;
+  }
+}
+
+// Obtener repasos de un día específico
+function getRepasosDelDia(fechaMs) {
+  try {
+    const fecha = new Date(fechaMs);
+    fecha.setHours(0, 0, 0, 0);
+    
     const repasosSheet = getGoogleSheet('Repasos_Programados');
     const repasosColumns = getColumnIndices('Repasos_Programados');
-    const repasosData = repasosSheet.getDataRange().getValues();
+    const data = repasosSheet.getDataRange().getValues();
     
     const repasos = [];
     
-    for (let i = 1; i < repasosData.length; i++) {
-      const fechaRepaso = new Date(repasosData[i][repasosColumns['fecha_programada']]);
+    for (let i = 1; i < data.length; i++) {
+      const fechaRepaso = new Date(data[i][repasosColumns['fecha_programada']]);
       fechaRepaso.setHours(0, 0, 0, 0);
       
       if (fechaRepaso.getTime() === fecha.getTime() && 
-          repasosData[i][repasosColumns['estado']] === 'pendiente') {
-        const tema = getTemaById(repasosData[i][repasosColumns['id_tema']]);
+          data[i][repasosColumns['estado']] === 'pendiente') {
+        
+        // Obtener nombre del tema
+        const idTema = data[i][repasosColumns['id_tema']];
+        const tema = getTemaById(idTema);
         
         repasos.push({
-          id: repasosData[i][repasosColumns['id_repaso']],
-          idTema: repasosData[i][repasosColumns['id_tema']],
-          numeroRepaso: repasosData[i][repasosColumns['numero_repaso']],
+          id: data[i][repasosColumns['id_repaso']],
+          numeroRepaso: data[i][repasosColumns['numero_repaso']],
           nombreTema: (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre
         });
       }
     }
     
-    return {
-      planificacion: planificacion,
-      temasActivos: temasActivos.sort((a, b) => a.numeroSlot - b.numeroSlot),
-      repasos: repasos
-    };
+    return repasos;
     
   } catch (error) {
-    console.error('Error al obtener detalle del día:', error);
-    throw error;
+    console.error('Error al obtener repasos del día:', error);
+    return [];
   }
 }
 
-// Actualizar tiempo real de planificación
-function actualizarTiempoRealPlanificacion(idPlanificacion, minutosReales) {
+// Función auxiliar para obtener tema por ID (si no existe)
+function getTemaById(idTema) {
   try {
-    const planSheet = getGoogleSheet('Planificacion_Diaria');
-    const planColumns = getColumnIndices('Planificacion_Diaria');
-    const data = planSheet.getDataRange().getValues();
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const data = temasSheet.getDataRange().getValues();
     
     for (let i = 1; i < data.length; i++) {
-      if (data[i][planColumns['id_planificacion']] === idPlanificacion) {
-        planSheet.getRange(i + 1, planColumns['tiempo_real_minutos'] + 1).setValue(minutosReales);
-        return { success: true };
+      if (data[i][temasColumns['id_tema']] == idTema) {
+        return {
+          id: data[i][temasColumns['id_tema']],
+          nombre: data[i][temasColumns['nombre']],
+          prenombre: data[i][temasColumns['prenombre']] || '',
+          pag_desde: data[i][temasColumns['pag_desde']],
+          pag_hasta: data[i][temasColumns['pag_hasta']],
+          pag_totales: data[i][temasColumns['pag_totales']]
+        };
       }
     }
     
-    throw new Error('Planificación no encontrada');
+    return { nombre: 'Tema no encontrado', prenombre: '' };
     
   } catch (error) {
-    console.error('Error al actualizar tiempo real:', error);
-    throw error;
+    console.error('Error al obtener tema por ID:', error);
+    return { nombre: 'Error', prenombre: '' };
   }
 }
 
-// Completar tema y generar repasos
-function completarTemaYGenerarRepasos(idProgreso, idTema) {
+// Obtener árbol completo de temas con estados (CORREGIDO CON BLOQUES)
+function getArbolTemasConEstados(idOposicion) {
   try {
-    const db = getDatabase();
-    db.startTransaction();
+    console.log('🌳 Obteniendo árbol de temas para oposición:', idOposicion);
     
-    try {
-      // 1. Marcar progreso como completado
-      const progresoSheet = getGoogleSheet('Progreso_Temas');
-      const progresoColumns = getColumnIndices('Progreso_Temas');
-      const progresoData = progresoSheet.getDataRange().getValues();
-      
-      let filaProgreso = -1;
-      let idPlanificacion = null;
-      
-      for (let i = 1; i < progresoData.length; i++) {
-        if (progresoData[i][progresoColumns['id_progreso']] === idProgreso) {
-          filaProgreso = i + 1;
-          idPlanificacion = progresoData[i][progresoColumns['id_planificacion']];
-          
-          // Actualizar estado y fecha
-          progresoSheet.getRange(filaProgreso, progresoColumns['fecha_completado'] + 1).setValue(new Date());
-          progresoSheet.getRange(filaProgreso, progresoColumns['estado'] + 1).setValue('completado');
-          
-          // Actualizar páginas completadas
-          const tema = getTemaById(idTema);
-          const paginasTotales = (tema.pag_hasta - tema.pag_desde + 1) || 0;
-          progresoSheet.getRange(filaProgreso, progresoColumns['paginas_completadas'] + 1).setValue(paginasTotales);
-          
-          break;
-        }
-      }
-      
-      if (filaProgreso === -1) {
-        throw new Error('Progreso no encontrado');
-      }
-      
-      // 2. Crear repasos programados
-      const repasosSheet = getGoogleSheet('Repasos_Programados');
-      const repasosColumns = getColumnIndices('Repasos_Programados');
-      
-      const fechaCompletado = new Date();
-      const intervalosRepasos = [1, 3, 7, 15, 30]; // días
-      
-      intervalosRepasos.forEach((dias, index) => {
-        const fechaRepaso = new Date(fechaCompletado);
-        fechaRepaso.setDate(fechaRepaso.getDate() + dias);
-        
-        const nuevoRepaso = [];
-        nuevoRepaso[repasosColumns['id_repaso']] = generateUniqueId(repasosSheet, repasosColumns['id_repaso'] + 1);
-        nuevoRepaso[repasosColumns['id_tema']] = idTema;
-        nuevoRepaso[repasosColumns['numero_repaso']] = index + 1;
-        nuevoRepaso[repasosColumns['fecha_programada']] = fechaRepaso;
-        nuevoRepaso[repasosColumns['fecha_completado']] = '';
-        nuevoRepaso[repasosColumns['estado']] = 'pendiente';
-        nuevoRepaso[repasosColumns['id_test']] = '';
-        nuevoRepaso[repasosColumns['id_evento_calendar']] = '';
-        nuevoRepaso[repasosColumns['nota_test']] = '';
-        nuevoRepaso[repasosColumns['tiempo_test_minutos']] = '';
-        
-        repasosSheet.appendRow(nuevoRepaso);
-        
-        // TODO: Crear evento en Google Calendar
-      });
-      
-      // 3. Avanzar al siguiente tema hijo
-      avanzarAlSiguienteTema(idPlanificacion, idTema);
-      
-      db.commitTransaction();
-      
-      return {
-        success: true,
-        repasosCreados: intervalosRepasos.length
-      };
-      
-    } catch (error) {
-      db.rollbackTransaction();
-      throw error;
-    }
+    // Obtener configuración para calcular tiempos
+    const config = getConfiguracionOposicion(idOposicion);
+    const minutosPorPagina = getMinutosPorPagina(config);
     
-  } catch (error) {
-    console.error('Error al completar tema:', error);
-    throw error;
-  }
-}
-
-// Avanzar al siguiente tema hijo
-function avanzarAlSiguienteTema(idPlanificacion, idTemaActual) {
-  try {
-    // Buscar el tema actual y su padre
-    const tema = getTemaById(idTemaActual);
-    const idPadre = tema.id_padre;
+    // Obtener temas vinculados a la oposición
+    const temasVinculados = getTemasVinculadosAOposicion(idOposicion);
+    console.log('📝 Temas vinculados obtenidos:', temasVinculados.length);
     
-    if (!idPadre) {
-      // Es un tema padre sin hijos, no hay siguiente
-      return;
-    }
+    // Obtener información de bloques
+    const idsBloques = [...new Set(temasVinculados.map(t => t.idBloque).filter(id => id))];
+    const bloquesInfo = getBloquesPorIds(idsBloques);
     
-    // Buscar siguiente hijo del mismo padre
-    const siguienteHijo = obtenerSiguienteTemaHijo(idPadre, idTemaActual);
+    // Obtener progresos completados
+    const progresosCompletados = getProgresosCompletadosPorOposicion(idOposicion);
     
-    if (siguienteHijo) {
-      // Actualizar tema actual en Planificacion_Temas
-      const planTemasSheet = getGoogleSheet('Planificacion_Temas');
-      const planTemasColumns = getColumnIndices('Planificacion_Temas');
-      const planTemasData = planTemasSheet.getDataRange().getValues();
-      
-      for (let i = 1; i < planTemasData.length; i++) {
-        if (planTemasData[i][planTemasColumns['id_planificacion']] === idPlanificacion &&
-            planTemasData[i][planTemasColumns['id_tema_padre']] === idPadre) {
-          
-          // Actualizar tema actual
-          planTemasSheet.getRange(i + 1, planTemasColumns['id_tema_actual'] + 1).setValue(siguienteHijo.id);
-          
-          // Crear nuevo progreso para el siguiente tema
-          crearProgresoTema(idPlanificacion, siguienteHijo.id);
-          
-          break;
-        }
-      }
-    } else {
-      // No hay más hijos, marcar slot como completado
-      const planTemasSheet = getGoogleSheet('Planificacion_Temas');
-      const planTemasColumns = getColumnIndices('Planificacion_Temas');
-      const planTemasData = planTemasSheet.getDataRange().getValues();
-      
-      for (let i = 1; i < planTemasData.length; i++) {
-        if (planTemasData[i][planTemasColumns['id_planificacion']] === idPlanificacion &&
-            planTemasData[i][planTemasColumns['id_tema_padre']] === idPadre) {
-          
-          planTemasSheet.getRange(i + 1, planTemasColumns['estado'] + 1).setValue('completado');
-          planTemasSheet.getRange(i + 1, planTemasColumns['fecha_completado'] + 1).setValue(new Date());
-          
-          break;
-        }
-      }
-    }
+    // Construir árbol con estados
+    const arbolCompleto = construirArbolConEstadosYTiempos(temasVinculados, progresosCompletados, minutosPorPagina);
     
-  } catch (error) {
-    console.error('Error al avanzar al siguiente tema:', error);
-    // No lanzar error, solo loggear
-  }
-}
-
-// Obtener siguiente tema hijo
-function obtenerSiguienteTemaHijo(idPadre, idActual) {
-  const temasSheet = getGoogleSheet('Temas');
-  const temasColumns = getColumnIndices('Temas');
-  const data = temasSheet.getDataRange().getValues();
-  
-  // Obtener todos los hijos del padre
-  const hijos = [];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][temasColumns['id_padre']] == idPadre) {
-      hijos.push({
-        id: data[i][temasColumns['id_tema']],
-        prenombre: data[i][temasColumns['prenombre']] || '',
-        nombre: data[i][temasColumns['nombre']],
-        orden: data[i][temasColumns['prenombre']] || data[i][temasColumns['nombre']]
-      });
-    }
-  }
-  
-  // Ordenar por prenombre
-  hijos.sort((a, b) => {
-    const numA = parseFloat(a.orden.replace(/[^\d.]/g, ''));
-    const numB = parseFloat(b.orden.replace(/[^\d.]/g, ''));
-    
-    if (!isNaN(numA) && !isNaN(numB)) {
-      return numA - numB;
-    }
-    
-    return a.orden.localeCompare(b.orden);
-  });
-  
-  // Encontrar el siguiente
-  const indexActual = hijos.findIndex(h => h.id == idActual);
-  if (indexActual >= 0 && indexActual < hijos.length - 1) {
-    return hijos[indexActual + 1];
-  }
-  
-  return null;
-}
-
-// Obtener bloque por ID
-function getBloquePorId(idBloque) {
-  const bloquesSheet = getGoogleSheet('Bloques');
-  const bloquesColumns = getColumnIndices('Bloques');
-  const data = bloquesSheet.getDataRange().getValues();
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][bloquesColumns['id_bloque']] == idBloque) {
-      return {
-        id: data[i][bloquesColumns['id_bloque']],
-        nombre: data[i][bloquesColumns['nombre']]
-      };
-    }
-  }
-  
-  return null;
-}
-
-// Obtener estadísticas del mes
-function getEstadisticasMesPlanificacion(año, mes) {
-  try {
-    const inicioMes = new Date(año, mes, 1);
-    const finMes = new Date(año, mes + 1, 0);
-    
-    let diasEstudiados = 0;
-    let minutosEstudiados = 0;
-    let temasCompletados = 0;
-    let repasosPendientes = 0;
-    
-    // Contar días estudiados y tiempo
-    const planSheet = getGoogleSheet('Planificacion_Diaria');
-    const planColumns = getColumnIndices('Planificacion_Diaria');
-    const planData = planSheet.getDataRange().getValues();
-    
-    for (let i = 1; i < planData.length; i++) {
-      const fecha = new Date(planData[i][planColumns['fecha']]);
-      
-      if (fecha >= inicioMes && fecha <= finMes) {
-        if (planData[i][planColumns['tiempo_real_minutos']] > 0) {
-          diasEstudiados++;
-          minutosEstudiados += planData[i][planColumns['tiempo_real_minutos']];
-        }
-      }
-    }
-    
-    // Contar temas completados
-    const progresoSheet = getGoogleSheet('Progreso_Temas');
-    const progresoColumns = getColumnIndices('Progreso_Temas');
-    const progresoData = progresoSheet.getDataRange().getValues();
-    
-    for (let i = 1; i < progresoData.length; i++) {
-      if (progresoData[i][progresoColumns['estado']] === 'completado') {
-        const fechaCompletado = new Date(progresoData[i][progresoColumns['fecha_completado']]);
-        if (fechaCompletado >= inicioMes && fechaCompletado <= finMes) {
-          temasCompletados++;
-        }
-      }
-    }
-    
-    // Contar repasos pendientes
-    const repasosSheet = getGoogleSheet('Repasos_Programados');
-    const repasosColumns = getColumnIndices('Repasos_Programados');
-    const repasosData = repasosSheet.getDataRange().getValues();
-    
-    for (let i = 1; i < repasosData.length; i++) {
-      const fechaProgramada = new Date(repasosData[i][repasosColumns['fecha_programada']]);
-      
-      if (fechaProgramada >= inicioMes && fechaProgramada <= finMes && 
-          repasosData[i][repasosColumns['estado']] === 'pendiente') {
-        repasosPendientes++;
-      }
-    }
+    console.log('🌳 Árbol construido:', arbolCompleto.length, 'temas principales');
     
     return {
-      diasEstudiados: diasEstudiados,
-      minutosEstudiados: minutosEstudiados,
-      temasCompletados: temasCompletados,
-      repasosPendientes: repasosPendientes
+      arbol: arbolCompleto,
+      configuracion: config,
+      minutosPorPagina: minutosPorPagina,
+      bloques: bloquesInfo  // ← AÑADIR INFO DE BLOQUES
     };
     
   } catch (error) {
-    console.error('Error al obtener estadísticas del mes:', error);
+    console.error('Error al obtener árbol de temas:', error);
     throw error;
   }
 }
 
-// Generar test de repaso
-function generarTestRepaso(idRepaso, idTema) {
+// Obtener temas vinculados a una oposición (CORREGIDO)
+function getTemasVinculadosAOposicion(idOposicion) {
   try {
-    // Obtener información del tema
-    const tema = getTemaById(idTema);
+    // Obtener relaciones tema-oposición (NOMBRE CORREGIDO)
+    const temaOposSheet = getGoogleSheet('Tema_Oposicion');
+    const temaOposColumns = getColumnIndices('Tema_Oposicion');
+    const temaOposData = temaOposSheet.getDataRange().getValues();
     
-    // Obtener todas las preguntas del tema y sus subtemas
-    const preguntasSheet = getGoogleSheet('Test_Preguntas');
-    const preguntasColumns = getColumnIndices('Test_Preguntas');
-    const preguntasData = preguntasSheet.getDataRange().getValues();
+    // Obtener todos los temas
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const temasData = temasSheet.getDataRange().getValues();
     
-    // Obtener todos los IDs de temas (incluir subtemas)
-    const todosLosTemas = obtenerTemasConHijos([idTema]);
+    // Obtener IDs de temas vinculados (NOMBRES DE COLUMNAS CORREGIDOS)
+    const idsVinculados = [];
+    for (let i = 1; i < temaOposData.length; i++) {
+      if (temaOposData[i][temaOposColumns['id_oposicion']] == idOposicion) {
+        idsVinculados.push(temaOposData[i][temaOposColumns['id_tema']]);
+      }
+    }
     
-    // Filtrar preguntas del tema
-    let preguntasFiltradas = [];
+    console.log('🔗 IDs vinculados encontrados:', idsVinculados);
     
-    for (let i = 1; i < preguntasData.length; i++) {
-      const row = preguntasData[i];
-      const idTemaPregunta = row[preguntasColumns['id_tema']];
-      const activa = row[preguntasColumns['activa']];
-      const vecesFallada = row[preguntasColumns['veces_fallada']] || 0;
-      const vecesMostrada = row[preguntasColumns['veces_mostrada']] || 0;
+    // Construir array de temas vinculados
+    const temas = [];
+    for (let i = 1; i < temasData.length; i++) {
+      const idTema = temasData[i][temasColumns['id_tema']];
       
-      // Verificar si la pregunta pertenece al tema o sus subtemas
-      if (todosLosTemas.includes(idTemaPregunta) && activa !== false) {
-        preguntasFiltradas.push({
-          index: i,
-          id: row[preguntasColumns['id_pregunta']],
-          titulo: row[preguntasColumns['titulo']],
-          descripcion: row[preguntasColumns['descripcion']],
-          opcion_a: row[preguntasColumns['opcion_a']],
-          opcion_b: row[preguntasColumns['opcion_b']],
-          opcion_c: row[preguntasColumns['opcion_c']],
-          opcion_d: row[preguntasColumns['opcion_d']],
-          respuesta_correcta: row[preguntasColumns['respuesta_correcta']],
-          retroalimentacion: row[preguntasColumns['retroalimentacion']],
-          vecesFallada: vecesFallada,
-          vecesMostrada: vecesMostrada,
-          // Calcular prioridad (más falladas primero)
-          prioridad: vecesMostrada > 0 ? (vecesFallada / vecesMostrada) : 0
+      if (idsVinculados.includes(idTema)) {
+        temas.push({
+          id: idTema,
+          nombre: temasData[i][temasColumns['nombre']],
+          prenombre: temasData[i][temasColumns['prenombre']] || '',
+          idPadre: temasData[i][temasColumns['id_padre']],
+          idBloque: temasData[i][temasColumns['id_bloque']],
+          pagTotales: temasData[i][temasColumns['pag_totales']] || 0
         });
       }
     }
     
-    if (preguntasFiltradas.length === 0) {
-      throw new Error('No hay preguntas disponibles para este tema');
-    }
-    
-    // Ordenar por prioridad (más falladas primero) y luego aleatorizar
-    preguntasFiltradas.sort((a, b) => b.prioridad - a.prioridad);
-    
-    // Tomar máximo 50 preguntas, priorizando las más falladas
-    const numPreguntas = Math.min(50, preguntasFiltradas.length);
-    let preguntasSeleccionadas = [];
-    
-    // Tomar las más falladas primero (hasta 30)
-    const masFalladas = preguntasFiltradas.filter(p => p.vecesFallada > 0).slice(0, 30);
-    preguntasSeleccionadas = [...masFalladas];
-    
-    // Completar con otras preguntas si es necesario
-    if (preguntasSeleccionadas.length < numPreguntas) {
-      const otrasPreguntasDisponibles = preguntasFiltradas.filter(
-        p => !preguntasSeleccionadas.some(ps => ps.id === p.id)
-      );
-      
-      const preguntasAdicionales = shuffleArray(otrasPreguntasDisponibles)
-        .slice(0, numPreguntas - preguntasSeleccionadas.length);
-      
-      preguntasSeleccionadas = [...preguntasSeleccionadas, ...preguntasAdicionales];
-    }
-    
-    // Mezclar el orden final
-    preguntasSeleccionadas = shuffleArray(preguntasSeleccionadas);
-    
-    // Crear registro en historial
-    const historialSheet = getGoogleSheet('Test_Historial');
-    const historialColumns = getColumnIndices('Test_Historial');
-    
-    const idHistorial = generateUniqueId(historialSheet, historialColumns['id_historial'] + 1);
-    
-    const nuevoHistorial = [];
-    nuevoHistorial[historialColumns['id_historial']] = idHistorial;
-    nuevoHistorial[historialColumns['id_oposicion']] = 0; // No específico de oposición
-    nuevoHistorial[historialColumns['temas_ids']] = idTema.toString();
-    nuevoHistorial[historialColumns['fecha']] = new Date();
-    nuevoHistorial[historialColumns['modo']] = 'repaso';
-    nuevoHistorial[historialColumns['total_preguntas']] = preguntasSeleccionadas.length;
-    nuevoHistorial[historialColumns['correctas']] = 0;
-    nuevoHistorial[historialColumns['incorrectas']] = 0;
-    nuevoHistorial[historialColumns['porcentaje']] = 0;
-    nuevoHistorial[historialColumns['tiempo_segundos']] = 0;
-    
-    historialSheet.appendRow(nuevoHistorial);
-    
-    // Actualizar el repaso con el ID del test
-    const repasosSheet = getGoogleSheet('Repasos_Programados');
-    const repasosColumns = getColumnIndices('Repasos_Programados');
-    const repasosData = repasosSheet.getDataRange().getValues();
-    
-    for (let i = 1; i < repasosData.length; i++) {
-      if (repasosData[i][repasosColumns['id_repaso']] === idRepaso) {
-        repasosSheet.getRange(i + 1, repasosColumns['id_test'] + 1).setValue(idHistorial);
-        break;
-      }
-    }
-    
-    return {
-      success: true,
-      idTest: idHistorial,
-      idHistorial: idHistorial,
-      preguntas: preguntasSeleccionadas,
-      nombreTema: (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre,
-      numeroPreguntas: preguntasSeleccionadas.length
-    };
+    console.log('📝 Temas construidos:', temas);
+    return temas;
     
   } catch (error) {
-    console.error('Error al generar test de repaso:', error);
-    throw error;
+    console.error('Error al obtener temas vinculados:', error);
+    return [];
   }
 }
 
-// Marcar repaso como completado
-function marcarRepasoCompletado(idRepaso, nota, tiempoSegundos) {
+// Obtener progresos completados por oposición
+function getProgresosCompletadosPorOposicion(idOposicion) {
   try {
-    const repasosSheet = getGoogleSheet('Repasos_Programados');
-    const repasosColumns = getColumnIndices('Repasos_Programados');
-    const data = repasosSheet.getDataRange().getValues();
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    const progresoData = progresoSheet.getDataRange().getValues();
     
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][repasosColumns['id_repaso']] === idRepaso) {
-        repasosSheet.getRange(i + 1, repasosColumns['fecha_completado'] + 1).setValue(new Date());
-        repasosSheet.getRange(i + 1, repasosColumns['estado'] + 1).setValue('completado');
-        repasosSheet.getRange(i + 1, repasosColumns['nota_test'] + 1).setValue(nota);
-        repasosSheet.getRange(i + 1, repasosColumns['tiempo_test_minutos'] + 1).setValue(Math.round(tiempoSegundos / 60));
-        
-        return { success: true };
+    const progresosMap = {};
+    
+    for (let i = 1; i < progresoData.length; i++) {
+      if (progresoData[i][progresoColumns['estado']] === 'completado') {
+        const idTema = progresoData[i][progresoColumns['id_tema']];
+        progresosMap[idTema] = {
+          fechaCompletado: progresoData[i][progresoColumns['fecha_completado']],
+          estado: 'completado'
+        };
       }
     }
     
-    throw new Error('Repaso no encontrado');
+    return progresosMap;
     
   } catch (error) {
-    console.error('Error al marcar repaso como completado:', error);
-    throw error;
+    console.error('Error al obtener progresos:', error);
+    return {};
   }
 }
 
-// Obtener repasos completos con estadísticas
-function getRepasosCompletos() {
-  try {
-    const repasosSheet = getGoogleSheet('Repasos_Programados');
-    const repasosColumns = getColumnIndices('Repasos_Programados');
-    const repasosData = repasosSheet.getDataRange().getValues();
+// Construir árbol con estados y tiempos
+function construirArbolConEstadosYTiempos(temas, progresosMap, minutosPorPagina) {
+  // Función recursiva para construir nodos
+  function construirNodo(idTema, nivel = 0) {
+    const tema = temas.find(t => t.id === idTema);
+    if (!tema) return null;
     
-    const repasos = [];
-    let estadisticas = {
-      total: 0,
-      pendientes: 0,
-      completados: 0,
-      vencidos: 0
-    };
-    
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    
-    for (let i = 1; i < repasosData.length; i++) {
-      const row = repasosData[i];
-      const tema = getTemaById(row[repasosColumns['id_tema']]);
-      const bloque = tema.id_bloque ? getBloquePorId(tema.id_bloque) : null;
-      
-      const fechaProgramada = new Date(row[repasosColumns['fecha_programada']]);
-      fechaProgramada.setHours(0, 0, 0, 0);
-      
-      const repaso = {
-        id: row[repasosColumns['id_repaso']],
-        idTema: row[repasosColumns['id_tema']],
-        nombreTema: (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre,
-        nombreBloque: bloque ? bloque.nombre : null,
-        numeroRepaso: row[repasosColumns['numero_repaso']],
-        fechaProgramada: row[repasosColumns['fecha_programada']],
-        fechaCompletado: row[repasosColumns['fecha_completado']],
-        estado: row[repasosColumns['estado']],
-        idTest: row[repasosColumns['id_test']],
-        notaTest: row[repasosColumns['nota_test']],
-        tiempoTestMinutos: row[repasosColumns['tiempo_test_minutos']]
-      };
-      
-      repasos.push(repaso);
-      
-      // Actualizar estadísticas
-      estadisticas.total++;
-      
-      switch (repaso.estado) {
-        case 'pendiente':
-          estadisticas.pendientes++;
-          if (fechaProgramada < hoy) {
-            estadisticas.vencidos++;
-          }
-          break;
-        case 'completado':
-          estadisticas.completados++;
-          break;
-      }
-    }
-    
-    // Obtener próximos 7 días
-    const proximos = repasos
-      .filter(r => {
-        if (r.estado !== 'pendiente') return false;
-        const fecha = new Date(r.fechaProgramada);
-        const diasRestantes = Math.ceil((fecha - hoy) / (1000 * 60 * 60 * 24));
-        return diasRestantes >= 0 && diasRestantes <= 7;
+    // Obtener hijos directos
+    const hijos = temas
+      .filter(t => t.idPadre === idTema)
+      .sort((a, b) => {
+        const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+        const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+        return numA - numB;
       })
-      .sort((a, b) => new Date(a.fechaProgramada) - new Date(b.fechaProgramada))
-      .slice(0, 10);
+      .map(hijo => construirNodo(hijo.id, nivel + 1))
+      .filter(nodo => nodo !== null);
     
-    return {
-      repasos: repasos.sort((a, b) => new Date(b.fechaProgramada) - new Date(a.fechaProgramada)),
-      estadisticas: estadisticas,
-      proximos: proximos
-    };
+    // Determinar estado
+    const esHoja = hijos.length === 0;
+    let estado = 'pendiente';
     
-  } catch (error) {
-    console.error('Error al obtener repasos:', error);
-    throw error;
-  }
-}
-
-// Marcar repaso como omitido
-function marcarRepasoOmitido(idRepaso) {
-  try {
-    const repasosSheet = getGoogleSheet('Repasos_Programados');
-    const repasosColumns = getColumnIndices('Repasos_Programados');
-    const data = repasosSheet.getDataRange().getValues();
-    
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][repasosColumns['id_repaso']] === idRepaso) {
-        repasosSheet.getRange(i + 1, repasosColumns['estado'] + 1).setValue('omitido');
-        repasosSheet.getRange(i + 1, repasosColumns['fecha_completado'] + 1).setValue(new Date());
-        
-        return { success: true };
+    if (esHoja) {
+      estado = progresosMap[idTema] ? 'completado' : 'pendiente';
+    } else {
+      // Para padres, calcular estado basado en hijos
+      const hijosCompletados = hijos.filter(h => h.estado === 'completado').length;
+      if (hijosCompletados === hijos.length && hijos.length > 0) {
+        estado = 'completado';
+      } else if (hijosCompletados > 0) {
+        estado = 'en_progreso';
       }
     }
     
-    throw new Error('Repaso no encontrado');
+    // Calcular tiempo
+    const paginas = tema.pagTotales || 0;
+    const tiempoMinutos = paginas * minutosPorPagina;
+    
+
+    // Determinar si el tema padre es seleccionable
+    let seleccionablePadre = false;
+    if (!esHoja && paginas > 0) {
+      // Tema padre seleccionable si tiene tiempo ≤ disponible y no está completado
+      seleccionablePadre = (tiempoMinutos <= tiempoEstudioDisponible) && estado !== 'completado';
+    }
+    
+    return {
+      id: idTema,
+      nombre: tema.nombre,
+      prenombre: tema.prenombre,
+      nombreCompleto: (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre,
+      paginas: paginas,
+      tiempoMinutos: tiempoMinutos,
+      tiempoTexto: formatearTiempo(tiempoMinutos),
+      esHoja: esHoja,
+      estado: estado,
+      nivel: nivel,
+      hijos: hijos,
+      idBloque: tema.idBloque,
+      seleccionable: esHoja && estado === 'pendiente', // Solo hojas pendientes
+      seleccionablePadre: seleccionablePadre // ← NUEVA PROPIEDAD
+    };
+  }
+    
+  // Obtener temas padre (sin idPadre)
+  const temasPadre = temas
+    .filter(t => !t.idPadre)
+    .sort((a, b) => {
+      const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+      const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+      return numA - numB;
+    });
+  
+  return temasPadre.map(tema => construirNodo(tema.id)).filter(nodo => nodo !== null);
+}
+
+// Formatear tiempo en horas y minutos
+function formatearTiempo(minutos) {
+  if (!minutos || minutos <= 0) return '0m';
+  
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
+  
+  if (horas > 0) {
+    return horas + 'h ' + mins + 'm';
+  } else {
+    return mins + 'm';
+  }
+}
+
+// Función de debug para verificar datos
+function debugTemasVinculados(idOposicion) {
+  try {
+    console.log('🔍 DEBUG: Verificando temas para oposición', idOposicion);
+    
+    // 1. Verificar hoja Oposicion_Temas
+    const temaOposSheet = getGoogleSheet('Tema_Oposicion');
+    const temaOposColumns = getColumnIndices('Tema_Oposicion');
+    const temaOposData  = temaOposSheet.getDataRange().getValues();
+    
+    console.log('📊 Columnas Tema_Oposicion:', temaOposColumns);
+    console.log('📊 Filas Tema_Oposicion:', temaOposData.length);
+    
+    // 2. Buscar relaciones para esta oposición
+    const relaciones = [];
+    for (let i = 1; i < temaOposData.length; i++) {
+      if (temaOposData[i][temaOposColumns['id_oposicion']] == idOposicion) {
+        relaciones.push({
+          idOposicion: temaOposData[i][temaOposColumns['id_oposicion']],
+          idTema: temaOposData[i][temaOposColumns['id_tema']]
+        });
+      }
+    }
+    
+    console.log('🔗 Relaciones encontradas:', relaciones);
+    
+    // 3. Verificar hoja Temas
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const temasData = temasSheet.getDataRange().getValues();
+    
+    console.log('📊 Columnas Temas:', temasColumns);
+    console.log('📊 Filas Temas:', temasData.length);
+    
+    // 4. Verificar que existen los temas vinculados
+    const temasEncontrados = [];
+    relaciones.forEach(rel => {
+      for (let i = 1; i < temasData.length; i++) {
+        if (temasData[i][temasColumns['id_tema']] == rel.idTema) {
+          temasEncontrados.push({
+            id: temasData[i][temasColumns['id_tema']],
+            nombre: temasData[i][temasColumns['nombre']],
+            prenombre: temasData[i][temasColumns['prenombre']],
+            idPadre: temasData[i][temasColumns['id_padre']],
+            idBloque: temasData[i][temasColumns['id_bloque']]
+          });
+          break;
+        }
+      }
+    });
+    
+    console.log('📝 Temas encontrados:', temasEncontrados);
+    
+    return {
+      relacionesEncontradas: relaciones.length,
+      temasEncontrados: temasEncontrados.length,
+      relaciones: relaciones,
+      temas: temasEncontrados
+    };
     
   } catch (error) {
-    console.error('Error al marcar repaso como omitido:', error);
-    throw error;
+    console.error('❌ Error en debug:', error);
+    return { error: error.message };
+  }
+}
+
+// Obtener información de bloques desde la hoja Bloques
+function getBloquesPorIds(idsBloques) {
+  try {
+    const bloquesSheet = getGoogleSheet('Bloques');
+    const bloquesColumns = getColumnIndices('Bloques');
+    const bloquesData = bloquesSheet.getDataRange().getValues();
+    
+    const bloquesMap = {};
+    
+    // Crear mapa de id_bloque -> nombre
+    for (let i = 1; i < bloquesData.length; i++) {
+      const idBloque = bloquesData[i][bloquesColumns['id_bloque']];
+      const nombre = bloquesData[i][bloquesColumns['nombre']];
+      bloquesMap[idBloque] = nombre;
+    }
+    
+    console.log('📊 Bloques encontrados:', bloquesMap);
+    return bloquesMap;
+    
+  } catch (error) {
+    console.error('Error al obtener bloques:', error);
+    return {};
   }
 }
