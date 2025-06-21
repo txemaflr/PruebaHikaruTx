@@ -201,6 +201,8 @@
 .section { display: none; }
     .section.active { display: block; }
   </style>
+
+  
 </head>
 <body>
   <h1>Gestión de Temario</h1>
@@ -757,133 +759,200 @@
   </div>
 </div>
 
-<!-- Sección Planificación -->
+<!-- Sección Planificación - VERSIÓN LIMPIA -->
 <div id="planificacion" class="section">
-  <div style="display: flex; gap: 20px;">
-    <!-- Panel principal - Calendario -->
-    <div style="flex: 1;">
-      <h2>Planificación de Estudio</h2>
-      
-      <!-- Controles del calendario -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <div>
-          <button onclick="cambiarMesCalendario(-1)" style="padding: 5px 10px;">
-            <i class="fas fa-chevron-left"></i>
-          </button>
-          <span id="mesActualCalendario" style="margin: 0 15px; font-weight: bold; font-size: 18px;"></span>
-          <button onclick="cambiarMesCalendario(1)" style="padding: 5px 10px;">
-            <i class="fas fa-chevron-right"></i>
-          </button>
-        </div>
-        <div>
-          <button onclick="mostrarPlanificacionHoy()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 5px;">
-            <i class="fas fa-calendar-day"></i> Hoy
-          </button>
-          <button onclick="nuevaPlanificacion()" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px; margin-left: 10px;">
-            <i class="fas fa-plus"></i> Nueva Planificación
-          </button>
-        </div>
-      </div>
-      
-      <!-- Calendario -->
-      <div id="calendarioPlanificacion" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;">
-        <!-- Aquí se generará el calendario dinámicamente -->
+  <h2>Planificación de Estudio</h2>
+  
+  <!-- Controles del calendario -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div>
+      <button onclick="cambiarMes(-1)" style="padding: 8px 12px; font-weight: bold;">
+        ◀ 
+      </button>
+      <span id="tituloMes" style="margin: 0 20px; font-weight: bold; font-size: 18px;"></span>
+      <button onclick="cambiarMes(1)" style="padding: 8px 12px; font-weight: bold;">
+        ▶
+      </button>
+    </div>
+    <div>
+      <button onclick="irAHoy()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 5px;">
+        📅 Hoy
+      </button>
+      <button onclick="nuevaPlanificacion()" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px; margin-left: 10px;">
+        ➕ Nueva Planificación
+      </button>
+    </div>
+  </div>
+  
+  <!-- Grid principal: Calendario 40% + Detalle 60% -->
+  <div style="display: grid; grid-template-columns: 40% 60%; gap: 20px; height: 600px;">
+    <!-- Calendario -->
+    <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <div id="calendario">
+        <!-- Aquí se renderiza el calendario -->
       </div>
     </div>
     
-    <!-- Panel lateral - Detalle del día -->
-    <div style="width: 350px;">
-      <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;">
-        <h3 id="tituloDetalleDia">Selecciona un día</h3>
-        <div id="detalleDiaPlanificacion">
-          <p style="text-align: center; color: #666; padding: 40px 0;">
-            <i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>
-            Selecciona un día del calendario para ver los detalles
-          </p>
-        </div>
-      </div>
-      
-      <!-- Estadísticas -->
-      <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-top: 20px;">
-        <h4>Estadísticas del Mes</h4>
-        <div id="estadisticasMesPlanificacion">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-              <div style="font-size: 24px; font-weight: bold; color: #007bff;" id="diasEstudiadosMes">0</div>
-              <div style="font-size: 12px; color: #666;">Días estudiados</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-              <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="horasTotalesMes">0h</div>
-              <div style="font-size: 12px; color: #666;">Horas totales</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-              <div style="font-size: 24px; font-weight: bold; color: #ffc107;" id="temasCompletadosMes">0</div>
-              <div style="font-size: 12px; color: #666;">Temas completados</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-              <div style="font-size: 24px; font-weight: bold; color: #dc3545;" id="repasosPendientesMes">0</div>
-              <div style="font-size: 12px; color: #666;">Repasos pendientes</div>
-            </div>
-          </div>
-        </div>
+    <!-- Detalle del día -->
+    <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-y: auto;">
+      <h3 id="tituloDetalleDia">Selecciona un día</h3>
+      <div id="contenidoDetalleDia">
+        <p style="text-align: center; color: #666; padding: 40px 0;">
+          <i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>
+          Selecciona un día del calendario
+        </p>
       </div>
     </div>
   </div>
   <!-- Modal Nueva Planificación -->
   <div id="modalNuevaPlanificacion" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-    <div style="background: white; padding: 30px; border-radius: 10px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="background: white; padding: 30px; border-radius: 10px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto;">
+      
+      <!-- Header del modal -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
         <h3 style="margin: 0;">Nueva Planificación de Estudio</h3>
-        <button onclick="cerrarModalNuevaPlanificacion()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        <button onclick="cerrarModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
       </div>
       
-      <!-- Paso 1: Selección de oposición -->
-      <div id="paso1Planificacion">
-        <h4>Paso 1: Selecciona la oposición</h4>
-        <select id="oposicionPlanificacion" onchange="cargarTemasPlanificacion()" style="width: 100%; padding: 10px; margin-bottom: 20px;">
-          <option value="">-- Selecciona una oposición --</option>
-        </select>
-      </div>
-      
-      <!-- Paso 2: Selección de temas -->
-      <div id="paso2Planificacion" style="display: none;">
-        <h4>Paso 2: Selecciona los temas a estudiar</h4>
-        <p style="color: #666; font-size: 14px;">Selecciona 3 temas de diferentes bloques. Puedes añadir un 4º tema si es de Geografía o Callejero.</p>
-        
-        <div id="temasSeleccionadosPlanificacion" style="margin-bottom: 20px;">
-          <h5>Temas seleccionados:</h5>
-          <div id="listaTemasSeleccionados" style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; min-height: 100px;">
-            <p style="color: #999; text-align: center;">No hay temas seleccionados</p>
+      <!-- Indicador de pasos -->
+      <div style="display: flex; justify-content: center; margin-bottom: 30px;">
+        <div style="display: flex; align-items: center; gap: 20px;">
+          <div id="indicadorPaso1" style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 30px; height: 30px; border-radius: 50%; background: #007bff; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">1</div>
+            <span>Día y Oposición</span>
           </div>
-        </div>
-        
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; max-height: 300px; overflow-y: auto;">
-          <h5>Temas disponibles:</h5>
-          <div id="arbolTemasPlanificacion">
-            <!-- Se cargará dinámicamente -->
+          <div style="width: 30px; height: 2px; background: #ddd;"></div>
+          <div id="indicadorPaso2" style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 30px; height: 30px; border-radius: 50%; background: #ddd; color: #999; display: flex; align-items: center; justify-content: center; font-weight: bold;">2</div>
+            <span style="color: #999;">Tiempo</span>
+          </div>
+          <div style="width: 30px; height: 2px; background: #ddd;"></div>
+          <div id="indicadorPaso3" style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 30px; height: 30px; border-radius: 50%; background: #ddd; color: #999; display: flex; align-items: center; justify-content: center; font-weight: bold;">3</div>
+            <span style="color: #999;">Temas</span>
           </div>
         </div>
       </div>
       
-      <!-- Paso 3: Configuración de tiempo -->
-      <div id="paso3Planificacion" style="display: none;">
-        <h4>Paso 3: Configuración de tiempo diario</h4>
-        <label>¿Cuántas horas planeas estudiar cada día?</label>
-        <input type="number" id="horasDiariasPlanificacion" min="1" max="12" value="4" style="width: 100px; padding: 8px; margin: 10px;">
-        <span>horas</span>
+      <!-- Contenido de los pasos -->
+      <div id="contenidoPasos">
+        
+        <!-- PASO 1: Día y Oposición -->
+        <div id="paso1" class="paso-modal">
+          <h4>Paso 1: Selecciona el día y la oposición</h4>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de planificación:</label>
+              <input type="date" id="fechaPlanificacion" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;">Oposición:</label>
+              <select id="oposicionPlanificacion" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                <option value="">-- Selecciona una oposición --</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Alerta de repasos del día -->
+          <div id="alertaRepasos" style="display: none; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <h6 style="margin: 0 0 10px 0; color: #856404;">⚠️ Repasos programados para este día:</h6>
+            <div id="listaRepasos"></div>
+            <p style="margin: 10px 0 0 0; font-size: 14px; color: #856404;">
+              <strong>Consejo:</strong> Ten en cuenta estos repasos al calcular el tiempo de estudio.
+            </p>
+          </div>
+        </div>
+        
+        <!-- PASO 2: Configuración de tiempo -->
+        <div id="paso2" class="paso-modal" style="display: none;">
+          <h4>Paso 2: Configura el tiempo de estudio</h4>
+          
+          <!-- Info de repasos del día -->
+          <div id="infoRepasosStepDos" style="display: none; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <h6 style="margin: 0 0 10px 0; color: #856404;">📋 Repasos programados para este día:</h6>
+            <div id="detalleRepasosStepDos"></div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;">Horas de estudio previstas:</label>
+              <input type="number" id="horasEstudio" min="0.5" max="12" step="0.5" value="4" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+              <small style="color: #666;">Sin incluir tiempo de repasos</small>
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tiempo total disponible:</label>
+              <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
+                <span id="tiempoEstudio" style="color: #007bff;">240 min</span> + 
+                <span id="tiempoRepasos" style="color: #ffc107;">0 min</span> = 
+                <span id="tiempoTotalConRepasos" style="color: #28a745;">240 min</span>
+              </div>
+              <small style="color: #666;">Estudio + Repasos = Total</small>
+            </div>
+          </div>
+          
+          <!-- Configuración actual -->
+          <div style="background: #e7f3ff; border-radius: 5px; padding: 15px;">
+            <h6 style="margin: 0 0 10px 0;">Configuración actual:</h6>
+            <div id="infoConfiguracion">
+              <div>Vuelta: <strong id="vueltaActual">1</strong></div>
+              <div>Minutos por página: <strong id="minutosPorPagina">30</strong></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- PASO 3: Selección de temas -->
+        <div id="paso3" class="paso-modal" style="display: none;">
+          <h4>Paso 3: Selecciona los temas a estudiar</h4>
+          
+          <!-- Resumen de tiempo en tiempo real -->
+          <div style="background: #f8f9fa; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+              <div>
+                <div style="font-size: 20px; font-weight: bold; color: #007bff;" id="tiempoTotal">240</div>
+                <div style="font-size: 12px; color: #666;">Total (min)</div>
+              </div>
+              <div>
+                <div style="font-size: 20px; font-weight: bold; color: #dc3545;" id="tiempoSeleccionado">0</div>
+                <div style="font-size: 12px; color: #666;">Seleccionado (min)</div>
+              </div>
+              <div>
+                <div style="font-size: 20px; font-weight: bold; color: #28a745;" id="tiempoRestante">240</div>
+                <div style="font-size: 12px; color: #666;">Restante (min)</div>
+              </div>
+              <div>
+                <div style="font-size: 20px; font-weight: bold; color: #6c757d;" id="bloquesUsados">0/3</div>
+                <div style="font-size: 12px; color: #666;">Bloques</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Árbol de temas -->
+          <div id="arbolTemas" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; max-height: 400px; overflow-y: auto; background: #fafafa;">
+            <p style="text-align: center; color: #666;">Cargando temas...</p>
+          </div>
+        </div>
       </div>
       
-      <!-- Botones de acción -->
-      <div style="display: flex; justify-content: space-between; margin-top: 30px;">
-        <button id="btnAnteriorPaso" onclick="anteriorPasoPlanificacion()" style="display: none;">Anterior</button>
+      <!-- Footer con botones -->
+      <div style="display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+        <button id="btnAnterior" onclick="pasoAnterior()" style="background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; display: none;">
+          ◀ Anterior
+        </button>
         <div>
-          <button onclick="cerrarModalNuevaPlanificacion()" style="margin-right: 10px;">Cancelar</button>
-          <button id="btnSiguientePaso" onclick="siguientePasoPlanificacion()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 5px;" disabled>Siguiente</button>
+          <button onclick="cerrarModal()" style="background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+            Cancelar
+          </button>
+          <button id="btnSiguiente" onclick="pasoSiguiente()" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+            Siguiente ▶
+          </button>
         </div>
       </div>
     </div>
   </div>
+
 </div>
+
 
   </div>
     <?!= include('scriptsGenerales') ?>
