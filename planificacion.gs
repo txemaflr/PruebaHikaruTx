@@ -473,3 +473,487 @@ function getBloquesPorIds(idsBloques) {
     return {};
   }
 }
+
+// PASO 1: Añadir estas 4 funciones al final de planificacion.gs
+
+// 1. Obtener o crear hoja de configuración
+function getOrCreateConfigSheet() {
+  const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
+  
+  let configSheet = spreadsheet.getSheetByName('Configuracion_Planificacion');
+  if (!configSheet) {
+    configSheet = spreadsheet.insertSheet('Configuracion_Planificacion');
+    configSheet.getRange(1, 1, 1, 3).setValues([['clave', 'valor', 'fecha_actualizacion']]);
+  }
+  
+  return configSheet;
+}
+
+// 2. Obtener oposición por ID
+function getOposicionById(idOposicion) {
+  try {
+    const oposicionesSheet = getGoogleSheet('Oposiciones');
+    const oposicionesColumns = getColumnIndices('Oposiciones');
+    const data = oposicionesSheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][oposicionesColumns['id_oposicion']] == idOposicion) {
+        return {
+          id: data[i][oposicionesColumns['id_oposicion']],
+          nombre: data[i][oposicionesColumns['nombre']]
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error al obtener oposición por ID:', error);
+    return null;
+  }
+}
+
+// 3. Obtener oposición activa actual
+function getOposicionActiva() {
+  try {
+    const configSheet = getOrCreateConfigSheet();
+    const data = configSheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === 'oposicion_activa' && data[i][1]) {
+        // Verificar que la oposición existe
+        const oposicion = getOposicionById(data[i][1]);
+        if (oposicion) {
+          return oposicion;
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error al obtener oposición activa:', error);
+    return null;
+  }
+}
+
+// 4. Establecer oposición activa
+function setOposicionActiva(idOposicion) {
+  try {
+    const configSheet = getOrCreateConfigSheet();
+    const data = configSheet.getDataRange().getValues();
+    
+    // Buscar si ya existe configuración
+    let filaExistente = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === 'oposicion_activa') {
+        filaExistente = i + 1;
+        break;
+      }
+    }
+    
+    if (filaExistente > 0) {
+      // Actualizar existente
+      configSheet.getRange(filaExistente, 2).setValue(idOposicion);
+    } else {
+      // Crear nuevo
+      configSheet.appendRow(['oposicion_activa', idOposicion, new Date()]);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error al establecer oposición activa:', error);
+    throw error;
+  }
+}
+
+// 5. Obtener temas comunes entre dos oposiciones con estado
+function getTemasComunes(idOposicion1, idOposicion2) {
+  try {
+    const temaOposicionSheet = getGoogleSheet('Tema_Oposicion');
+    const temaOposicionColumns = getColumnIndices('Tema_Oposicion');
+    const data = temaOposicionSheet.getDataRange().getValues();
+    
+    // Obtener temas de cada oposición
+    const temasOp1 = [];
+    const temasOp2 = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      const idOposicion = data[i][temaOposicionColumns['id_oposicion']];
+      const idTema = data[i][temaOposicionColumns['id_tema']];
+      
+      if (idOposicion == idOposicion1) {
+        temasOp1.push(idTema);
+      } else if (idOposicion == idOposicion2) {
+        temasOp2.push(idTema);
+      }
+    }
+    
+    // Encontrar temas comunes
+    const temasComunes = temasOp1.filter(tema => temasOp2.includes(tema));
+    
+    // Obtener información completa de los temas comunes
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const temasData = temasSheet.getDataRange().getValues();
+    
+    const temasDetalle = [];
+    
+    temasComunes.forEach(idTema => {
+      for (let i = 1; i < temasData.length; i++) {
+        if (temasData[i][temasColumns['id_tema']] == idTema) {
+          // Verificar si el tema está completado
+          const completado = verificarTemaCompletado(idTema);
+          
+          temasDetalle.push({
+            id: idTema,
+            nombre: temasData[i][temasColumns['nombre']],
+            prenombre: temasData[i][temasColumns['prenombre']],
+            nombreCompleto: (temasData[i][temasColumns['prenombre']] || '') + ' ' + temasData[i][temasColumns['nombre']],
+            id_bloque: temasData[i][temasColumns['id_bloque']],
+            completado: completado
+          });
+          break;
+        }
+      }
+    });
+    
+    return temasDetalle;
+  } catch (error) {
+    console.error('Error al obtener temas comunes:', error);
+    throw error;
+  }
+}
+
+// 6. Verificar si un tema está completado
+function verificarTemaCompletado(idTema) {
+  try {
+    // Buscar en Progreso_Temas si hay registro completado
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    const data = progresoSheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][progresoColumns['id_tema']] == idTema && 
+          data[i][progresoColumns['estado']] === 'completado') {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error al verificar tema completado:', error);
+    return false;
+  }
+}
+
+// 7. Obtener temas comunes organizados en árbol con horas
+function getTemassComunesEnArbol(idOposicion1, idOposicion2) {
+  try {
+    // Obtener temas comunes básicos
+    const temasComunes = getTemasComunes(idOposicion1, idOposicion2);
+    const idsComunes = temasComunes.map(t => t.id);
+    
+    // Obtener todos los temas para construir jerarquía
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const temasData = temasSheet.getDataRange().getValues();
+    
+    // Construir árbol solo con temas comunes y sus ancestros
+    const arbol = construirArbolTemasComunes(temasData, temasColumns, idsComunes);
+    
+    return arbol;
+  } catch (error) {
+    console.error('Error al obtener temas comunes en árbol:', error);
+    throw error;
+  }
+}
+
+// 8. Construir árbol jerárquico de temas comunes
+function construirArbolTemasComunes(temasData, temasColumns, idsComunes) {
+  // Esta función sería similar a getTemasEnArbol() pero filtrada
+  // ¿Quieres que implemente esta función completa ahora?
+}
+
+// 7. Obtener temas comunes agrupados por bloque con horas
+function getTemassComunesPorBloque(idOposicion1, idOposicion2) {
+  try {
+    // Obtener temas comunes
+    const temasComunes = getTemasComunes(idOposicion1, idOposicion2);
+    
+    // Obtener información de bloques
+    const bloquesSheet = getGoogleSheet('Bloques');
+    const bloquesColumns = getColumnIndices('Bloques');
+    const bloquesData = bloquesSheet.getDataRange().getValues();
+    
+    // Agrupar por bloque
+    const temasPorBloque = {};
+    
+    temasComunes.forEach(tema => {
+      const idBloque = tema.id_bloque || 'sin_bloque';
+      
+      if (!temasPorBloque[idBloque]) {
+        // Buscar nombre del bloque
+        let nombreBloque = 'Sin bloque';
+        for (let i = 1; i < bloquesData.length; i++) {
+          if (bloquesData[i][bloquesColumns['id_bloque']] == idBloque) {
+            nombreBloque = bloquesData[i][bloquesColumns['nombre']];
+            break;
+          }
+        }
+        
+        temasPorBloque[idBloque] = {
+          idBloque: idBloque,
+          nombreBloque: nombreBloque,
+          temas: []
+        };
+      }
+      
+      // Calcular horas del tema (páginas * minutos por página / 60)
+      const paginas = calcularPaginasTema(tema.id);
+      const minutosEstimados = paginas * 30; // 30 min por página (configuración base)
+      const horasEstimadas = Math.round((minutosEstimados / 60) * 10) / 10; // redondear a 1 decimal
+      
+      temasPorBloque[idBloque].temas.push({
+        ...tema,
+        paginas: paginas,
+        minutosEstimados: minutosEstimados,
+        horasEstimadas: horasEstimadas
+      });
+    });
+    
+    // Convertir a array y ordenar
+    const resultado = Object.values(temasPorBloque);
+    
+    // Ordenar bloques por nombre
+    resultado.sort((a, b) => a.nombreBloque.localeCompare(b.nombreBloque));
+    
+    // Ordenar temas dentro de cada bloque
+    resultado.forEach(bloque => {
+      bloque.temas.sort((a, b) => {
+        const ordenA = a.prenombre || a.nombre;
+        const ordenB = b.prenombre || b.nombre;
+        return ordenA.localeCompare(ordenB);
+      });
+    });
+    
+    return resultado;
+  } catch (error) {
+    console.error('Error al obtener temas comunes por bloque:', error);
+    throw error;
+  }
+}
+
+// 8. Calcular páginas de un tema (recursivo si tiene hijos)
+function calcularPaginasTema(idTema) {
+  try {
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const data = temasSheet.getDataRange().getValues();
+    
+    // Buscar el tema
+    let tema = null;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][temasColumns['id_tema']] == idTema) {
+        tema = {
+          id: data[i][temasColumns['id_tema']],
+          pag_desde: data[i][temasColumns['pag_desde']],
+          pag_hasta: data[i][temasColumns['pag_hasta']],
+          id_padre: data[i][temasColumns['id_padre']]
+        };
+        break;
+      }
+    }
+    
+    if (!tema) return 0;
+    
+    // Si tiene páginas definidas, calcular
+    if (tema.pag_desde && tema.pag_hasta) {
+      return tema.pag_hasta - tema.pag_desde + 1;
+    }
+    
+    // Si no tiene páginas, buscar en hijos
+    let paginasHijos = 0;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][temasColumns['id_padre']] == idTema) {
+        paginasHijos += calcularPaginasTema(data[i][temasColumns['id_tema']]);
+      }
+    }
+    
+    return paginasHijos;
+  } catch (error) {
+    console.error('Error al calcular páginas del tema:', error);
+    return 0;
+  }
+}
+
+// 9. Obtener temas comunes en formato árbol jerárquico por bloque
+function getTemassComunesEnArbolPorBloque(idOposicion1, idOposicion2) {
+  try {
+    // Obtener temas comunes básicos
+    const temasComunes = getTemasComunes(idOposicion1, idOposicion2);
+    const idsComunes = temasComunes.map(t => t.id);
+    
+    // Obtener todos los temas para construir jerarquía
+    const temasSheet = getGoogleSheet('Temas');
+    const temasColumns = getColumnIndices('Temas');
+    const temasData = temasSheet.getDataRange().getValues();
+    
+    // Crear mapa de todos los temas
+    const mapaTemas = {};
+    for (let i = 1; i < temasData.length; i++) {
+      const tema = {
+        id: temasData[i][temasColumns['id_tema']],
+        nombre: temasData[i][temasColumns['nombre']],
+        prenombre: temasData[i][temasColumns['prenombre']],
+        nombreCompleto: (temasData[i][temasColumns['prenombre']] || '') + ' ' + temasData[i][temasColumns['nombre']],
+        id_padre: temasData[i][temasColumns['id_padre']],
+        id_bloque: temasData[i][temasColumns['id_bloque']],
+        pag_desde: temasData[i][temasColumns['pag_desde']],
+        pag_hasta: temasData[i][temasColumns['pag_hasta']],
+        esComun: idsComunes.includes(temasData[i][temasColumns['id_tema']]),
+        completado: verificarTemaCompletado(temasData[i][temasColumns['id_tema']]),
+        hijos: []
+      };
+      
+      // Calcular páginas y horas
+      tema.paginas = calcularPaginasTema(tema.id);
+      tema.minutosEstimados = tema.paginas * 30;
+      tema.horasEstimadas = Math.round((tema.minutosEstimados / 60) * 10) / 10;
+      
+      mapaTemas[tema.id] = tema;
+    }
+    
+    // Construir jerarquía
+    const temasRaiz = [];
+    Object.values(mapaTemas).forEach(tema => {
+      if (tema.id_padre && mapaTemas[tema.id_padre]) {
+        mapaTemas[tema.id_padre].hijos.push(tema);
+      } else {
+        temasRaiz.push(tema);
+      }
+    });
+    
+    // Filtrar solo temas que son comunes o tienen descendientes comunes
+    const temasFiltrados = filtrarTemasConComunesYDescendientes(temasRaiz, idsComunes);
+    
+    // Agrupar por bloque
+    return agruparTemasPorBloque(temasFiltrados);
+    
+  } catch (error) {
+    console.error('Error al obtener temas comunes en árbol:', error);
+    throw error;
+  }
+}
+
+// 10. Filtrar temas que son comunes o tienen descendientes comunes
+function filtrarTemasConComunesYDescendientes(temas, idsComunes) {
+  const resultado = [];
+  
+  temas.forEach(tema => {
+    // Filtrar hijos recursivamente
+    tema.hijos = filtrarTemasConComunesYDescendientes(tema.hijos, idsComunes);
+    
+    // Incluir si el tema es común O tiene hijos comunes
+    if (tema.esComun || tema.hijos.length > 0) {
+      resultado.push(tema);
+    }
+  });
+  
+  return resultado;
+}
+
+// 11. Agrupar temas filtrados por bloque (VERSIÓN CORREGIDA SIN DUPLICADOS)
+function agruparTemasPorBloque(temas) {
+  const bloquesSheet = getGoogleSheet('Bloques');
+  const bloquesColumns = getColumnIndices('Bloques');
+  const bloquesData = bloquesSheet.getDataRange().getValues();
+  
+  const temasPorBloque = {};
+  
+  // Solo procesar temas de nivel raíz (que no tienen padre en la lista filtrada)
+  temas.forEach(tema => {
+    const idBloque = tema.id_bloque || 'sin_bloque';
+    
+    if (!temasPorBloque[idBloque]) {
+      let nombreBloque = 'Sin bloque';
+      for (let i = 1; i < bloquesData.length; i++) {
+        if (bloquesData[i][bloquesColumns['id_bloque']] == idBloque) {
+          nombreBloque = bloquesData[i][bloquesColumns['nombre']];
+          break;
+        }
+      }
+      
+      temasPorBloque[idBloque] = {
+        idBloque: idBloque,
+        nombreBloque: nombreBloque,
+        temas: []
+      };
+    }
+    
+    // Solo añadir temas que no tienen padre en la lista (son raíz del árbol)
+    const tienePadreEnLista = temas.some(otroTema => otroTema.id === tema.id_padre);
+    if (!tienePadreEnLista) {
+      temasPorBloque[idBloque].temas.push(tema);
+    }
+  });
+  
+  // Convertir a array y ordenar
+  const resultado = Object.values(temasPorBloque);
+  resultado.sort((a, b) => a.nombreBloque.localeCompare(b.nombreBloque));
+  
+  // Ordenar temas dentro de cada bloque
+  resultado.forEach(bloque => {
+    bloque.temas.sort((a, b) => {
+      const ordenA = a.prenombre || a.nombre;
+      const ordenB = b.prenombre || b.nombre;
+      return ordenA.localeCompare(ordenB);
+    });
+  });
+  
+  return resultado;
+}
+
+function testTemasConHoras() {
+  const resultado = getTemassComunesEnArbolPorBloque(1, 2);
+  
+  // Verificar estructura del primer bloque
+  if (resultado.length > 0) {
+    const primerBloque = resultado[0];
+    console.log('Nombre del bloque:', primerBloque.nombreBloque);
+    console.log('Número de temas:', primerBloque.temas.length);
+    
+    // Verificar primer tema
+    if (primerBloque.temas.length > 0) {
+      const primerTema = primerBloque.temas[0];
+      console.log('Primer tema:', primerTema.nombreCompleto);
+      console.log('¿Es común?:', primerTema.esComun);
+      console.log('Número de hijos:', primerTema.hijos ? primerTema.hijos.length : 'No tiene hijos');
+      console.log('Horas estimadas:', primerTema.horasEstimadas);
+      
+      // Si tiene hijos, mostrar el primer hijo
+      if (primerTema.hijos && primerTema.hijos.length > 0) {
+        console.log('Primer hijo:', primerTema.hijos[0].nombreCompleto);
+        console.log('¿Hijo es común?:', primerTema.hijos[0].esComun);
+      }
+    }
+  }
+  
+  return resultado;
+}
+
+function testComparacion() {
+  const oposiciones = getOposicionesOrdenadas();
+  console.log('Oposiciones disponibles:', oposiciones);
+  
+  if (oposiciones.length >= 2) {
+    const temas = getTemasComunes(oposiciones[0].id, oposiciones[1].id);
+    console.log('Temas comunes:', temas);
+  }
+}
+
+// Función temporal para probar
+function testOposicionActiva() {
+  console.log('Probando oposición activa...');
+  const activa = getOposicionActiva();
+  console.log('Oposición activa:', activa);
+  return activa;
+}
