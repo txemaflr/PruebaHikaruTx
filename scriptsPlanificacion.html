@@ -11,7 +11,9 @@ var tiempoTotalDisponible = 240; // minutos
 var tiempoUsado = 0;
 var bloquesActivos = [];
 var configuracionActual = null;
+var oposicionActiva = null;
 
+/*
 // Inicializar sección de planificación
 function inicializarSeccionPlanificacion() {
   console.log('🔧 Inicializando planificación limpia...');
@@ -21,6 +23,557 @@ function inicializarSeccionPlanificacion() {
   if (mesActual.getMonth() === hoy.getMonth() && mesActual.getFullYear() === hoy.getFullYear()) {
     seleccionarDia(hoy.getDate());
   }
+}
+*/
+
+// 1. Inicializar sección de planificación
+function inicializarSeccionPlanificacion() {
+  console.log('Inicializando sección Planificación...');
+  cargarOposicionActiva();
+}
+
+// 2. Cargar oposición activa
+function cargarOposicionActiva() {
+  google.script.run
+    .withSuccessHandler(function(oposicion) {
+      oposicionActiva = oposicion;
+      console.log('Oposición activa cargada:', oposicion);
+      mostrarPaginaPrincipal();
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar oposición activa:', error);
+      mostrarPaginaPrincipal();
+    })
+    .getOposicionActiva();
+}
+
+// 3. Mostrar página principal (VERSIÓN CON COMPARACIÓN)
+function mostrarPaginaPrincipal() {
+  const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+  
+  if (!oposicionActiva) {
+    // No hay oposición activa - mostrar selector
+    let html = '<div style="text-align: center; padding: 40px;">';
+    html += '<h3>Selecciona una oposición para planificar</h3>';
+    html += '<p style="color: #666; margin-bottom: 30px;">Solo puedes tener una oposición activa a la vez</p>';
+    
+    html += '<div style="max-width: 400px; margin: 0 auto;">';
+    html += '<label style="display: block; margin-bottom: 10px; text-align: left;">Oposición:</label>';
+    html += '<select id="selectorOposicion" style="width: 100%; padding: 10px; margin-bottom: 20px;">';
+    html += '<option value="">-- Selecciona una oposición --</option>';
+    html += '</select>';
+    
+    html += '<button onclick="establecerOposicionActiva()" ';
+    html += 'style="background: #007bff; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer;">';
+    html += 'Establecer como activa</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    contenedor.innerHTML = html;
+    cargarOposicionesDisponibles();
+    
+  } else {
+    // Ya hay oposición activa
+    let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
+    html += '<div>';
+    html += '<h3 style="margin: 0; color: #007bff;">📚 ' + oposicionActiva.nombre + '</h3>';
+    html += '<p style="margin: 5px 0 0 0; color: #666;">Oposición activa</p>';
+    html += '</div>';
+    html += '<div>';
+    html += '<button onclick="cambiarOposicion()" style="background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 3px; margin-right: 10px;">Cambiar</button>';
+    html += '<button id="btnCompararOposiciones" onclick="mostrarComparadorOposiciones()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 3px; margin-right: 10px;" disabled>';
+    html += '🔍 Comparar</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    contenedor.innerHTML = html;
+    
+    // Verificar si hay más de una oposición para habilitar comparación
+    verificarOposicionesDisponibles();
+  }
+}
+
+// 4. Cargar oposiciones disponibles
+function cargarOposicionesDisponibles() {
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      const select = document.getElementById('selectorOposicion');
+      
+      oposiciones.forEach(function(op) {
+        const option = document.createElement('option');
+        option.value = op.id;
+        option.textContent = op.nombre;
+        select.appendChild(option);
+      });
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar oposiciones:', error);
+      alert('Error al cargar oposiciones');
+    })
+    .getOposicionesOrdenadas();
+}
+
+// 5. Establecer oposición activa
+function establecerOposicionActiva() {
+  const idOposicion = document.getElementById('selectorOposicion').value;
+  
+  if (!idOposicion) {
+    alert('Selecciona una oposición');
+    return;
+  }
+  
+  google.script.run
+    .withSuccessHandler(function() {
+      alert('Oposición establecida correctamente');
+      // Recargar la página principal
+      cargarOposicionActiva();
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al establecer oposición activa:', error);
+      alert('Error al establecer oposición activa');
+    })
+    .setOposicionActiva(idOposicion);
+}
+
+// 6. Cambiar oposición activa (VERSIÓN CON CANCELAR)
+function cambiarOposicion() {
+  const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+  
+  let html = '<div style="text-align: center; padding: 40px;">';
+  html += '<h3>Cambiar oposición activa</h3>';
+  html += '<p style="color: #666; margin-bottom: 30px;">Actualmente: <strong>' + oposicionActiva.nombre + '</strong></p>';
+  
+  html += '<div style="max-width: 400px; margin: 0 auto;">';
+  html += '<label style="display: block; margin-bottom: 10px; text-align: left;">Nueva oposición:</label>';
+  html += '<select id="selectorNuevaOposicion" style="width: 100%; padding: 10px; margin-bottom: 20px;">';
+  html += '<option value="">-- Selecciona una oposición --</option>';
+  html += '</select>';
+  
+  html += '<div style="display: flex; gap: 10px; justify-content: center;">';
+  html += '<button onclick="cancelarCambioOposicion()" ';
+  html += 'style="background: #6c757d; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer;">';
+  html += 'Cancelar</button>';
+  
+  html += '<button onclick="confirmarCambioOposicion()" ';
+  html += 'style="background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer;">';
+  html += 'Cambiar</button>';
+  html += '</div>';
+  html += '</div>';
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
+  
+  // Cargar oposiciones (excluyendo la actual)
+  cargarOposicionesParaCambio();
+}
+
+// 7. Verificar si hay más oposiciones para habilitar comparación
+function verificarOposicionesDisponibles() {
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      const btnComparar = document.getElementById('btnCompararOposiciones');
+      if (btnComparar && oposiciones.length > 1) {
+        btnComparar.disabled = false;
+        btnComparar.title = 'Comparar con otras oposiciones';
+      }
+    })
+    .getOposicionesOrdenadas();
+}
+
+// 8. Mostrar comparador de oposiciones (VERSIÓN COMPLETA)
+function mostrarComparadorOposiciones() {
+  // Crear modal
+  let html = '<div id="modalComparacion" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">';
+  html += '<div style="background: white; padding: 30px; border-radius: 10px; max-width: 800px; width: 90%; max-height: 80%; overflow-y: auto;">';
+  
+  // Cabecera
+  html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
+  html += '<h4 style="margin: 0;">🔍 Comparar Oposiciones</h4>';
+  html += '<button onclick="cerrarModalComparacion()" style="background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>';
+  html += '</div>';
+  
+  // Información actual
+  html += '<div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">';
+  html += '<strong>Oposición activa:</strong> ' + oposicionActiva.nombre;
+  html += '</div>';
+  
+  // Selector de oposición para comparar
+  html += '<div style="margin-bottom: 20px;">';
+  html += '<label style="display: block; margin-bottom: 10px;">Comparar con:</label>';
+  html += '<select id="selectorOposicionComparar" onchange="cargarComparacion()" style="width: 100%; padding: 10px;">';
+  html += '<option value="">-- Selecciona una oposición --</option>';
+  html += '</select>';
+  html += '</div>';
+  
+  // Contenedor de resultados
+  html += '<div id="resultadosComparacion"></div>';
+  
+  html += '</div>';
+  html += '</div>';
+  
+  document.body.insertAdjacentHTML('beforeend', html);
+  
+  // Cargar oposiciones disponibles para comparar
+  cargarOposicionesParaComparar();
+}
+
+// 9. Cargar oposiciones para cambio (excluyendo la actual)
+function cargarOposicionesParaCambio() {
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      const select = document.getElementById('selectorNuevaOposicion');
+      
+      oposiciones.forEach(function(op) {
+        // Excluir la oposición actualmente activa
+        if (op.id != oposicionActiva.id) {
+          const option = document.createElement('option');
+          option.value = op.id;
+          option.textContent = op.nombre;
+          select.appendChild(option);
+        }
+      });
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar oposiciones:', error);
+      alert('Error al cargar oposiciones');
+    })
+    .getOposicionesOrdenadas();
+}
+
+// 10. Cancelar cambio de oposición
+function cancelarCambioOposicion() {
+  // Volver a mostrar la página principal con la oposición actual
+  mostrarPaginaPrincipal();
+}
+
+// 11. Confirmar cambio de oposición
+function confirmarCambioOposicion() {
+  const idNuevaOposicion = document.getElementById('selectorNuevaOposicion').value;
+  
+  if (!idNuevaOposicion) {
+    alert('Selecciona una oposición');
+    return;
+  }
+  
+  google.script.run
+    .withSuccessHandler(function() {
+      alert('Oposición cambiada correctamente');
+      // Recargar la página principal con la nueva oposición
+      cargarOposicionActiva();
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cambiar oposición:', error);
+      alert('Error al cambiar oposición');
+    })
+    .setOposicionActiva(idNuevaOposicion);
+}
+
+// 12. Cargar oposiciones para comparar (excluyendo la activa)
+function cargarOposicionesParaComparar() {
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      const select = document.getElementById('selectorOposicionComparar');
+      
+      oposiciones.forEach(function(op) {
+        if (op.id != oposicionActiva.id) {
+          const option = document.createElement('option');
+          option.value = op.id;
+          option.textContent = op.nombre;
+          select.appendChild(option);
+        }
+      });
+    })
+    .getOposicionesOrdenadas();
+}
+
+// 13. Cargar comparación de temas
+function cargarComparacion() {
+  const idOposicionComparar = document.getElementById('selectorOposicionComparar').value;
+  const contenedor = document.getElementById('resultadosComparacion');
+  
+  if (!idOposicionComparar) {
+    contenedor.innerHTML = '';
+    return;
+  }
+  
+  contenedor.innerHTML = '<p style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Cargando comparación...</p>';
+  
+  google.script.run
+    .withSuccessHandler(function(temas) {
+      mostrarResultadosComparacion(temas, idOposicionComparar);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al comparar:', error);
+      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error al cargar comparación</p>';
+    })
+    .getTemasComunes(oposicionActiva.id, idOposicionComparar);
+}
+
+// 14. Mostrar resultados de la comparación (VERSIÓN ÁRBOL COLAPSABLE)
+function mostrarResultadosComparacion(temas, idOposicionComparar) {
+  // Cargar los datos organizados en árbol por bloque
+  google.script.run
+    .withSuccessHandler(function(temasPorBloque) {
+      mostrarArbolTemasConCheckboxes(temasPorBloque, idOposicionComparar);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar temas en árbol:', error);
+      const contenedor = document.getElementById('resultadosComparacion');
+      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error al cargar temas en árbol</p>';
+    })
+    .getTemassComunesEnArbolPorBloque(oposicionActiva.id, idOposicionComparar);
+}
+
+// 16. Mostrar árbol de temas con checkboxes (VERSIÓN NOMBRES CORREGIDOS)
+function mostrarArbolTemasConCheckboxes(datosBloquess, idOposicionComparar) {
+  const contenedor = document.getElementById('resultadosComparacion');
+  
+  if (datosBloquess.length === 0) {
+    contenedor.innerHTML = '<div style="text-align: center; padding: 20px; background: #fff3cd; border-radius: 5px;">' +
+                          '<h5 style="color: #856404;">No hay temas comunes</h5>' +
+                          '<p style="color: #856404; margin: 0;">Estas oposiciones no comparten ningún tema.</p>' +
+                          '</div>';
+    return;
+  }
+  
+  // Calcular estadísticas totales recursivamente
+  let stats = calcularEstadisticasRecursivas(datosBloquess);
+  
+  let html = '<div>';
+  
+  // Estadísticas generales
+  html += '<div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">';
+  html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">';
+  
+  html += '<div><strong>' + stats.totalTemas + '</strong><br><span style="color: #666; font-size: 12px;">Temas comunes</span></div>';
+  html += '<div><strong style="color: #28a745;">' + stats.totalCompletados + '</strong><br><span style="color: #666; font-size: 12px;">Completados</span></div>';
+  html += '<div><strong style="color: #dc3545;">' + stats.totalPendientes + '</strong><br><span style="color: #666; font-size: 12px;">Pendientes</span></div>';
+  html += '<div><strong style="color: #007bff;">' + stats.totalHoras.toFixed(1) + 'h</strong><br><span style="color: #666; font-size: 12px;">Tiempo total</span></div>';
+  
+  html += '</div>';
+  html += '</div>';
+  
+  // Contador de seleccionados
+  html += '<div id="contadorSeleccionados" style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; text-align: center;">';
+  html += '<strong>Seleccionados: <span id="temasSeleccionadosCount">0</span> temas | ';
+  html += 'Tiempo: <span id="tiempoSeleccionadoCount">0.0</span>h</strong>';
+  html += '<button id="btnPlanificarSeleccionados" onclick="planificarTemasSeleccionados()" ';
+  html += 'style="background: #28a745; color: white; border: none; padding: 8px 20px; border-radius: 5px; margin-left: 20px;" disabled>';
+  html += '📅 Planificar seleccionados</button>';
+  html += '</div>';
+  
+  // Checkbox para seleccionar todos
+  html += '<div style="margin-bottom: 15px;">';
+  html += '<label style="cursor: pointer; font-weight: bold;">';
+  html += '<input type="checkbox" id="seleccionarTodos" onchange="toggleSeleccionarTodos()" style="margin-right: 8px;"> ';
+  html += 'Seleccionar todos los temas pendientes';
+  html += '</label>';
+  html += '</div>';
+  
+  // Temas por bloque con árbol
+  datosBloquess.forEach(bloque => {
+    html += '<div style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
+    
+    // Cabecera del bloque
+    html += '<div style="background: #007bff; color: white; padding: 12px; font-weight: bold;">';
+    html += '📚 ' + bloque.nombreBloque + ' (' + (stats.temasPorBloque[bloque.idBloque] || 0) + ' temas comunes)';
+    html += '</div>';
+    
+    // Temas del bloque en formato árbol
+    html += '<div style="padding: 10px;">';
+    html += renderizarArbolTemas(bloque.temas, 0);
+    html += '</div>';
+    
+    html += '</div>';
+  });
+  
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
+}
+
+// 15. Cerrar modal de comparación
+function cerrarModalComparacion() {
+  const modal = document.getElementById('modalComparacion');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// 17. Actualizar contador de temas seleccionados
+function actualizarContador() {
+  const checkboxes = document.querySelectorAll('.tema-checkbox:checked');
+  let totalTemas = checkboxes.length;
+  let totalHoras = 0;
+  
+  checkboxes.forEach(checkbox => {
+    totalHoras += parseFloat(checkbox.getAttribute('data-horas'));
+  });
+  
+  document.getElementById('temasSeleccionadosCount').textContent = totalTemas;
+  document.getElementById('tiempoSeleccionadoCount').textContent = totalHoras.toFixed(1);
+  
+  // Habilitar/deshabilitar botón de planificar
+  const btnPlanificar = document.getElementById('btnPlanificarSeleccionados');
+  btnPlanificar.disabled = totalTemas === 0;
+}
+
+// 18. Toggle seleccionar todos
+function toggleSeleccionarTodos() {
+  const seleccionarTodos = document.getElementById('seleccionarTodos').checked;
+  const checkboxes = document.querySelectorAll('.tema-checkbox');
+  
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = seleccionarTodos;
+  });
+  
+  actualizarContador();
+}
+
+// 19. Planificar temas seleccionados (VERSIÓN CORREGIDA)
+function planificarTemasSeleccionados() {
+  const checkboxes = document.querySelectorAll('.tema-checkbox:checked');
+  
+  if (checkboxes.length === 0) {
+    alert('Selecciona al menos un tema');
+    return;
+  }
+  
+  // Recopilar información completa de temas seleccionados
+  const temasSeleccionados = [];
+  let tiempoTotal = 0;
+  
+  checkboxes.forEach(checkbox => {
+    const horas = parseFloat(checkbox.getAttribute('data-horas'));
+    temasSeleccionados.push({
+      id: parseInt(checkbox.getAttribute('data-tema-id')),
+      horas: horas
+    });
+    tiempoTotal += horas;
+  });
+  
+  // Confirmar antes de proceder
+  const mensaje = `¿Crear planificación con ${temasSeleccionados.length} temas seleccionados?\n\nTiempo total estimado: ${tiempoTotal.toFixed(1)} horas`;
+  
+  if (!confirm(mensaje)) {
+    return;
+  }
+  
+  // Guardar datos en variable global para usar en nueva planificación
+  window.temasParaPlanificar = {
+    temas: temasSeleccionados,
+    tiempoTotal: tiempoTotal,
+    origen: 'comparacion'
+  };
+  
+  // Cerrar modal de comparación
+  cerrarModalComparacion();
+  
+  // Mostrar modal de nueva planificación
+  setTimeout(function() {
+    mostrarNuevaPlanificacionConTemas();
+  }, 100);
+}
+
+// 20. Mostrar nueva planificación con temas pre-seleccionados (VERSIÓN COMPLETA)
+function mostrarNuevaPlanificacionConTemas() {
+  if (!window.temasParaPlanificar) {
+    alert('Error: No hay temas seleccionados');
+    return;
+  }
+  
+  // Mostrar modal de nueva planificación
+  document.getElementById('modalNuevaPlanificacion').style.display = 'flex';
+  pasoActualPlanificacion = 1;
+  fechaSeleccionada = null;
+  repasosDiaSeleccionado = [];
+  
+  // Marcar que viene de comparación
+  window.modoCreacionPlanificacion = 'desde_comparacion';
+  
+  // Mostrar paso 1 específico para temas de comparación
+  mostrarPaso1ConTemasPreseleccionados();
+}
+
+// 24. Paso 1 específico para temas de comparación
+function mostrarPaso1ConTemasPreseleccionados() {
+  const contenedor = document.getElementById('paso1Planificacion');
+  
+  let html = '<h4>Paso 1: Planificar temas seleccionados</h4>';
+  
+  // Resumen de temas seleccionados
+  html += '<div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">';
+  html += '<h5 style="color: #0d47a1; margin: 0 0 10px 0;">📚 Temas de comparación seleccionados</h5>';
+  html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">';
+  html += '<div><strong>' + window.temasParaPlanificar.temas.length + '</strong><br><span style="font-size: 12px;">Temas</span></div>';
+  html += '<div><strong>' + window.temasParaPlanificar.tiempoTotal.toFixed(1) + 'h</strong><br><span style="font-size: 12px;">Tiempo estimado</span></div>';
+  html += '<div><strong>' + oposicionActiva.nombre + '</strong><br><span style="font-size: 12px;">Oposición</span></div>';
+  html += '</div>';
+  html += '</div>';
+  
+  // Selector de fecha
+  html += '<div style="margin-bottom: 20px;">';
+  html += '<label style="display: block; margin-bottom: 10px;"><strong>Fecha para planificar:</strong></label>';
+  html += '<input type="date" id="fechaPlanificacion" ';
+  html += 'min="' + new Date().toISOString().split('T')[0] + '" ';
+  html += 'onchange="cargarRepasosDiaConTemas(this.value)" ';
+  html += 'style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">';
+  html += '</div>';
+  
+  // Contenedor para repasos del día
+  html += '<div id="repasosDiaContainer" style="margin-bottom: 20px;"></div>';
+  
+  // Validaciones y advertencias
+  html += '<div id="validacionesDia"></div>';
+  
+  contenedor.innerHTML = html;
+  
+  // Establecer fecha por defecto (hoy)
+  document.getElementById('fechaPlanificacion').value = new Date().toISOString().split('T')[0];
+  cargarRepasosDiaConTemas(new Date().toISOString().split('T')[0]);
+  
+  // Actualizar botones del modal
+  document.getElementById('btnAnteriorPaso').style.display = 'none';
+  document.getElementById('btnSiguientePaso').textContent = 'Siguiente: Configurar tiempo';
+  document.getElementById('btnSiguientePaso').disabled = false;
+}
+
+// 25. Cargar repasos del día con cálculo de tiempo disponible
+function cargarRepasosDiaConTemas(fecha) {
+  if (!fecha) return;
+  
+  fechaSeleccionada = new Date(fecha);
+  
+  const contenedorRepasos = document.getElementById('repasosDiaContainer');
+  const contenedorValidaciones = document.getElementById('validacionesDia');
+  
+  contenedorRepasos.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Verificando día y repasos...</p>';
+  
+  // Verificar si el día es modificable
+  google.script.run
+    .withSuccessHandler(function(esModificable) {
+      if (!esModificable) {
+        mostrarDiaNoModificableConTemas(fecha);
+        return;
+      }
+      
+      // Cargar repasos del día
+      google.script.run
+        .withSuccessHandler(function(repasos) {
+          repasosDiaSeleccionado = repasos;
+          mostrarRepasosDiaConTemas(repasos);
+          validarDisponibilidadDiaConTemas(repasos);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al cargar repasos:', error);
+          contenedorRepasos.innerHTML = '<p style="color: red;">Error al cargar repasos</p>';
+        })
+        .getRepasosProgramadosDia(fecha);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al verificar día:', error);
+    })
+    .esDiaModificable(fecha);
 }
 
 // Renderizar calendario
@@ -86,6 +639,205 @@ function renderizarCalendario() {
   html += '</div>';
   
   document.getElementById('calendario').innerHTML = html;
+}
+
+// 21. Calcular estadísticas recursivamente (VERSIÓN CORREGIDA)
+function calcularEstadisticasRecursivas(bloquesDatos) {
+  let totalTemas = 0;
+  let totalCompletados = 0;
+  let totalHoras = 0;
+  let contadorPorBloque = {};
+  
+  function contarTemaRecursivo(tema) {
+    if (tema.esComun) {
+      totalTemas++;
+      if (tema.completado) totalCompletados++;
+      totalHoras += tema.horasEstimadas || 0;
+      
+      const idBloque = tema.id_bloque || 'sin_bloque';
+      contadorPorBloque[idBloque] = (contadorPorBloque[idBloque] || 0) + 1;
+    }
+    
+    if (tema.hijos) {
+      tema.hijos.forEach(hijo => contarTemaRecursivo(hijo));
+    }
+  }
+  
+  bloquesDatos.forEach(bloque => {
+    bloque.temas.forEach(tema => contarTemaRecursivo(tema));
+  });
+  
+  return {
+    totalTemas: totalTemas,
+    totalCompletados: totalCompletados,
+    totalPendientes: totalTemas - totalCompletados,
+    totalHoras: totalHoras,
+    temasPorBloque: contadorPorBloque
+  };
+}
+
+// 22. Renderizar árbol de temas de forma recursiva
+function renderizarArbolTemas(temas, nivel) {
+  let html = '';
+  const margenIzquierdo = nivel * 20;
+  
+  temas.forEach(tema => {
+    // Solo mostrar si es común (tiene checkbox) o tiene hijos comunes
+    const tieneHijosComunes = tema.hijos && tema.hijos.some(hijo => hijo.esComun || (hijo.hijos && hijo.hijos.length > 0));
+    
+    if (tema.esComun || tieneHijosComunes) {
+      const estado = tema.completado ? '✅' : '⭕';
+      const colorFondo = tema.completado ? '#d4edda' : '#f8f9fa';
+      
+      html += '<div style="margin-left: ' + margenIzquierdo + 'px; margin-bottom: 5px;">';
+      html += '<div style="display: flex; align-items: center; padding: 8px; background: ' + colorFondo + '; border-radius: 5px;">';
+      
+      // Icono de colapsar/expandir si tiene hijos
+      if (tema.hijos && tema.hijos.length > 0) {
+        html += '<span onclick="toggleArbol(this)" style="cursor: pointer; margin-right: 8px; user-select: none; width: 16px; text-align: center;">▼</span>';
+      } else {
+        html += '<span style="margin-right: 8px; width: 16px;"></span>';
+      }
+      
+      // Checkbox solo para temas comunes y pendientes
+      if (tema.esComun && !tema.completado) {
+        html += '<input type="checkbox" class="tema-checkbox" ';
+        html += 'data-tema-id="' + tema.id + '" ';
+        html += 'data-horas="' + (tema.horasEstimadas || 0) + '" ';
+        html += 'onchange="actualizarContador()" ';
+        html += 'style="margin-right: 10px;">';
+      } else if (tema.esComun && tema.completado) {
+        html += '<span style="margin-right: 10px; width: 16px; text-align: center;">✅</span>';
+      } else {
+        html += '<span style="margin-right: 10px; width: 16px;"></span>';
+      }
+      
+      // Información del tema
+      html += '<div style="flex: 1;">';
+      html += '<strong>' + tema.nombreCompleto + '</strong>';
+      
+      if (tema.esComun) {
+        html += '<br><small style="color: #666;">';
+        html += (tema.paginas || 0) + ' páginas | ' + (tema.horasEstimadas || 0).toFixed(1) + 'h estimadas';
+        if (tema.completado) {
+          html += ' | <span style="color: #28a745;">Completado</span>';
+        }
+        html += '</small>';
+      }
+      html += '</div>';
+      
+      html += '</div>';
+      
+      // Renderizar hijos (inicialmente visibles)
+      if (tema.hijos && tema.hijos.length > 0) {
+        html += '<div class="hijos-tema">';
+        html += renderizarArbolTemas(tema.hijos, nivel + 1);
+        html += '</div>';
+      }
+      
+      html += '</div>';
+    }
+  });
+  
+  return html;
+}
+
+// 23. Toggle árbol (colapsar/expandir)
+function toggleArbol(elemento) {
+  const contenedorHijos = elemento.parentElement.parentElement.querySelector('.hijos-tema');
+  if (contenedorHijos) {
+    if (contenedorHijos.style.display === 'none') {
+      contenedorHijos.style.display = 'block';
+      elemento.textContent = '▼';
+    } else {
+      contenedorHijos.style.display = 'none';
+      elemento.textContent = '▶';
+    }
+  }
+}
+
+// 26. Mostrar día no modificable para temas de comparación
+function mostrarDiaNoModificableConTemas(fecha) {
+  const contenedorRepasos = document.getElementById('repasosDiaContainer');
+  const contenedorValidaciones = document.getElementById('validacionesDia');
+  
+  contenedorRepasos.innerHTML = '';
+  
+  let html = '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin-bottom: 15px;">';
+  html += '<h5 style="color: #856404; margin: 0 0 10px 0;"><i class="fas fa-exclamation-triangle"></i> Día no modificable</h5>';
+  html += '<p style="margin: 0; color: #856404;">Los días anteriores no se pueden modificar. Selecciona hoy o una fecha futura.</p>';
+  html += '</div>';
+  
+  contenedorValidaciones.innerHTML = html;
+  document.getElementById('btnSiguientePaso').disabled = true;
+}
+
+// 27. Mostrar repasos del día para temas de comparación
+function mostrarRepasosDiaConTemas(repasos) {
+  const contenedor = document.getElementById('repasosDiaContainer');
+  
+  if (repasos.length === 0) {
+    contenedor.innerHTML = '<div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px;">' +
+                          '<h5 style="color: #155724; margin: 0 0 5px 0;"><i class="fas fa-check-circle"></i> Sin repasos programados</h5>' +
+                          '<p style="margin: 0; color: #155724;">Perfecto, todo el tiempo estará disponible para los temas seleccionados.</p>' +
+                          '</div>';
+    return;
+  }
+  
+  let tiempoTotalRepasos = repasos.reduce((total, repaso) => total + repaso.tiempoEstimado, 0);
+  
+  let html = '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px;">';
+  html += '<h5 style="color: #856404; margin: 0 0 10px 0;"><i class="fas fa-redo"></i> Repasos programados (' + repasos.length + ')</h5>';
+  html += '<p style="color: #856404; margin: 0 0 10px 0;">Estos repasos reducirán el tiempo disponible para estudiar.</p>';
+  
+  repasos.forEach(function(repaso) {
+    html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #ffeaa7;">';
+    html += '<div><strong>R' + repaso.numeroRepaso + ':</strong> ' + repaso.nombreTema + '</div>';
+    html += '<div style="color: #856404; font-size: 12px;">' + repaso.tiempoEstimado + ' min</div>';
+    html += '</div>';
+  });
+  
+  html += '<div style="text-align: right; margin-top: 10px; font-weight: bold; color: #856404;">';
+  html += 'Tiempo total repasos: ' + Math.round(tiempoTotalRepasos / 60 * 10) / 10 + ' horas';
+  html += '</div>';
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
+}
+
+// 28. Validar disponibilidad con cálculo de tiempo
+function validarDisponibilidadDiaConTemas(repasos) {
+  const contenedor = document.getElementById('validacionesDia');
+  
+  const tiempoRepasos = repasos.reduce((total, repaso) => total + repaso.tiempoEstimado, 0) / 60; // en horas
+  const tiempoTemas = window.temasParaPlanificar.tiempoTotal;
+  const tiempoMinimoNecesario = tiempoRepasos + tiempoTemas;
+  
+  let html = '<div style="background: #e3f2fd; border: 1px solid #bbdefb; padding: 15px; border-radius: 5px;">';
+  html += '<h5 style="color: #0d47a1; margin: 0 0 10px 0;">⏱️ Cálculo de tiempo</h5>';
+  html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; margin-bottom: 10px;">';
+  
+  html += '<div style="padding: 8px; background: #fff3e0; border-radius: 3px;">';
+  html += '<div style="font-weight: bold;">' + tiempoRepasos.toFixed(1) + 'h</div>';
+  html += '<div style="font-size: 12px;">Repasos</div>';
+  html += '</div>';
+  
+  html += '<div style="padding: 8px; background: #e8f5e8; border-radius: 3px;">';
+  html += '<div style="font-weight: bold;">' + tiempoTemas.toFixed(1) + 'h</div>';
+  html += '<div style="font-size: 12px;">Temas nuevos</div>';
+  html += '</div>';
+  
+  html += '<div style="padding: 8px; background: #f3e5f5; border-radius: 3px;">';
+  html += '<div style="font-weight: bold;">' + tiempoMinimoNecesario.toFixed(1) + 'h</div>';
+  html += '<div style="font-size: 12px;">Total necesario</div>';
+  html += '</div>';
+  
+  html += '</div>';
+  html += '<p style="margin: 0; color: #0d47a1; text-align: center;"><strong>En el siguiente paso podrás ajustar las horas de estudio disponibles.</strong></p>';
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
+  document.getElementById('btnSiguientePaso').disabled = false;
 }
 
 // Cambiar mes
