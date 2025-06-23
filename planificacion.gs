@@ -294,7 +294,8 @@ function getProgresosCompletadosPorOposicion(idOposicion) {
 }
 
 // Construir árbol con estados y tiempos
-function construirArbolConEstadosYTiempos(temas, progresosMap, minutosPorPagina) {
+function construirArbolConEstadosYTiempos(temas, progresosMap, minutosPorPagina, tiempoDisponible) {
+
   // Función recursiva para construir nodos
   function construirNodo(idTema, nivel = 0) {
     const tema = temas.find(t => t.id === idTema);
@@ -336,7 +337,7 @@ function construirArbolConEstadosYTiempos(temas, progresosMap, minutosPorPagina)
     let seleccionablePadre = false;
     if (!esHoja && paginas > 0) {
       // Tema padre seleccionable si tiene tiempo ≤ disponible y no está completado
-      seleccionablePadre = (tiempoMinutos <= tiempoEstudioDisponible) && estado !== 'completado';
+      seleccionablePadre = (tiempoMinutos <= tiempoDisponible) && estado !== 'completado';
     }
     
     return {
@@ -910,6 +911,267 @@ function agruparTemasPorBloque(temas) {
   });
   
   return resultado;
+}
+
+// Verificar progreso de una oposición
+function verificarProgresoOposicion(idOposicion) {
+  try {
+    let temasCompletados = 0;
+    let horasEstudiadas = 0;
+    let repasosPendientes = 0;
+    
+    // Contar temas completados
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    const progresoData = progresoSheet.getDataRange().getValues();
+    
+    // Obtener planificaciones de esta oposición
+    const planSheet = getGoogleSheet('Planificacion_Diaria');
+    const planColumns = getColumnIndices('Planificacion_Diaria');
+    const planData = planSheet.getDataRange().getValues();
+    
+    const planificacionesOposicion = [];
+    for (let i = 1; i < planData.length; i++) {
+      if (planData[i][planColumns['id_oposicion']] == idOposicion) {
+        planificacionesOposicion.push({
+          id: planData[i][planColumns['id_planificacion']],
+          tiempoReal: planData[i][planColumns['tiempo_real_minutos']] || 0
+        });
+      }
+    }
+    
+    // Calcular temas completados y horas estudiadas
+    for (let i = 1; i < progresoData.length; i++) {
+      const idPlanificacion = progresoData[i][progresoColumns['id_planificacion']];
+      const planificacionCorrespondiente = planificacionesOposicion.find(p => p.id === idPlanificacion);
+      
+      if (planificacionCorrespondiente) {
+        if (progresoData[i][progresoColumns['estado']] === 'completado') {
+          temasCompletados++;
+        }
+        
+        // Sumar tiempo dedicado
+        const tiempoDedicado = progresoData[i][progresoColumns['tiempo_dedicado_minutos']] || 0;
+        horasEstudiadas += tiempoDedicado;
+      }
+    }
+    
+    // Convertir minutos a horas
+    horasEstudiadas = Math.round(horasEstudiadas / 60 * 10) / 10;
+    
+    // Contar repasos pendientes relacionados con temas de esta oposición
+    const repasosSheet = getGoogleSheet('Repasos_Programados');
+    const repasosColumns = getColumnIndices('Repasos_Programados');
+    const repasosData = repasosSheet.getDataRange().getValues();
+    
+    // Obtener IDs de temas vinculados a la oposición
+    const temasVinculados = getTemasVinculadosAOposicion(idOposicion);
+    const idsTemasVinculados = temasVinculados.map(t => t.id);
+    
+    for (let i = 1; i < repasosData.length; i++) {
+      const idTema = repasosData[i][repasosColumns['id_tema']];
+      const estado = repasosData[i][repasosColumns['estado']];
+      
+      if (idsTemasVinculados.includes(idTema) && estado === 'pendiente') {
+        repasosPendientes++;
+      }
+    }
+    
+    return {
+      tieneProgreso: temasCompletados > 0 || horasEstudiadas > 0 || repasosPendientes > 0,
+      temasCompletados: temasCompletados,
+      horasEstudiadas: horasEstudiadas,
+      repasosPendientes: repasosPendientes
+    };
+    
+  } catch (error) {
+    console.error('Error al verificar progreso:', error);
+    return {
+      tieneProgreso: false,
+      temasCompletados: 0,
+      horasEstudiadas: 0,
+      repasosPendientes: 0
+    };
+  }
+}
+
+// Cambiar estado de una oposición
+function cambiarEstadoOposicion(idOposicion, nuevoEstado) {
+  try {
+    const oposicionesSheet = getGoogleSheet('Oposiciones');
+    const oposicionesColumns = getColumnIndices('Oposiciones');
+    const data = oposicionesSheet.getDataRange().getValues();
+    
+    // Verificar que existe columna de estado, si no crearla
+    if (!oposicionesColumns['estado']) {
+      // Añadir columna estado
+      const numColumnas = oposicionesSheet.getLastColumn();
+      oposicionesSheet.getRange(1, numColumnas + 1).setValue('estado');
+      
+      // Actualizar todas las filas existentes con estado 'activa'
+      for (let i = 2; i <= oposicionesSheet.getLastRow(); i++) {
+        oposicionesSheet.getRange(i, numColumnas + 1).setValue('activa');
+      }
+      
+      // Volver a obtener índices
+      const nuevosColumns = getColumnIndices('Oposiciones');
+      oposicionesColumns['estado'] = nuevosColumns['estado'];
+    }
+    
+    // Buscar la oposición y cambiar estado
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][oposicionesColumns['id_oposicion']] == idOposicion) {
+        oposicionesSheet.getRange(i + 1, oposicionesColumns['estado'] + 1).setValue(nuevoEstado);
+        
+        // Si se marca como interrumpida o finalizada, añadir fecha
+        if (nuevoEstado === 'interrumpida' || nuevoEstado === 'finalizada') {
+          // Verificar si existe columna fecha_estado
+          if (!oposicionesColumns['fecha_estado']) {
+            const numColumnas = oposicionesSheet.getLastColumn();
+            oposicionesSheet.getRange(1, numColumnas + 1).setValue('fecha_estado');
+            oposicionesColumns['fecha_estado'] = numColumnas;
+          }
+          
+          oposicionesSheet.getRange(i + 1, oposicionesColumns['fecha_estado'] + 1).setValue(new Date());
+        }
+        
+        return { success: true };
+      }
+    }
+    
+    throw new Error('Oposición no encontrada');
+    
+  } catch (error) {
+    console.error('Error al cambiar estado de oposición:', error);
+    throw error;
+  }
+}
+
+// Obtener oposiciones con estado
+function getOposicionesConEstado() {
+  try {
+    const oposicionesSheet = getGoogleSheet('Oposiciones');
+    const oposicionesColumns = getColumnIndices('Oposiciones');
+    const data = oposicionesSheet.getDataRange().getValues();
+    
+    const oposiciones = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      const estado = data[i][oposicionesColumns['estado']] || 'activa'; // Por defecto activa
+      
+      oposiciones.push({
+        id: data[i][oposicionesColumns['id_oposicion']],
+        nombre: data[i][oposicionesColumns['nombre']],
+        estado: estado,
+        fechaEstado: data[i][oposicionesColumns['fecha_estado']] || null
+      });
+    }
+    
+    return oposiciones.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    
+  } catch (error) {
+    console.error('Error al obtener oposiciones con estado:', error);
+    return [];
+  }
+}
+
+// Verificar si un día es modificable (no es pasado)
+function esDiaModificable(fechaStr) {
+  try {
+    const fecha = new Date(fechaStr + 'T00:00:00');
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fecha.setHours(0, 0, 0, 0);
+    
+    return fecha >= hoy;
+  } catch (error) {
+    console.error('Error al verificar día modificable:', error);
+    return false;
+  }
+}
+
+// Obtener repasos programados para un día específico
+function getRepasosDelDia(fechaMs) {
+  try {
+    const fecha = new Date(fechaMs);
+    fecha.setHours(0, 0, 0, 0);
+    
+    const repasosSheet = getGoogleSheet('Repasos_Programados');
+    const repasosColumns = getColumnIndices('Repasos_Programados');
+    const data = repasosSheet.getDataRange().getValues();
+    
+    const repasos = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      const fechaRepaso = new Date(data[i][repasosColumns['fecha_programada']]);
+      fechaRepaso.setHours(0, 0, 0, 0);
+      
+      if (fechaRepaso.getTime() === fecha.getTime() && 
+          data[i][repasosColumns['estado']] === 'pendiente') {
+        
+        // Obtener nombre del tema
+        const idTema = data[i][repasosColumns['id_tema']];
+        const tema = getTemaById(idTema);
+        
+        repasos.push({
+          id: data[i][repasosColumns['id_repaso']],
+          numeroRepaso: data[i][repasosColumns['numero_repaso']],
+          nombreTema: (tema.prenombre ? tema.prenombre + ' ' : '') + tema.nombre,
+          tiempoEstimado: 30 // Estimación fija de 30 min por repaso
+        });
+      }
+    }
+    
+    return repasos;
+    
+  } catch (error) {
+    console.error('Error al obtener repasos del día:', error);
+    return [];
+  }
+}
+
+// Función corregida para obtener árbol con tiempo disponible
+function getArbolTemasConEstados(idOposicion, tiempoDisponibleMinutos) {
+  try {
+    console.log('🌳 Obteniendo árbol de temas para oposición:', idOposicion);
+    console.log('⏱️ Tiempo disponible:', tiempoDisponibleMinutos, 'min');
+    
+    // Obtener configuración para calcular tiempos
+    const config = getConfiguracionOposicion(idOposicion);
+    const minutosPorPagina = getMinutosPorPagina(config);
+    
+    // Obtener temas vinculados a la oposición
+    const temasVinculados = getTemasVinculadosAOposicion(idOposicion);
+    console.log('📝 Temas vinculados obtenidos:', temasVinculados.length);
+    
+    // Obtener información de bloques
+    const idsBloques = [...new Set(temasVinculados.map(t => t.idBloque).filter(id => id))];
+    const bloquesInfo = getBloquesPorIds(idsBloques);
+    
+    // Obtener progresos completados
+    const progresosCompletados = getProgresosCompletadosPorOposicion(idOposicion);
+    
+    // Construir árbol con estados y tiempo disponible
+    const arbolCompleto = construirArbolConEstadosYTiempos(
+      temasVinculados, 
+      progresosCompletados, 
+      minutosPorPagina,
+      tiempoDisponibleMinutos  // PASAR TIEMPO DISPONIBLE
+    );
+    
+    console.log('🌳 Árbol construido:', arbolCompleto.length, 'temas principales');
+    
+    return {
+      arbol: arbolCompleto,
+      configuracion: config,
+      minutosPorPagina: minutosPorPagina,
+      bloques: bloquesInfo
+    };
+    
+  } catch (error) {
+    console.error('Error al obtener árbol de temas:', error);
+    throw error;
+  }
 }
 
 function testTemasConHoras() {
