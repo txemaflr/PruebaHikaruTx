@@ -12,6 +12,9 @@ var tiempoUsado = 0;
 var bloquesActivos = [];
 var configuracionActual = null;
 var oposicionActiva = null;
+// Variables para sistema de advertencias de dos niveles
+let advertenciasOrdenMostradas = {}; // {idTema: numeroDeVeces}
+let advertenciasBloquesMostradas = {}; // {combinacionBloques: numeroDeVeces}
 
 /*
 // Inicializar sección de planificación
@@ -766,6 +769,9 @@ function validarDisponibilidadDiaConTemas(repasos) {
 }
 
 // 29. Función para mostrar paso 1 normal (no desde comparación)
+// CORRECCIÓN 2: En scriptsPlanificacion.html
+// Reemplazar la función mostrarPaso1Normal() existente
+
 function mostrarPaso1Normal() {
   const contenedor = document.getElementById('paso1');
   
@@ -795,7 +801,7 @@ function mostrarPaso1Normal() {
   html += 'style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">';
   html += '</div>';
   
-  // Contenedor para repasos del día
+  // ✅ CORRECCIÓN: Contenedor para repasos del día con ID correcto
   html += '<div id="alertaRepasos" style="display: none; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin-bottom: 20px;">';
   html += '<h6 style="margin: 0 0 10px 0; color: #856404;">⚠️ Repasos programados para este día:</h6>';
   html += '<div id="listaRepasos"></div>';
@@ -806,13 +812,7 @@ function mostrarPaso1Normal() {
   
   contenedor.innerHTML = html;
   
-  // Establecer fecha por defecto (día seleccionado del calendario o hoy)
-  const fechaDefecto = diaSeleccionado ? 
-    new Date(mesActual.getFullYear(), mesActual.getMonth(), diaSeleccionado) : 
-    new Date();
-  
-  document.getElementById('fechaPlanificacion').value = fechaDefecto.toISOString().split('T')[0];
-  verificarRepasosDelDia();
+  console.log('✅ Paso 1 normal renderizado con IDs correctos');
 }
 
 // 30. Función principal que decide qué mostrar en paso 1
@@ -825,34 +825,54 @@ function mostrarPaso1() {
 }
 
 // 31. Función actualizada para calcular tiempo correctamente
+// CORRECCIÓN 5: En scriptsPlanificacion.html
+// Reemplazar la función actualizarCalculoTiempo() existente
+
 function actualizarCalculoTiempo() {
-  const horasPrevistas = parseFloat(document.getElementById('horasEstudio').value) || 0;
+  console.log('⏱️ Actualizando cálculo de tiempo...');
+  
+  // Obtener horas previstas del input
+  const horasInput = document.getElementById('horasEstudio');
+  const horasPrevistas = parseFloat(horasInput ? horasInput.value : 4) || 4;
   const minutosPrevistas = horasPrevistas * 60;
   
-  // Calcular tiempo de repasos
-  const tiempoRepasos = window.repasosDelDia ? window.repasosDelDia.length * 30 : 0;
+  console.log('📝 Horas previstas:', horasPrevistas, 'h =', minutosPrevistas, 'min');
   
-  // CÁLCULO CORRECTO: Tiempo real = Previstas - Repasos
+  // Calcular tiempo de repasos (30 min por repaso)
+  const repasos = window.repasosDelDia || [];
+  const tiempoRepasos = repasos.length * 30; // 30 min por repaso
+  
+  console.log('📚 Repasos encontrados:', repasos.length, '=', tiempoRepasos, 'min');
+  
+  // CÁLCULO CORRECTO: Tiempo real = Tiempo previsto - Tiempo de repasos
   const tiempoRealEstudio = Math.max(0, minutosPrevistas - tiempoRepasos);
   
+  console.log('✅ CÁLCULO FINAL:');
+  console.log('   - Tiempo previsto:', minutosPrevistas, 'min');
+  console.log('   - Tiempo repasos:', tiempoRepasos, 'min');
+  console.log('   - Tiempo real para temas:', tiempoRealEstudio, 'min');
+  
   // Actualizar variables globales
-  tiempoTotalDisponible = tiempoRealEstudio; // Solo el tiempo real para temas nuevos
-  window.tiempoTotalParaPlanificacion = minutosPrevistas; // Tiempo total previsto
-  window.tiempoRepasosDelDia = tiempoRepasos; // Tiempo de repasos
-  window.tiempoRealParaTemas = tiempoRealEstudio; // Tiempo real para temas
+  tiempoTotalDisponible = tiempoRealEstudio; // ← SOLO el tiempo real para temas nuevos
+  window.tiempoTotalParaPlanificacion = minutosPrevistas; // ← Tiempo total previsto
+  window.tiempoRepasosDelDia = tiempoRepasos; // ← Tiempo de repasos
+  window.tiempoRealParaTemas = tiempoRealEstudio; // ← Tiempo real para temas
   
-  // Actualizar interfaz
-  document.getElementById('tiempoEstudio').textContent = tiempoRealEstudio + ' min';
-  document.getElementById('tiempoRepasos').textContent = tiempoRepasos + ' min';
-  document.getElementById('tiempoTotalConRepasos').textContent = minutosPrevistas + ' min';
+  // Actualizar interfaz (verificar que existen los elementos)
+  const elementoEstudio = document.getElementById('tiempoEstudio');
+  const elementoRepasos = document.getElementById('tiempoRepasos');
+  const elementoTotal = document.getElementById('tiempoTotalConRepasos');
   
-  // Mostrar advertencia si no hay tiempo suficiente
+  if (elementoEstudio) elementoEstudio.textContent = tiempoRealEstudio + ' min';
+  if (elementoRepasos) elementoRepasos.textContent = tiempoRepasos + ' min';
+  if (elementoTotal) elementoTotal.textContent = minutosPrevistas + ' min';
+  
+  // Mostrar advertencia si el tiempo es muy bajo
   mostrarAdvertenciaTiempo(tiempoRealEstudio, tiempoRepasos, minutosPrevistas);
   
-  console.log('⏱️ Cálculo actualizado:');
-  console.log('   Horas previstas:', horasPrevistas, 'h =', minutosPrevistas, 'min');
-  console.log('   Tiempo repasos:', tiempoRepasos, 'min');
-  console.log('   Tiempo real para temas:', tiempoRealEstudio, 'min');
+  console.log('🔧 Variables globales actualizadas:');
+  console.log('   - tiempoTotalDisponible:', tiempoTotalDisponible);
+  console.log('   - window.tiempoRealParaTemas:', window.tiempoRealParaTemas);
 }
 
 // 32. Mostrar advertencia si el tiempo es insuficiente
@@ -887,28 +907,64 @@ function mostrarAdvertenciaTiempo(tiempoReal, tiempoRepasos, tiempoTotal) {
 }
 
 // 33. Validación del paso 2 (actualizada)
+// CORRECCIÓN 9: En scriptsPlanificacion.html
+// Reemplazar la función validarPaso2() existente
+
 function validarPaso2() {
-  const horas = parseFloat(document.getElementById('horasEstudio').value);
+  console.log('✅ Validando paso 2...');
   
+  const horasInput = document.getElementById('horasEstudio');
+  const horas = parseFloat(horasInput ? horasInput.value : 0);
+  
+  console.log('📊 Horas ingresadas:', horas);
+  console.log('📊 Tiempo real para temas:', window.tiempoRealParaTemas);
+  console.log('📊 Tiempo de repasos:', window.tiempoRepasosDelDia);
+  
+  // Validación básica de horas
   if (!horas || horas < 0.5) {
     alert('⚠️ Introduce un tiempo de estudio válido (mínimo 0.5 horas)');
+    if (horasInput) horasInput.focus();
     return false;
   }
   
+  if (horas > 12) {
+    const confirmar = confirm('⚠️ Has introducido ' + horas + ' horas de estudio.\n\n' +
+                            '¿Estás seguro? Es mucho tiempo para un día.');
+    if (!confirmar) {
+      if (horasInput) horasInput.focus();
+      return false;
+    }
+  }
+  
+  // Validación de tiempo disponible
   const tiempoReal = window.tiempoRealParaTemas || 0;
+  const tiempoRepasos = window.tiempoRepasosDelDia || 0;
   
   if (tiempoReal <= 0) {
-    const confirmar = confirm('⚠️ Los repasos ocupan todo el tiempo disponible.\n\n' +
-                            '¿Quieres continuar? Solo podrás gestionar los repasos, no añadir temas nuevos.');
-    return confirmar;
+    const mensaje = '⚠️ Los repasos (' + Math.round(tiempoRepasos / 60 * 10) / 10 + 'h) ocupan todo el tiempo disponible o más.\n\n' +
+                   '¿Quieres continuar? Solo podrás gestionar los repasos, no añadir temas nuevos.';
+    
+    const confirmar = confirm(mensaje);
+    if (!confirmar) {
+      if (horasInput) horasInput.focus();
+      return false;
+    }
+    
+    console.log('⚠️ Usuario confirmó continuar sin tiempo para temas nuevos');
   }
   
-  if (tiempoReal < 60) { // Menos de 1 hora
-    const confirmar = confirm('⚠️ Solo tienes ' + tiempoReal + ' minutos para temas nuevos.\n\n' +
-                            '¿Quieres continuar con tan poco tiempo?');
-    return confirmar;
+  if (tiempoReal > 0 && tiempoReal < 60) { // Menos de 1 hora
+    const mensaje = '⚠️ Solo tienes ' + tiempoReal + ' minutos (' + Math.round(tiempoReal / 60 * 10) / 10 + 'h) para temas nuevos.\n\n' +
+                   '¿Quieres continuar con tan poco tiempo?';
+    
+    const confirmar = confirm(mensaje);
+    if (!confirmar) {
+      if (horasInput) horasInput.focus();
+      return false;
+    }
   }
   
+  console.log('✅ Paso 2 validado correctamente');
   return true;
 }
 
@@ -984,6 +1040,9 @@ function cargarArbolTemasCorregido() {
 }
 
 // 36. Renderizar nodo con verificación de pre-selección
+// CORRECCIÓN 40: En scriptsPlanificacion.html
+// Reemplazar la función renderizarNodoTemaConPreseleccion() existente
+
 function renderizarNodoTemaConPreseleccion(nodo, nivel, nombreBloque) {
   const margenIzquierdo = nivel * 20;
   const iconoEstado = getIconoEstado(nodo.estado);
@@ -991,37 +1050,71 @@ function renderizarNodoTemaConPreseleccion(nodo, nivel, nombreBloque) {
   
   // Verificar si está pre-seleccionado
   const estaPreseleccionado = temasSeleccionados.some(t => t.id === nodo.id);
+  const tieneHijos = nodo.hijos && nodo.hijos.length > 0;
   
   let html = '';
   
   // Contenedor del nodo
   html += '<div style="margin-left: ' + margenIzquierdo + 'px; margin-bottom: 8px;">';
   
-  // Fila del tema
+  // Fila principal del tema
   html += '<div style="display: flex; align-items: center; padding: 10px; background: ' + colorFondo + '; border: 1px solid #e0e0e0; border-radius: 6px;">';
   
-  // Checkbox (para hojas seleccionables O padres seleccionables)
-  if (nodo.seleccionable || nodo.seleccionablePadre) {
-    const tipoSeleccion = nodo.seleccionablePadre ? 'padre' : 'hijo';
+  // NUEVA LÓGICA DE VISUALIZACIÓN:
+  if (tieneHijos) {
+    // TEMA CON HIJOS: Icono de colapsar/expandir + info + (opcionalmente checkbox si es seleccionable como padre)
     
-    html += '<input type="checkbox" ';
-    html += 'onchange="toggleSeleccionTemaConValidacion(this, ' + nodo.id + ', ' + nodo.tiempoMinutos + ', \'' + nombreBloque + '\', \'' + tipoSeleccion + '\')" ';
-    html += (estaPreseleccionado ? 'checked ' : ''); // MARCAR SI ESTÁ PRE-SELECCIONADO
-    html += 'style="margin-right: 10px; transform: scale(1.2);" ';
-    html += 'title="' + (nodo.seleccionablePadre ? 'Seleccionar tema completo (' + nodo.tiempoTexto + ')' : 'Seleccionar subtema') + '">';
+    // Icono de colapsar/expandir
+    html += '<span onclick="toggleColapsarTema(this, \'' + nodo.id + '\')" ';
+    html += 'style="cursor: pointer; margin-right: 8px; user-select: none; width: 16px; text-align: center; font-weight: bold; color: #007bff;">▶</span>';
     
-    // Añadir badge si está pre-seleccionado
-    if (estaPreseleccionado) {
-      html += '<span style="margin-left: 5px; background: #007bff; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px;">PRE-SEL</span>';
+    // Checkbox para tema padre (si es seleccionable como padre)
+    if (nodo.seleccionablePadre) {
+      html += '<input type="checkbox" ';
+      html += 'onchange="toggleSeleccionTemaConValidacion(this, ' + nodo.id + ', ' + nodo.tiempoMinutos + ', \'' + nombreBloque + '\', \'padre\')" ';
+      html += (estaPreseleccionado ? 'checked ' : '');
+      html += 'style="margin-right: 10px; transform: scale(1.2);" ';
+      html += 'title="Seleccionar tema completo (' + nodo.tiempoTexto + ')">';
+      
+      if (estaPreseleccionado) {
+        html += '<span style="margin-left: 5px; background: #007bff; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px;">PRE-SEL</span>';
+      }
+    } else {
+      // Solo icono de estado para temas padre no seleccionables
+      html += '<span style="width: 24px; margin-right: 10px; text-align: center; font-size: 16px;">' + iconoEstado + '</span>';
     }
+    
   } else {
-    html += '<span style="width: 24px; margin-right: 10px; text-align: center; font-size: 16px;">' + iconoEstado + '</span>';
+    // TEMA HOJA (SIN HIJOS): Checkbox directo
+    
+    html += '<span style="width: 16px; margin-right: 8px;"></span>'; // Espacio para alineación
+    
+    if (nodo.seleccionable) {
+      html += '<input type="checkbox" ';
+      html += 'onchange="toggleSeleccionTemaConValidacion(this, ' + nodo.id + ', ' + nodo.tiempoMinutos + ', \'' + nombreBloque + '\', \'hijo\')" ';
+      html += (estaPreseleccionado ? 'checked ' : '');
+      html += 'style="margin-right: 10px; transform: scale(1.2);" ';
+      html += 'title="Seleccionar subtema (' + nodo.tiempoTexto + ')">';
+      
+      if (estaPreseleccionado) {
+        html += '<span style="margin-left: 5px; background: #007bff; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px;">PRE-SEL</span>';
+      }
+    } else {
+      html += '<span style="width: 24px; margin-right: 10px; text-align: center; font-size: 16px;">' + iconoEstado + '</span>';
+    }
   }
   
-  // Contenido del tema
+  // Contenido del tema (nombre e información)
   html += '<div style="flex: 1;">';
   html += '<div style="font-weight: ' + (nivel === 0 ? 'bold' : 'normal') + '; color: ' + getColorTexto(nodo.estado) + ';">';
   html += nodo.nombreCompleto;
+  
+  // Mostrar info de hijos si los tiene
+  if (tieneHijos) {
+    const hijosCount = contarHijosRecursivo(nodo);
+    html += ' <span style="color: #666; font-size: 12px;">(' + hijosCount + ' subtemas)</span>';
+  }
+  
   html += '</div>';
   
   if (nodo.paginas > 0) {
@@ -1038,18 +1131,103 @@ function renderizarNodoTemaConPreseleccion(nodo, nivel, nombreBloque) {
   html += '</span>';
   html += '</div>';
   
-  html += '</div>';
+  html += '</div>'; // Fin de fila principal
   
-  // Renderizar hijos si existen
-  if (nodo.hijos && nodo.hijos.length > 0) {
+  // Contenedor de hijos (inicialmente oculto si tiene hijos)
+  if (tieneHijos) {
+    html += '<div id="hijos-' + nodo.id + '" style="display: none; margin-top: 5px;">';
+    
+    // Renderizar hijos recursivamente
     nodo.hijos.forEach(hijo => {
       html += renderizarNodoTemaConPreseleccion(hijo, nivel + 1, nombreBloque);
     });
+    
+    html += '</div>'; // Fin de contenedor de hijos
   }
   
-  html += '</div>';
+  html += '</div>'; // Fin de contenedor del nodo
   
   return html;
+}
+
+// Nueva función para colapsar/expandir temas
+function toggleColapsarTema(elemento, idTema) {
+  const contenedorHijos = document.getElementById('hijos-' + idTema);
+  
+  if (contenedorHijos) {
+    if (contenedorHijos.style.display === 'none') {
+      // Expandir
+      contenedorHijos.style.display = 'block';
+      elemento.textContent = '▼';
+      elemento.style.color = '#28a745';
+      console.log('📂 Tema expandido:', idTema);
+    } else {
+      // Colapsar
+      contenedorHijos.style.display = 'none';
+      elemento.textContent = '▶';
+      elemento.style.color = '#007bff';
+      console.log('📁 Tema colapsado:', idTema);
+    }
+  }
+}
+
+// Función auxiliar para contar hijos recursivamente
+function contarHijosRecursivo(nodo) {
+  if (!nodo.hijos || nodo.hijos.length === 0) {
+    return 0;
+  }
+  
+  let total = nodo.hijos.length;
+  nodo.hijos.forEach(hijo => {
+    total += contarHijosRecursivo(hijo);
+  });
+  
+  return total;
+}
+
+// Nueva función para expandir automáticamente temas con selecciones
+function expandirTemasConSelecciones() {
+  console.log('🔄 Expandiendo automáticamente temas con selecciones...');
+  
+  temasSeleccionados.forEach(tema => {
+    // Expandir el camino hacia este tema
+    expandirCaminoHaciaTema(tema.id);
+  });
+}
+
+// Función para expandir el camino hacia un tema específico
+function expandirCaminoHaciaTema(idTema) {
+  const nodo = encontrarNodoEnArbolCompleto(idTema, window.arbolCompletoGlobal);
+  if (!nodo) return;
+  
+  // Obtener todos los ancestros del tema
+  const ancestros = [];
+  let nodoActual = nodo;
+  
+  while (nodoActual) {
+    const padre = obtenerTemaPadreReal(nodoActual, window.arbolCompletoGlobal);
+    if (padre) {
+      ancestros.unshift(padre); // Añadir al inicio para mantener orden jerárquico
+      nodoActual = padre;
+    } else {
+      break;
+    }
+  }
+  
+  // Expandir todos los ancestros
+  ancestros.forEach(ancestro => {
+    const contenedorHijos = document.getElementById('hijos-' + ancestro.id);
+    const iconoExpandir = document.querySelector('[onclick="toggleColapsarTema(this, \'' + ancestro.id + '\')"]');
+    
+    if (contenedorHijos && contenedorHijos.style.display === 'none') {
+      contenedorHijos.style.display = 'block';
+      if (iconoExpandir) {
+        iconoExpandir.textContent = '▼';
+        iconoExpandir.style.color = '#28a745';
+      }
+      console.log('📂 Auto-expandido ancestro:', ancestro.nombreCompleto);
+    }
+  });
 }
 
 // 37. Actualizar información de bloques para temas pre-seleccionados
@@ -1297,23 +1475,92 @@ function confirmarCambioOposicion() {
 
 // 45. Configurar event listeners para horas
 function setupEventListenerHoras() {
+  console.log('🔧 Configurando event listener para horas...');
+  
   const horasInput = document.getElementById('horasEstudio');
-  if (horasInput) {
-    horasInput.removeEventListener('input', actualizarCalculoTiempo);
-    horasInput.addEventListener('input', actualizarCalculoTiempo);
+  
+  if (!horasInput) {
+    console.error('❌ Input de horas no encontrado');
+    return;
   }
+  
+  // Remover listeners anteriores para evitar duplicados
+  horasInput.removeEventListener('input', actualizarCalculoTiempo);
+  horasInput.removeEventListener('change', actualizarCalculoTiempo);
+  
+  // Añadir nuevos listeners
+  horasInput.addEventListener('input', function() {
+    console.log('⚡ Input de horas cambiado:', this.value);
+    actualizarCalculoTiempo();
+  });
+  
+  horasInput.addEventListener('change', function() {
+    console.log('⚡ Change de horas:', this.value);
+    actualizarCalculoTiempo();
+  });
+  
+  // Validación en tiempo real
+  horasInput.addEventListener('input', function() {
+    const valor = parseFloat(this.value);
+    if (valor < 0.5) {
+      this.style.borderColor = '#dc3545';
+      this.title = 'Mínimo 0.5 horas';
+    } else if (valor > 12) {
+      this.style.borderColor = '#ffc107';
+      this.title = 'Máximo recomendado: 12 horas';
+    } else {
+      this.style.borderColor = '#28a745';
+      this.title = '';
+    }
+  });
+  
+  console.log('✅ Event listeners configurados correctamente');
 }
 
 // 46. Función para mostrar paso 2
 function mostrarPaso2() {
-  cargarConfiguracionActual();
+  console.log('🔧 Iniciando paso 2');
+  console.log('📊 Repasos del día:', window.repasosDelDia);
+  
+  // Cargar configuración actual si hay oposición activa
+  if (oposicionActiva) {
+    cargarConfiguracionActual();
+  } else {
+    // Valores por defecto si no hay configuración
+    document.getElementById('vueltaActual').textContent = '1';
+    document.getElementById('minutosPorPagina').textContent = '30';
+  }
+  
+  // Mostrar repasos en el paso 2
   mostrarRepasosEnPasoDos();
+  
+  // Establecer valor por defecto de horas si está vacío
+  const horasInput = document.getElementById('horasEstudio');
+  if (horasInput && !horasInput.value) {
+    horasInput.value = '4';
+    console.log('✅ Establecido valor por defecto: 4 horas');
+  }
+  
+  // Configurar event listener para cambios de horas
+  setupEventListenerHoras();
+  
+  // Calcular tiempo inicial
   actualizarCalculoTiempo();
+  
+  console.log('✅ Paso 2 completado');
 }
 
 // 47. Renderizar árbol con temas pre-seleccionados marcados
+// CORRECCIÓN 41: En scriptsPlanificacion.html
+// Reemplazar la función renderizarArbolConTemasPreseleccionados() existente
+
 function renderizarArbolConTemasPreseleccionados(arbolTemas, minutosPorPagina, bloquesInfo) {
   const contenedor = document.getElementById('arbolTemas');
+  
+  if (!arbolTemas || arbolTemas.length === 0) {
+    contenedor.innerHTML = '<p style="text-align: center; color: #666;">No hay temas vinculados a esta oposición</p>';
+    return;
+  }
   
   // Agrupar temas por bloque
   const temasPorBloque = agruparTemasPorBloque(arbolTemas, bloquesInfo);
@@ -1327,23 +1574,32 @@ function renderizarArbolConTemasPreseleccionados(arbolTemas, minutosPorPagina, b
     
     html += '<div style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
     
-    // Header del bloque
-    html += '<div onclick="toggleBloque(\'' + nombreBloque + '\')" style="padding: 15px; background: #f8f9fa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">';
+    // Header del bloque (colapsable)
+    html += '<div onclick="toggleBloqueCompleto(\'' + nombreBloque + '\')" style="padding: 15px; background: #f8f9fa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">';
     html += '<div>';
     html += '<h6 style="margin: 0; font-weight: bold;">' + nombreBloque;
     if (esEspecial) {
       html += ' <span style="background: #ffc107; color: #212529; padding: 2px 8px; border-radius: 3px; font-size: 11px; margin-left: 8px;">ESPECIAL</span>';
     }
     html += '</h6>';
-    html += '<small style="color: #666;">' + temasDelBloque.length + ' temas principales</small>';
+    html += '<small style="color: #666;">' + temasDelBloque.length + ' temas principales | ';
+    html += 'Límite: ' + (esEspecial ? '1 especial' : '3 normales') + '</small>';
     html += '</div>';
-    html += '<i id="icono-' + nombreBloque + '" style="transition: transform 0.3s;">▼</i>';
+    html += '<i id="icono-bloque-' + nombreBloque + '" style="transition: transform 0.3s;">▼</i>';
     html += '</div>';
     
-    // Contenido del bloque
+    // Contenido del bloque (inicialmente visible)
     html += '<div id="bloque-' + nombreBloque + '" style="padding: 15px;">';
     
-    // Renderizar cada tema del bloque
+    // NUEVA VISUALIZACIÓN: Información de reglas del bloque
+    html += '<div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 12px;">';
+    html += '<strong>📋 Reglas para este bloque:</strong><br>';
+    html += '• Solo un tema padre original por bloque<br>';
+    html += '• Orden secuencial dentro del tema padre original<br>';
+    html += '• Temas colapsados: haz clic en ▶ para expandir y ver opciones';
+    html += '</div>';
+    
+    // Renderizar cada tema del bloque con nueva visualización
     temasDelBloque.forEach(tema => {
       html += renderizarNodoTemaConPreseleccion(tema, 0, nombreBloque);
     });
@@ -1354,10 +1610,127 @@ function renderizarArbolConTemasPreseleccionados(arbolTemas, minutosPorPagina, b
   
   contenedor.innerHTML = html;
   
-  // Actualizar resumen después del renderizado
+  // Expandir automáticamente temas con selecciones después del renderizado
   setTimeout(() => {
+    expandirTemasConSelecciones();
     actualizarResumenTiempo();
   }, 100);
+}
+
+// Nueva función para colapsar bloque completo
+function toggleBloqueCompleto(nombreBloque) {
+  const contenido = document.getElementById('bloque-' + nombreBloque);
+  const icono = document.getElementById('icono-bloque-' + nombreBloque);
+  
+  if (contenido && icono) {
+    if (contenido.style.display === 'none') {
+      contenido.style.display = 'block';
+      icono.textContent = '▼';
+      console.log('📂 Bloque expandido:', nombreBloque);
+    } else {
+      contenido.style.display = 'none';
+      icono.textContent = '▶';
+      console.log('📁 Bloque colapsado:', nombreBloque);
+    }
+  }
+}
+
+// CORRECCIÓN FINAL: En scriptsPlanificacion.html
+// Reemplazar la función mostrarInformacionDeReglasActualizada() de la Corrección 41
+// Y cambiar su nombre a mostrarInformacionDeReglas()
+
+function mostrarInformacionDeReglas() {
+  const contenedorInfo = document.createElement('div');
+  contenedorInfo.id = 'informacionReglas';
+  contenedorInfo.style.cssText = `
+    background: #e3f2fd; 
+    border-left: 4px solid #2196f3; 
+    padding: 15px; 
+    margin-bottom: 20px; 
+    border-radius: 5px;
+    font-size: 14px;
+  `;
+  
+  contenedorInfo.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: start;">
+      <div style="flex: 1;">
+        <h5 style="margin: 0 0 10px 0; color: #0d47a1;">📋 Reglas de selección (CORREGIDAS)</h5>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+          <div style="background: white; padding: 10px; border-radius: 5px;">
+            <strong>📦 Límites de bloques:</strong><br>
+            • Máximo 3 bloques normales<br>
+            • + 1 bloque especial (Geografía/Callejero)
+          </div>
+          <div style="background: white; padding: 10px; border-radius: 5px;">
+            <strong>👨‍👧‍👦 Un tema padre por bloque:</strong><br>
+            • Solo temas de UN tema padre original<br>
+            • Ejemplo: Solo temas "1.x" o solo "2.x"
+          </div>
+        </div>
+        
+        <div style="background: white; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+          <strong>📊 Orden dentro del tema padre:</strong> Seguir orden del árbol (1.1 → 1.2 → 1.3)<br>
+          <strong>⏱️ Excepción por tiempo:</strong> Si tema padre no cabe → seleccionar hijos en orden
+        </div>
+        
+        <div style="background: white; padding: 10px; border-radius: 5px;">
+          <strong>👁️ Visualización:</strong><br>
+          • <span style="color: #007bff;">▶</span> = Expandir para ver opciones<br>
+          • <span style="color: #28a745;">▼</span> = Colapsar<br>
+          • Hojas (sin hijos) = checkbox directo
+        </div>
+        
+        <div style="margin-top: 10px; font-size: 12px; color: #666;">
+          💡 <strong>Advertencias:</strong> 1ª vez = no permite, 2ª vez = permite (libertad total)
+        </div>
+      </div>
+      
+      <div style="margin-left: 20px;">
+        <button onclick="mostrarDebugEstado()" style="background: #ff9800; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-bottom: 5px; display: block; width: 100%;">
+          🐛 Debug Estado
+        </button>
+        <button onclick="repararEstadoSeleccion()" style="background: #f44336; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-bottom: 5px; display: block; width: 100%;">
+          🔧 Reparar Estado
+        </button>
+        <button onclick="expandirTodosLosTemas()" style="background: #4caf50; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; display: block; width: 100%;">
+          📂 Expandir Todos
+        </button>
+      </div>
+    </div>
+  `;
+  
+  // Insertar antes del árbol de temas
+  const arbolTemas = document.getElementById('arbolTemas');
+  if (arbolTemas && !document.getElementById('informacionReglas')) {
+    arbolTemas.parentElement.insertBefore(contenedorInfo, arbolTemas);
+  }
+}
+
+// Nueva función para expandir todos los temas
+function expandirTodosLosTemas() {
+  console.log('📂 Expandiendo todos los temas...');
+  
+  // Expandir todos los bloques
+  const iconosBloque = document.querySelectorAll('[id^="icono-bloque-"]');
+  iconosBloque.forEach(icono => {
+    const nombreBloque = icono.id.replace('icono-bloque-', '');
+    const contenido = document.getElementById('bloque-' + nombreBloque);
+    if (contenido && contenido.style.display === 'none') {
+      contenido.style.display = 'block';
+      icono.textContent = '▼';
+    }
+  });
+  
+  // Expandir todos los temas
+  const iconosTema = document.querySelectorAll('[onclick^="toggleColapsarTema"]');
+  iconosTema.forEach(icono => {
+    if (icono.textContent === '▶') {
+      icono.click(); // Simular clic para expandir
+    }
+  });
+  
+  console.log('✅ Todos los temas expandidos');
 }
 
 // 48. Forzar renderizado inicial del calendario
@@ -1494,6 +1867,9 @@ function limpiarDetalleDia() {
 }
 
 // Abrir modal de nueva planificación
+// CORRECCIÓN 22: En scriptsPlanificacion.html
+// Reemplazar la función nuevaPlanificacion() existente
+
 function nuevaPlanificacion() {
   // Validar que hay un día seleccionado
   if (!diaSeleccionado) {
@@ -1518,23 +1894,36 @@ function nuevaPlanificacion() {
   tiempoUsado = 0;
   bloquesActivos = [];
   
-  // Establecer fecha seleccionada
-  const fechaStr = fechaSeleccionada.getFullYear() + '-' + 
-    String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(fechaSeleccionada.getDate()).padStart(2, '0');
-  document.getElementById('fechaPlanificacion').value = fechaStr;
+  // 🔄 NUEVO: Resetear advertencias para empezar limpio
+  resetearAdvertencias();
+  
+  // Limpiar modo comparación si existe
+  window.modoCreacionPlanificacion = 'normal';
+  window.temasParaPlanificar = null;
   
   // Mostrar modal
   document.getElementById('modalNuevaPlanificacion').style.display = 'flex';
   
-  // Cargar oposiciones
-  //cargarOposiciones();
-  
   // Mostrar paso 1
   mostrarPaso(1);
   
-  // Verificar repasos del día seleccionado
-  verificarRepasosDelDia();
+  // ✅ Establecer fecha automáticamente DESPUÉS de mostrar el paso
+  setTimeout(function() {
+    const fechaStr = fechaSeleccionada.getFullYear() + '-' + 
+      String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(fechaSeleccionada.getDate()).padStart(2, '0');
+    
+    const inputFecha = document.getElementById('fechaPlanificacion');
+    if (inputFecha) {
+      inputFecha.value = fechaStr;
+      console.log('✅ Fecha establecida automáticamente:', fechaStr);
+      
+      // Verificar repasos después de establecer la fecha
+      verificarRepasosDelDia();
+    } else {
+      console.error('❌ No se encontró el input de fecha');
+    }
+  }, 200); // Dar tiempo para que se renderice el paso 1
 }
 
 // Cerrar modal
@@ -1543,7 +1932,20 @@ function cerrarModal() {
 }
 
 // Mostrar paso específico
+// CORRECCIÓN 10: En scriptsPlanificacion.html
+// Reemplazar la función mostrarPaso() existente
+
 function mostrarPaso(numeroPaso) {
+  console.log('📍 Mostrando paso:', numeroPaso);
+  
+  // GUARDAR fecha actual antes de cambiar de paso
+  let fechaGuardada = null;
+  const fechaInput = document.getElementById('fechaPlanificacion');
+  if (fechaInput && fechaInput.value) {
+    fechaGuardada = fechaInput.value;
+    console.log('💾 Fecha guardada:', fechaGuardada);
+  }
+  
   pasoActual = numeroPaso;
   
   // Ocultar todos los pasos
@@ -1563,25 +1965,64 @@ function mostrarPaso(numeroPaso) {
   
   // Acciones específicas por paso
   if (numeroPaso === 1) {
-    mostrarPaso1(); // ← AÑADIR ESTA LÍNEA
+    mostrarPaso1(); 
+    
+    // ✅ RESTAURAR fecha después de renderizar
+    setTimeout(function() {
+      const nuevaFechaInput = document.getElementById('fechaPlanificacion');
+      if (nuevaFechaInput && fechaGuardada) {
+        nuevaFechaInput.value = fechaGuardada;
+        console.log('🔄 Fecha restaurada:', fechaGuardada);
+        
+        // Verificar repasos de la fecha restaurada
+        verificarRepasosDelDia();
+      }
+    }, 100);
+    
   } else if (numeroPaso === 2) {
-    mostrarPaso2(); // Usar función específica
-    setupEventListenerHoras(); // Configurar listeners
+    mostrarPaso2();
+    setupEventListenerHoras();
+    
   } else if (numeroPaso === 3) {
-  // Obtener tiempo real disponible del paso 2 (ya calculado correctamente)
-  const tiempoRealParaTemas = window.tiempoRealParaTemas || 0;
-  
-  // Actualizar variables globales para el árbol
-  tiempoTotalDisponible = tiempoRealParaTemas; // ← CORRECTO
+    console.log('📍 Iniciando paso 3 con reglas correctas y visualización colapsada');
+    
+    // Obtener tiempo real disponible del paso 2
+    const tiempoRealParaTemas = window.tiempoRealParaTemas || 0;
+    tiempoTotalDisponible = tiempoRealParaTemas;
+    
+    console.log('⏱️ Tiempo disponible para paso 3:', tiempoTotalDisponible, 'min');
+    
     // Pre-cargar temas de comparación si existen
     if (window.temasParaPlanificar && window.temasParaPlanificar.temas) {
+      console.log('🔄 Pre-cargando temas de comparación...');
       precargarTemasDeComparacion();
     }
     
-    cargarArbolTemasCorregido();  // ← NUEVA FUNCIÓN
-    actualizarResumenTiempo();
-    }
-
+    // Cargar árbol de temas con nueva visualización
+    cargarArbolTemasCorregido();
+    
+    // Mostrar información de reglas actualizada y configurar visualización
+    setTimeout(() => {
+      console.log('🎨 Configurando interfaz del paso 3...');
+      
+      // Mostrar información de reglas actualizada
+      mostrarInformacionDeReglas();
+      
+      // Expandir automáticamente temas con selecciones previas
+      if (temasSeleccionados.length > 0) {
+        expandirTemasConSelecciones();
+        console.log('📂 Temas con selecciones previas expandidos');
+      }
+      
+      // Actualizar resumen de tiempo
+      actualizarResumenTiempo();
+      
+      // Verificar estado automáticamente
+      verificarEstadoAutomaticamente();
+      
+      console.log('✅ Paso 3 configurado correctamente');
+    }, 500);
+  }
 }
 
 // Actualizar indicadores de pasos
@@ -1669,9 +2110,13 @@ function cargarOposiciones() {
 }
 
 // Verificar repasos del día con indicador de carga
+// CORRECCIÓN 3: En scriptsPlanificacion.html
+// Reemplazar la función verificarRepasosDelDia() existente
+
 function verificarRepasosDelDia() {
   const fechaInput = document.getElementById('fechaPlanificacion');
   if (!fechaInput || !fechaInput.value) {
+    console.log('❌ No hay fecha seleccionada');
     const alertaDiv = document.getElementById('alertaRepasos');
     if (alertaDiv) alertaDiv.style.display = 'none';
     return;
@@ -1680,55 +2125,484 @@ function verificarRepasosDelDia() {
   const fecha = fechaInput.value;
   const fechaMs = new Date(fecha + 'T00:00:00').getTime();
   
+  console.log('🔍 Verificando repasos para fecha:', fecha);
+  console.log('🔍 Fecha en ms:', fechaMs);
+  
+  // Mostrar loading en el contenedor de repasos
+  const alertaDiv = document.getElementById('alertaRepasos');
+  const listaDiv = document.getElementById('listaRepasos');
+  
+  if (alertaDiv && listaDiv) {
+    alertaDiv.style.display = 'block';
+    listaDiv.innerHTML = '<p style="margin: 0;"><i class="fas fa-spinner fa-spin"></i> Verificando repasos...</p>';
+  }
+  
   google.script.run
     .withSuccessHandler(function(repasos) {
-      const alertaDiv = document.getElementById('alertaRepasos');
-      const listaDiv = document.getElementById('listaRepasos');
+      console.log('✅ Repasos recibidos:', repasos);
       
-      if (!alertaDiv || !listaDiv) return; // Elementos no existen
+      // Guardar repasos globalmente
+      window.repasosDelDia = repasos || [];
       
-      if (repasos && repasos.length > 0) {
-        // Mostrar repasos...
-        window.repasosDelDia = repasos;
-        alertaDiv.style.display = 'block';
-      } else {
-        alertaDiv.style.display = 'none';
-        window.repasosDelDia = [];
+      if (!alertaDiv || !listaDiv) {
+        console.error('❌ Elementos de repasos no encontrados');
+        return;
       }
       
-      const btnSiguiente = document.getElementById('btnSiguientePaso');
+      if (repasos && repasos.length > 0) {
+        // Mostrar repasos encontrados
+        let html = '';
+        let tiempoTotal = 0;
+        
+        repasos.forEach(function(repaso) {
+          html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #ffeaa7;">';
+          html += '<div><strong>R' + repaso.numeroRepaso + ':</strong> ' + repaso.nombreTema + '</div>';
+          html += '<div style="color: #856404; font-size: 12px;">' + (repaso.tiempoEstimado || 30) + ' min</div>';
+          html += '</div>';
+          tiempoTotal += (repaso.tiempoEstimado || 30);
+        });
+        
+        html += '<div style="text-align: right; margin-top: 10px; font-weight: bold; color: #856404;">';
+        html += 'Total repasos: ' + tiempoTotal + ' minutos (' + Math.round(tiempoTotal / 60 * 10) / 10 + ' horas)';
+        html += '</div>';
+        
+        listaDiv.innerHTML = html;
+        alertaDiv.style.display = 'block';
+        
+        console.log('✅ Repasos mostrados:', repasos.length, 'repasos,', tiempoTotal, 'minutos');
+      } else {
+        // No hay repasos
+        alertaDiv.style.display = 'none';
+        console.log('✅ No hay repasos para este día');
+      }
+      
+      // Habilitar botón siguiente
+      const btnSiguiente = document.getElementById('btnSiguiente');
       if (btnSiguiente) btnSiguiente.disabled = false;
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar repasos:', error);
+      console.error('❌ Error al cargar repasos:', error);
       window.repasosDelDia = [];
-      const btnSiguiente = document.getElementById('btnSiguientePaso');
+      
+      if (alertaDiv && listaDiv) {
+        listaDiv.innerHTML = '<p style="margin: 0; color: red;">Error al cargar repasos: ' + error.message + '</p>';
+        alertaDiv.style.display = 'block';
+      }
+      
+      // Habilitar botón siguiente aunque haya error
+      const btnSiguiente = document.getElementById('btnSiguiente');
       if (btnSiguiente) btnSiguiente.disabled = false;
     })
     .getRepasosDelDia(fechaMs);
 }
 
+// CORRECCIÓN 37: En scriptsPlanificacion.html
+// Reemplazar la función validarSeleccionTema() existente
+
+function validarSeleccionTema(tiempoMinutos, nombreBloque) {
+  console.log('⏱️ Validando límites para:', tiempoMinutos, 'min en bloque', nombreBloque);
+  console.log('📊 Tiempo actual usado:', tiempoUsado, '/ Disponible:', tiempoTotalDisponible);
+  
+  // VALIDACIÓN 1: Verificar tiempo disponible (restrictiva)
+  if (tiempoUsado + tiempoMinutos > tiempoTotalDisponible) {
+    const exceso = (tiempoUsado + tiempoMinutos - tiempoTotalDisponible);
+    return {
+      valido: false,
+      mensaje: 'Excede el tiempo disponible 🕒\n\n' +
+               'Tiempo disponible: ' + formatearTiempo(tiempoTotalDisponible) + '\n' +
+               'Ya usado: ' + formatearTiempo(tiempoUsado) + '\n' +
+               'Este tema: ' + formatearTiempo(tiempoMinutos) + '\n' +
+               'Exceso: ' + formatearTiempo(exceso) + '\n\n' +
+               '💡 Soluciones:\n' +
+               '• Aumenta las horas de estudio en el Paso 2\n' +
+               '• Selecciona menos temas o más cortos\n' +
+               '• Revisa si hay repasos que reduzcan el tiempo'
+    };
+  }
+  
+  // VALIDACIÓN 2: Verificar límites de bloques (con advertencias)
+  if (!bloquesActivos.includes(nombreBloque)) {
+    const esEspecial = esBloqueBloqueEspecial(nombreBloque);
+    const bloquesNormales = bloquesActivos.filter(b => !esBloqueBloqueEspecial(b));
+    const bloquesEspeciales = bloquesActivos.filter(b => esBloqueBloqueEspecial(b));
+    
+    console.log('📊 Análisis de bloques:', {
+      normales: bloquesNormales,
+      especiales: bloquesEspeciales,
+      nuevoEsEspecial: esEspecial,
+      totalActual: bloquesActivos.length
+    });
+    
+    // REGLA CORRECTA: Máximo 3 normales + 1 especial
+    let mensajeAdvertencia = '';
+    let claveAdvertencia = '';
+    let debeAdvertir = false;
+    
+    if (!esEspecial && bloquesNormales.length >= 3) {
+      mensajeAdvertencia = 'Límite de bloques normales alcanzado 📚\n\n' +
+                          'Ya tienes 3 bloques normales (límite máximo):\n' +
+                          bloquesNormales.join(', ') + '\n\n' +
+                          'Nuevo bloque: ' + nombreBloque + '\n\n' +
+                          'Solo puedes tener 3 bloques normales por día.\n' +
+                          'Puedes añadir 1 bloque especial (Geografía/Callejero) adicional.';
+      claveAdvertencia = `limite_bloques_normales_${nombreBloque}`;
+      debeAdvertir = true;
+      
+    } else if (esEspecial && bloquesEspeciales.length >= 1) {
+      mensajeAdvertencia = 'Límite de bloques especiales alcanzado 🎯\n\n' +
+                          'Ya tienes 1 bloque especial (límite máximo):\n' +
+                          bloquesEspeciales.join(', ') + '\n\n' +
+                          'Nuevo bloque: ' + nombreBloque + '\n\n' +
+                          'Solo puedes tener 1 bloque especial (Geografía/Callejero) por día.';
+      claveAdvertencia = `limite_bloques_especiales_${nombreBloque}`;
+      debeAdvertir = true;
+      
+    } else if (bloquesActivos.length >= 4) {
+      mensajeAdvertencia = 'Límite total de bloques alcanzado 🧠\n\n' +
+                          'Ya tienes 4 bloques (límite máximo del sistema):\n' +
+                          bloquesActivos.join(', ') + '\n\n' +
+                          'Nuevo bloque: ' + nombreBloque + '\n\n' +
+                          'Límite: 3 bloques normales + 1 especial = 4 total máximo.';
+      claveAdvertencia = `limite_bloques_totales_${nombreBloque}`;
+      debeAdvertir = true;
+    }
+    
+    if (debeAdvertir) {
+      // Usar sistema de advertencias de dos niveles
+      const permitido = manejarAdvertenciaConDobleNivel('bloques', claveAdvertencia, mensajeAdvertencia);
+      
+      if (!permitido) {
+        return {
+          valido: false,
+          mensaje: 'Límite de bloques - primera advertencia mostrada'
+        };
+      }
+      // Si permitido = true, continuar
+    }
+  }
+  
+  console.log('✅ Validaciones de límites de bloques pasadas');
+  return { valido: true };
+}
+
+// CORRECCIÓN 33: En scriptsPlanificacion.html
+// Reemplazar la función seleccionarHijosAutomaticamente() existente
+
+function seleccionarHijosAutomaticamente(idTemaPadre, nombreBloque) {
+  console.log('🔄 Seleccionando hijos automáticamente para tema padre:', idTemaPadre);
+  
+  // Encontrar el nodo del tema padre
+  const nodoTemaPadre = encontrarNodoEnArbolCompleto(idTemaPadre, window.arbolCompletoGlobal);
+  if (!nodoTemaPadre || !nodoTemaPadre.hijos || nodoTemaPadre.hijos.length === 0) {
+    console.log('❌ No es tema padre o no tiene hijos');
+    return [];
+  }
+  
+  // Recopilar todos los hijos (incluyendo nietos, bisnietos, etc.)
+  const todosLosHijos = obtenerTodosLosDescendientes(nodoTemaPadre, window.arbolCompletoGlobal);
+  
+  console.log('👶 Hijos encontrados:', todosLosHijos.map(h => h.nombreCompleto));
+  
+  // Marcar checkboxes de todos los hijos en la interfaz
+  const hijosSeleccionados = [];
+  
+  todosLosHijos.forEach(hijo => {
+    // CORRECCIÓN: Buscar checkbox usando método más robusto
+    const checkboxEncontrado = encontrarCheckboxPorIdTema(hijo.id);
+    
+    if (checkboxEncontrado) {
+      // Marcar como seleccionado
+      checkboxEncontrado.checked = true;
+      checkboxEncontrado.disabled = true; // Deshabilitar porque se seleccionó automáticamente
+      
+      // Añadir estilo visual para indicar que es automático
+      const contenedor = checkboxEncontrado.closest('div[style*="padding"]');
+      if (contenedor) {
+        contenedor.style.opacity = '0.7';
+        contenedor.style.backgroundColor = '#e3f2fd';
+        
+        // Remover badges anteriores para evitar duplicados
+        const badgesAnteriores = contenedor.querySelectorAll('.badge-auto');
+        badgesAnteriores.forEach(badge => badge.remove());
+        
+        // Añadir badge "AUTO"
+        const badge = document.createElement('span');
+        badge.className = 'badge-auto';
+        badge.textContent = 'AUTO';
+        badge.style.cssText = 'background: #2196f3; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 10px;';
+        checkboxEncontrado.parentElement.appendChild(badge);
+      }
+      
+      hijosSeleccionados.push({
+        id: hijo.id,
+        tiempo: 0, // Tiempo 0 porque se cuenta en el padre
+        bloque: nombreBloque,
+        tipo: 'hijo_automatico',
+        padreId: idTemaPadre
+      });
+      
+      console.log('✅ Hijo marcado automáticamente:', hijo.nombreCompleto);
+    } else {
+      console.warn('⚠️ No se encontró checkbox para hijo:', hijo.nombreCompleto, 'ID:', hijo.id);
+    }
+  });
+  
+  console.log('🔄 Total hijos seleccionados automáticamente:', hijosSeleccionados.length);
+  return hijosSeleccionados;
+}
+
+// Función auxiliar mejorada para encontrar checkbox por ID de tema
+function encontrarCheckboxPorIdTema(idTema) {
+  console.log('🔍 Buscando checkbox para tema ID:', idTema);
+  
+  // Buscar TODOS los checkboxes en la página
+  const todosLosCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+  
+  for (let checkbox of todosLosCheckboxes) {
+    // Extraer ID del tema del atributo onchange
+    const onchangeAttr = checkbox.getAttribute('onchange');
+    if (onchangeAttr) {
+      // Buscar número en la función onchange: toggleSeleccionTemaConValidacion(this, 123, ...)
+      const match = onchangeAttr.match(/toggleSeleccionTemaConValidacion\(this,\s*(\d+)/);
+      if (match) {
+        const idTemaCheckbox = parseInt(match[1]);
+        
+        if (idTemaCheckbox === idTema) {
+          console.log('✅ Checkbox encontrado para tema:', idTema);
+          return checkbox;
+        }
+      }
+    }
+  }
+  
+  console.warn('❌ Checkbox no encontrado para tema:', idTema);
+  return null;
+}
+
+// CORRECCIÓN 31: En scriptsPlanificacion.html
+// Reemplazar la función desmarcarHijosAutomaticos() existente
+
+function desmarcarHijosAutomaticos(idTemaPadre) {
+  console.log('🔄 Desmarcando hijos automáticos del tema padre:', idTemaPadre);
+  
+  // Encontrar y remover temas hijos automáticos de la lista
+  const temasARemover = temasSeleccionados.filter(tema => 
+    tema.tipo === 'hijo_automatico' && tema.padreId === idTemaPadre
+  );
+  
+  console.log('❌ Temas hijos a remover:', temasARemover);
+  
+  temasARemover.forEach(tema => {
+    // Remover de la lista global
+    const index = temasSeleccionados.findIndex(t => t.id === tema.id);
+    if (index > -1) {
+      temasSeleccionados.splice(index, 1);
+      console.log('❌ Removido de lista:', tema.id);
+    }
+    
+    // CORRECCIÓN: Desmarcar checkbox correctamente en la interfaz
+    limpiarEstadoVisualDeTema(tema.id);
+  });
+  
+  console.log('✅ Hijos automáticos desmarcados completamente');
+}
+
+// Nueva función para limpiar estado visual de un tema específico
+function limpiarEstadoVisualDeTema(idTema) {
+  console.log('🧹 Limpiando estado visual del tema:', idTema);
+  
+  // Buscar TODOS los checkboxes en la página
+  const todosLosCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+  
+  todosLosCheckboxes.forEach(checkbox => {
+    // Extraer ID del tema del atributo onchange
+    const onchangeAttr = checkbox.getAttribute('onchange');
+    if (onchangeAttr) {
+      // Buscar número en la función onchange: toggleSeleccionTemaConValidacion(this, 123, ...)
+      const match = onchangeAttr.match(/toggleSeleccionTemaConValidacion\(this,\s*(\d+)/);
+      if (match) {
+        const idTemaCheckbox = parseInt(match[1]);
+        
+        if (idTemaCheckbox === idTema) {
+          console.log('🎯 Encontrado checkbox para tema:', idTema);
+          
+          // Desmarcar checkbox
+          checkbox.checked = false;
+          checkbox.disabled = false;
+          
+          // Encontrar el contenedor del tema
+          const contenedor = checkbox.closest('div[style*="padding"]');
+          if (contenedor) {
+            // Restaurar estilo normal
+            contenedor.style.opacity = '';
+            contenedor.style.backgroundColor = '';
+            
+            // Remover TODOS los badges (AUTO, PRE-SEL, progreso, etc.)
+            const badges = contenedor.querySelectorAll('span[style*="background"]');
+            badges.forEach(badge => {
+              // Solo remover badges que no sean esenciales (como estado del tema)
+              const textoDelBadge = badge.textContent;
+              if (textoDelBadge.includes('AUTO') || 
+                  textoDelBadge.includes('PRE-SEL') || 
+                  textoDelBadge.includes('seleccionados')) {
+                badge.remove();
+                console.log('🗑️ Badge removido:', textoDelBadge);
+              }
+            });
+          }
+          
+          console.log('✅ Estado visual limpiado para tema:', idTema);
+          return; // Salir del loop una vez encontrado
+        }
+      }
+    }
+  });
+}
+
+// Nueva función para limpiar completamente el estado visual de un tema padre
+function limpiarEstadoVisualTemaPadre(idTemaPadre) {
+  console.log('🧹 Limpiando estado visual del tema padre:', idTemaPadre);
+  
+  // Limpiar el tema padre principal
+  limpiarEstadoVisualDeTema(idTemaPadre);
+  
+  // Obtener todos los hijos del tema padre
+  const nodoTemaPadre = encontrarNodoEnArbolCompleto(idTemaPadre, window.arbolCompletoGlobal);
+  if (nodoTemaPadre) {
+    const todosLosHijos = obtenerTodosLosDescendientes(nodoTemaPadre, window.arbolCompletoGlobal);
+    
+    console.log('👶 Limpiando hijos del tema padre:', todosLosHijos.length);
+    
+    // Limpiar estado visual de todos los hijos
+    todosLosHijos.forEach(hijo => {
+      limpiarEstadoVisualDeTema(hijo.id);
+    });
+  }
+  
+  console.log('✅ Estado visual del tema padre y todos sus hijos limpiado');
+}
+
+// Función auxiliar para encontrar nodo en árbol completo
+function encontrarNodoEnArbolCompleto(idTema, arbol) {
+  for (let nodo of arbol) {
+    if (nodo.id === idTema) {
+      return nodo;
+    }
+    if (nodo.hijos && nodo.hijos.length > 0) {
+      const encontrado = encontrarNodoEnArbolCompleto(idTema, nodo.hijos);
+      if (encontrado) return encontrado;
+    }
+  }
+  return null;
+}
+
+// Función auxiliar para obtener el tema padre real (no el abuelo)
+function obtenerTemaPadreReal(nodo, arbolCompleto) {
+  // Buscar recursivamente el padre directo
+  function buscarPadre(arbol, idBuscado) {
+    for (let tema of arbol) {
+      if (tema.hijos && tema.hijos.length > 0) {
+        // Si es hijo directo, devolver este tema como padre
+        if (tema.hijos.some(hijo => hijo.id === idBuscado)) {
+          return tema;
+        }
+        // Buscar recursivamente en los hijos
+        const padreEncontrado = buscarPadre(tema.hijos, idBuscado);
+        if (padreEncontrado) return padreEncontrado;
+      }
+    }
+    return null;
+  }
+  
+  return buscarPadre(arbolCompleto, nodo.id);
+}
+
+// Función auxiliar para obtener todos los hijos de un tema padre
+function obtenerTodosLosHijos(temaPadre, arbolCompleto) {
+  if (!temaPadre || !temaPadre.hijos) return [];
+  
+  const todosLosHijos = [];
+  
+  function recopilarHijos(nodos) {
+    nodos.forEach(nodo => {
+      if (nodo.esHoja) {
+        todosLosHijos.push(nodo);
+      }
+      if (nodo.hijos && nodo.hijos.length > 0) {
+        recopilarHijos(nodo.hijos);
+      }
+    });
+  }
+  
+  recopilarHijos(temaPadre.hijos);
+  return todosLosHijos;
+}
+
 // Cargar configuración actual (conectado al backend)
 function cargarConfiguracionActual() {
-  const idOposicion = document.getElementById('oposicionPlanificacion').value;
-  if (!idOposicion) return;
+  console.log('⚙️ Cargando configuración actual...');
+  
+  if (!oposicionActiva || !oposicionActiva.id) {
+    console.error('❌ No hay oposición activa');
+    // Valores por defecto
+    const elementoVuelta = document.getElementById('vueltaActual');
+    const elementoMinutos = document.getElementById('minutosPorPagina');
+    
+    if (elementoVuelta) elementoVuelta.textContent = '1';
+    if (elementoMinutos) elementoMinutos.textContent = '30';
+    
+    configuracionActual = {
+      vueltaActual: 1,
+      minPorPagV1: 30,
+      minPorPagV2: 20,
+      minPorPagV3: 15,
+      minPorPagV4: 10
+    };
+    return;
+  }
+  
+  console.log('🔍 Obteniendo configuración para oposición:', oposicionActiva.id);
   
   google.script.run
     .withSuccessHandler(function(config) {
+      console.log('✅ Configuración recibida:', config);
+      
       configuracionActual = config;
       
-      document.getElementById('vueltaActual').textContent = config.vueltaActual;
+      // Actualizar interfaz
+      const elementoVuelta = document.getElementById('vueltaActual');
+      const elementoMinutos = document.getElementById('minutosPorPagina');
       
-      const minutosPorPagina = getMinutosPorPaginaLocal(config);
-      document.getElementById('minutosPorPagina').textContent = minutosPorPagina;
+      if (elementoVuelta) {
+        elementoVuelta.textContent = config.vueltaActual || '1';
+      }
+      
+      if (elementoMinutos) {
+        const minutosPorPagina = getMinutosPorPaginaLocal(config);
+        elementoMinutos.textContent = minutosPorPagina;
+      }
+      
+      console.log('✅ Configuración aplicada a la interfaz');
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar configuración:', error);
-      // Valores por defecto
-      document.getElementById('vueltaActual').textContent = '1';
-      document.getElementById('minutosPorPagina').textContent = '30';
+      console.error('❌ Error al cargar configuración:', error);
+      
+      // Valores por defecto en caso de error
+      const elementoVuelta = document.getElementById('vueltaActual');
+      const elementoMinutos = document.getElementById('minutosPorPagina');
+      
+      if (elementoVuelta) elementoVuelta.textContent = '1';
+      if (elementoMinutos) elementoMinutos.textContent = '30';
+      
+      configuracionActual = {
+        vueltaActual: 1,
+        minPorPagV1: 30,
+        minPorPagV2: 20,
+        minPorPagV3: 15,
+        minPorPagV4: 10
+      };
     })
-    .getConfiguracionOposicion(idOposicion);
+    .getConfiguracionOposicion(oposicionActiva.id);
 }
 
 // Función auxiliar para calcular minutos por página localmente
@@ -1747,39 +2621,51 @@ function actualizarTiempoDisponible() {
 
 // Mostrar repasos en el paso 2
 function mostrarRepasosEnPasoDos() {
+  console.log('📚 Mostrando repasos en paso 2...');
+  
   const infoDiv = document.getElementById('infoRepasosStepDos');
   const detalleDiv = document.getElementById('detalleRepasosStepDos');
   
-  if (window.repasosDelDia && window.repasosDelDia.length > 0) {
-    const tiempoRepasos = window.repasosDelDia.length * 30;
+  // Verificar que existen los elementos
+  if (!infoDiv || !detalleDiv) {
+    console.error('❌ Elementos de repasos no encontrados en paso 2');
+    return;
+  }
+  
+  const repasos = window.repasosDelDia || [];
+  console.log('📊 Repasos a mostrar:', repasos);
+  
+  if (repasos.length > 0) {
+    const tiempoRepasos = repasos.length * 30; // 30 min por repaso
     
     let html = '<div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">';
     html += '<div>';
     html += '<ul style="margin: 0; padding-left: 20px;">';
-    window.repasosDelDia.forEach(function(repaso) {
-      html += '<li>' + repaso.nombreTema + ' <span style="color: #856404;">(30 min)</span></li>';
+    
+    repasos.forEach(function(repaso) {
+      html += '<li><strong>R' + (repaso.numeroRepaso || '?') + ':</strong> ' + 
+              (repaso.nombreTema || 'Tema desconocido') + 
+              ' <span style="color: #856404;">(30 min)</span></li>';
     });
+    
     html += '</ul>';
     html += '</div>';
     html += '<div style="text-align: center; background: #ffc107; color: white; padding: 10px; border-radius: 5px; min-width: 80px;">';
     html += '<div style="font-size: 20px; font-weight: bold;">' + tiempoRepasos + ' min</div>';
-    html += '<div style="font-size: 12px;">Total</div>';
+    html += '<div style="font-size: 12px;">Total repasos</div>';
     html += '</div>';
     html += '</div>';
     
     detalleDiv.innerHTML = html;
     infoDiv.style.display = 'block';
     
-    // Actualizar el cálculo de tiempo
-    document.getElementById('tiempoRepasos').textContent = tiempoRepasos + ' min';
-    actualizarTiempoDisponible();
+    console.log('✅ Repasos mostrados en paso 2:', repasos.length, 'repasos,', tiempoRepasos, 'min');
+    
   } else {
+    // No hay repasos
     infoDiv.style.display = 'none';
-    document.getElementById('tiempoRepasos').textContent = '0 min';
-    actualizarTiempoDisponible();
+    console.log('✅ No hay repasos - ocultando sección');
   }
-    // Actualizar el cálculo de tiempo después de mostrar repasos
-  actualizarCalculoTiempo();
 }
 
 // Cargar árbol de temas (CORREGIDO - tiempo estudio MENOS repasos)
@@ -1957,30 +2843,127 @@ function renderizarNodoTema(nodo, nivel, nombreBloque) {
   return html;
 }
 
-// Toggle selección con validación de orden (FUNCIÓN COMPLETA)
-function toggleSeleccionTemaConValidacion(checkbox, idTema, tiempoMinutos, nombreBloque, tipoSeleccion) {
-  if (checkbox.checked) {
-    // Validar orden consecutivo
-    const nodoSeleccionado = { id: idTema };
-    const validacionOrden = validarOrdenConsecutivo(nodoSeleccionado, window.arbolCompletoGlobal);
-    
-    if (!validacionOrden.esConsecutivo) {
-      const confirmar = confirm('⚠️ ' + validacionOrden.mensaje + '\n\n¿Quieres continuar seleccionando este tema?');
-      if (!confirmar) {
-        checkbox.checked = false;
-        return;
+// CORRECCIÓN 38: En scriptsPlanificacion.html
+// Reemplazar la función validarSeleccionTemaConReglasPadre() existente
+
+function validarSeleccionTemaConReglasPadre(idTema, nombreBloque) {
+  console.log('🔍 Validando tema padre original por bloque:', idTema, 'en bloque:', nombreBloque);
+  
+  // Encontrar el nodo del tema seleccionado
+  const nodoTema = encontrarNodoEnArbolCompleto(idTema, window.arbolCompletoGlobal);
+  if (!nodoTema) {
+    return { valido: true };
+  }
+  
+  // Obtener el tema padre original del tema seleccionado
+  const temaPadreOriginalNuevo = obtenerTemaPadreOriginal(nodoTema, window.arbolCompletoGlobal);
+  console.log('👨‍👧‍👦 Tema padre original del nuevo tema:', temaPadreOriginalNuevo.nombreCompleto);
+  
+  // Si no hay temas seleccionados, permitir libre elección
+  if (temasSeleccionados.length === 0) {
+    console.log('✅ Primer tema - libre elección');
+    return { valido: true };
+  }
+  
+  // Obtener temas del MISMO BLOQUE
+  const temasDelMismoBloque = temasSeleccionados.filter(t => t.bloque === nombreBloque);
+  
+  // Si no hay temas del mismo bloque, permitir (es de bloque diferente)
+  if (temasDelMismoBloque.length === 0) {
+    console.log('✅ Bloque diferente - libre elección');
+    return { valido: true };
+  }
+  
+  // REGLA CLAVE: Obtener el tema padre original YA ESTABLECIDO para este bloque
+  let temaPadreOriginalDelBloque = null;
+  
+  for (const temaDelBloque of temasDelMismoBloque) {
+    const nodoExistente = encontrarNodoEnArbolCompleto(temaDelBloque.id, window.arbolCompletoGlobal);
+    if (nodoExistente) {
+      const temaPadreOriginalExistente = obtenerTemaPadreOriginal(nodoExistente, window.arbolCompletoGlobal);
+      
+      if (!temaPadreOriginalDelBloque) {
+        temaPadreOriginalDelBloque = temaPadreOriginalExistente;
+      } else if (temaPadreOriginalDelBloque.id !== temaPadreOriginalExistente.id) {
+        // ¡PROBLEMA! Ya hay temas de diferentes temas padre originales en el mismo bloque
+        console.error('❌ INCONSISTENCIA: Diferentes temas padre originales en el mismo bloque');
       }
     }
+  }
+  
+  console.log('📋 Tema padre original establecido para bloque "' + nombreBloque + '":', 
+             temaPadreOriginalDelBloque ? temaPadreOriginalDelBloque.nombreCompleto : 'Ninguno');
+  
+  // VALIDACIÓN: El nuevo tema debe pertenecer al mismo tema padre original del bloque
+  if (temaPadreOriginalDelBloque && temaPadreOriginalNuevo.id !== temaPadreOriginalDelBloque.id) {
+    const mensaje = 'Un tema padre original por bloque 📦\n\n' +
+                   'Bloque: "' + nombreBloque + '"\n' +
+                   'Tema padre original establecido: "' + temaPadreOriginalDelBloque.nombreCompleto + '"\n' +
+                   'Tema padre original del nuevo tema: "' + temaPadreOriginalNuevo.nombreCompleto + '"\n\n' +
+                   'Solo puedes tener temas de UN tema padre original por bloque.\n' +
+                   'Esto mantiene la coherencia y el orden del estudio.\n\n' +
+                   '¿Quieres seleccionar el tema de todas formas?';
     
-    // Validar límites normales
-    const validacion = validarSeleccionTema(tiempoMinutos, nombreBloque);
-    if (!validacion.valido) {
+    // Usar sistema de advertencias de dos niveles
+    const claveAdvertencia = `tema_padre_bloque_${nombreBloque}_${temaPadreOriginalDelBloque.id}_vs_${temaPadreOriginalNuevo.id}`;
+    const permitido = manejarAdvertenciaConDobleNivel('bloques', claveAdvertencia, mensaje, idTema);
+    
+    return {
+      valido: permitido,
+      mensaje: permitido ? '' : 'Advertencia de tema padre por bloque mostrada',
+      requiereAdvertencia: true
+    };
+  }
+  
+  console.log('✅ Tema padre original válido para el bloque');
+  return { valido: true };
+}
+
+
+// Toggle selección con validación de orden (FUNCIÓN COMPLETA)
+// CORRECCIÓN 42: En scriptsPlanificacion.html
+// Reemplazar la función toggleSeleccionTemaConValidacion() existente
+
+function toggleSeleccionTemaConValidacion(checkbox, idTema, tiempoMinutos, nombreBloque, tipoSeleccion) {
+  console.log('🎯 Toggle selección tema:', idTema, tiempoMinutos + 'min', nombreBloque, tipoSeleccion);
+  
+  if (checkbox.checked) {
+    // ===== VALIDACIONES PARA SELECCIÓN =====
+    
+    // VALIDACIÓN 1: Límites de tiempo (restrictiva - no se puede sobrepasar)
+    const validacionLimites = validarSeleccionTema(tiempoMinutos, nombreBloque);
+    if (!validacionLimites.valido) {
       checkbox.checked = false;
-      alert('⚠️ ' + validacion.mensaje);
+      alert('⚠️ ' + validacionLimites.mensaje);
       return;
     }
     
-    // Agregar tema
+    // VALIDACIÓN 2: Un tema padre original por bloque (con advertencias de dos niveles)
+    const validacionTemaPadre = validarSeleccionTemaConReglasPadre(idTema, nombreBloque);
+    if (!validacionTemaPadre.valido) {
+      checkbox.checked = false;
+      return; // Ya manejado con sistema de advertencias
+    }
+    
+    // VALIDACIÓN 3: Orden dentro del tema padre original (con advertencias de dos niveles)
+    const nodoSeleccionado = { id: idTema };
+    const validacionOrden = validarOrdenConsecutivo(nodoSeleccionado, window.arbolCompletoGlobal);
+    
+    if (!validacionOrden.esConsecutivo && validacionOrden.requiereAdvertencia) {
+      const claveAdvertencia = `orden_tema_padre_${validacionOrden.temaPadreOriginal}_tema_${idTema}`;
+      const permitidoPorOrden = manejarAdvertenciaConDobleNivel('orden', claveAdvertencia, validacionOrden.mensaje, idTema);
+      
+      if (!permitidoPorOrden) {
+        checkbox.checked = false;
+        return; // Primera advertencia - no permitir
+      }
+      // Segunda advertencia o más - continuar con la selección
+    }
+    
+    // ✅ TODAS LAS VALIDACIONES PASADAS - Proceder con la selección
+    console.log('✅ Todas las validaciones pasadas - añadiendo tema');
+    
+    // Agregar tema a la lista
     temasSeleccionados.push({
       id: idTema,
       tiempo: tiempoMinutos,
@@ -1988,39 +2971,95 @@ function toggleSeleccionTemaConValidacion(checkbox, idTema, tiempoMinutos, nombr
       tipo: tipoSeleccion
     });
     
+    // Añadir bloque a la lista si no está
     if (!bloquesActivos.includes(nombreBloque)) {
       bloquesActivos.push(nombreBloque);
     }
     
+    // Actualizar tiempo usado
     tiempoUsado += tiempoMinutos;
     
-    // Mostrar mensaje informativo para temas padre
+    console.log('✅ Tema añadido:', {
+      id: idTema,
+      tiempo: tiempoMinutos,
+      bloque: nombreBloque,
+      tipo: tipoSeleccion,
+      tiempoTotalUsado: tiempoUsado
+    });
+    
+    // 🔄 Si es tema padre, seleccionar hijos automáticamente
     if (tipoSeleccion === 'padre') {
+      const hijosAutomaticos = seleccionarHijosAutomaticamente(idTema, nombreBloque);
+      
+      // Añadir hijos automáticos a la lista (con tiempo 0)
+      hijosAutomaticos.forEach(hijo => {
+        temasSeleccionados.push(hijo);
+      });
+      
+      // Expandir automáticamente el tema padre para mostrar los hijos
       setTimeout(() => {
-        alert('✅ Tema padre seleccionado completo.\nSe estudiará todo el tema en ' + formatearTiempo(tiempoMinutos) + '.');
+        expandirCaminoHaciaTema(idTema);
+        
+        alert('✅ Tema padre seleccionado: ' + formatearTiempo(tiempoMinutos) + '\n\n' +
+              '🔄 Se han seleccionado automáticamente ' + hijosAutomaticos.length + ' subtemas.\n' +
+              '⏱️ Tiempo total: Solo cuenta el del tema padre.\n' +
+              '👁️ Los subtemas se muestran expandidos con badge "AUTO".');
       }, 100);
+      
+      console.log('🔄 Hijos automáticos añadidos:', hijosAutomaticos.length);
     }
     
   } else {
-    // Quitar tema
+    // ===== DESELECCIÓN =====
+    console.log('❌ Iniciando deselección del tema:', idTema);
+    
+    // Buscar el tema en la lista
     const index = temasSeleccionados.findIndex(t => t.id === idTema);
     if (index > -1) {
       const tema = temasSeleccionados[index];
+      
+      // Remover de la lista
       temasSeleccionados.splice(index, 1);
       tiempoUsado -= tema.tiempo;
       
-      // Verificar si quitar bloque
+      console.log('⏱️ Tiempo restado:', tema.tiempo, 'min. Nuevo total:', tiempoUsado, 'min');
+      
+      // Si era tema padre, limpiar hijos automáticos
+      if (tema.tipo === 'padre') {
+        console.log('👨‍👧‍👦 Era tema padre - limpiando hijos automáticos');
+        desmarcarHijosAutomaticos(idTema);
+        limpiarEstadoVisualTemaPadre(idTema);
+      } else {
+        // Para temas normales, limpiar solo su estado visual
+        limpiarEstadoVisualDeTema(idTema);
+      }
+      
+      // Verificar si quitar bloque de la lista activa
       const masDelMismoBloque = temasSeleccionados.some(t => t.bloque === nombreBloque);
       if (!masDelMismoBloque) {
         const indexBloque = bloquesActivos.indexOf(nombreBloque);
         if (indexBloque > -1) {
           bloquesActivos.splice(indexBloque, 1);
+          console.log('📦 Bloque removido de activos:', nombreBloque);
         }
       }
+      
+      console.log('✅ Tema removido completamente');
+      
+    } else {
+      console.warn('⚠️ Tema no encontrado en lista para deseleccionar:', idTema);
+      limpiarEstadoVisualDeTema(idTema); // Limpiar por si acaso
     }
   }
   
+  // Actualizar resumen y verificar estado
   actualizarResumenTiempo();
+  
+  // Log del estado final
+  console.log('📊 Estado final del toggle:');
+  console.log('   - Temas seleccionados:', temasSeleccionados.length);
+  console.log('   - Tiempo total usado:', tiempoUsado, 'min');
+  console.log('   - Bloques activos:', bloquesActivos);
 }
 
 // Formatear tiempo localmente
@@ -2145,55 +3184,139 @@ function toggleSeleccionTema(checkbox, idTema, tiempoMinutos, nombreBloque) {
 }
 
 // Validar selección de tema
+// CORRECCIÓN 23: En scriptsPlanificacion.html
+// Reemplazar la función validarSeleccionTema() existente
+
 function validarSeleccionTema(tiempoMinutos, nombreBloque) {
-  // Verificar tiempo disponible
+  console.log('⏱️ Validando límites para:', tiempoMinutos, 'min en bloque', nombreBloque);
+  console.log('📊 Tiempo actual usado:', tiempoUsado, '/ Disponible:', tiempoTotalDisponible);
+  
+  // VALIDACIÓN 1: Verificar tiempo disponible (esta sigue siendo restrictiva por seguridad)
   if (tiempoUsado + tiempoMinutos > tiempoTotalDisponible) {
+    const exceso = (tiempoUsado + tiempoMinutos - tiempoTotalDisponible);
     return {
       valido: false,
-      mensaje: 'Excede el tiempo disponible (' + Math.round((tiempoUsado + tiempoMinutos - tiempoTotalDisponible)) + ' min de más)'
+      mensaje: 'Excede el tiempo disponible 🕒\n\n' +
+               'Tiempo disponible: ' + formatearTiempo(tiempoTotalDisponible) + '\n' +
+               'Ya usado: ' + formatearTiempo(tiempoUsado) + '\n' +
+               'Este tema: ' + formatearTiempo(tiempoMinutos) + '\n' +
+               'Exceso: ' + formatearTiempo(exceso) + '\n\n' +
+               '💡 Soluciones:\n' +
+               '• Aumenta las horas de estudio en el Paso 2\n' +
+               '• Selecciona menos temas o más cortos\n' +
+               '• Revisa si hay repasos que reduzcan el tiempo'
     };
   }
   
-  // Verificar límite de bloques
+  // VALIDACIÓN 2: Verificar límite de bloques (ahora informativa con sistema de advertencias)
   if (!bloquesActivos.includes(nombreBloque)) {
     const esEspecial = esBloqueBloqueEspecial(nombreBloque);
+    const bloquesNormales = bloquesActivos.filter(b => !esBloqueBloqueEspecial(b));
+    const bloquesEspeciales = bloquesActivos.filter(b => esBloqueBloqueEspecial(b));
     
-    if (!esEspecial && bloquesActivos.filter(b => !esBloqueBloqueEspecial(b)).length >= 3) {
-      return {
-        valido: false,
-        mensaje: 'Máximo 3 bloques normales permitidos'
-      };
+    console.log('📊 Bloques actuales:', {
+      normales: bloquesNormales,
+      especiales: bloquesEspeciales,
+      nuevoEsEspecial: esEspecial
+    });
+    
+    // Límites con advertencias informativas
+    let mensajeAdvertencia = '';
+    let claveAdvertencia = '';
+    let debeAdvertir = false;
+    
+    if (!esEspecial && bloquesNormales.length >= 4) {
+      mensajeAdvertencia = 'Máximo de bloques normales recomendado 📚\n\n' +
+                          'Ya tienes ' + bloquesNormales.length + ' bloques normales:\n' +
+                          bloquesNormales.join(', ') + '\n\n' +
+                          'Nuevo bloque: ' + nombreBloque + '\n\n' +
+                          'Muchos bloques pueden dispersar la concentración.\n' +
+                          'Se recomienda máximo 4 bloques normales por sesión.';
+      claveAdvertencia = `bloques_normales_${bloquesNormales.length + 1}`;
+      debeAdvertir = true;
+      
+    } else if (esEspecial && bloquesEspeciales.length >= 2) {
+      mensajeAdvertencia = 'Máximo de bloques especiales recomendado 🎯\n\n' +
+                          'Ya tienes ' + bloquesEspeciales.length + ' bloques especiales:\n' +
+                          bloquesEspeciales.join(', ') + '\n\n' +
+                          'Nuevo bloque: ' + nombreBloque + '\n\n' +
+                          'Los bloques especiales (Geografía/Callejero) requieren\n' +
+                          'concentración específica. Máximo 2 recomendados.';
+      claveAdvertencia = `bloques_especiales_${bloquesEspeciales.length + 1}`;
+      debeAdvertir = true;
+      
+    } else if (bloquesActivos.length >= 5) {
+      mensajeAdvertencia = 'Muchos bloques en una sesión 🧠\n\n' +
+                          'Ya tienes ' + bloquesActivos.length + ' bloques activos:\n' +
+                          bloquesActivos.join(', ') + '\n\n' +
+                          'Nuevo bloque: ' + nombreBloque + '\n\n' +
+                          'Cambiar entre muchos bloques puede reducir la eficiencia.\n' +
+                          'Se recomienda concentrarse en menos bloques por sesión.';
+      claveAdvertencia = `bloques_totales_${bloquesActivos.length + 1}`;
+      debeAdvertir = true;
     }
     
-    if (bloquesActivos.length >= 4) {
-      return {
-        valido: false,
-        mensaje: 'Máximo 4 bloques total (3 normales + 1 especial)'
-      };
+    if (debeAdvertir) {
+      // Usar sistema de advertencias de dos niveles para bloques
+      const permitido = manejarAdvertenciaConDobleNivel('bloques', claveAdvertencia, mensajeAdvertencia);
+      
+      if (!permitido) {
+        return {
+          valido: false,
+          mensaje: 'Advertencia de bloques mostrada'
+        };
+      }
+      // Si permitido = true, continuar con la selección
     }
   }
   
+  console.log('✅ Validaciones de límites pasadas');
   return { valido: true };
 }
 
 // Actualizar resumen de tiempo
+// CORRECCIÓN 36: En scriptsPlanificacion.html
+// Reemplazar la función actualizarResumenTiempo() existente
+
 function actualizarResumenTiempo() {
+  console.log('📊 Actualizando resumen de tiempo...');
+  console.log('   - Tiempo total disponible:', tiempoTotalDisponible);
+  console.log('   - Tiempo usado:', tiempoUsado);
+  console.log('   - Bloques activos:', bloquesActivos);
+  
   const tiempoRestante = tiempoTotalDisponible - tiempoUsado;
   
-  document.getElementById('tiempoTotal').textContent = tiempoTotalDisponible;
-  document.getElementById('tiempoSeleccionado').textContent = tiempoUsado;
-  document.getElementById('tiempoRestante').textContent = tiempoRestante;
-  document.getElementById('bloquesUsados').textContent = bloquesActivos.length + '/3';
+  // Actualizar elementos de la interfaz si existen
+  const elementoTiempoTotal = document.getElementById('tiempoTotal');
+  const elementoTiempoSeleccionado = document.getElementById('tiempoSeleccionado');
+  const elementoTiempoRestante = document.getElementById('tiempoRestante');
+  const elementoBloquesUsados = document.getElementById('bloquesUsados');
+  
+  if (elementoTiempoTotal) elementoTiempoTotal.textContent = tiempoTotalDisponible;
+  if (elementoTiempoSeleccionado) elementoTiempoSeleccionado.textContent = tiempoUsado;
+  if (elementoTiempoRestante) elementoTiempoRestante.textContent = tiempoRestante;
+  if (elementoBloquesUsados) elementoBloquesUsados.textContent = bloquesActivos.length + '/4+';
   
   // Cambiar colores según estado
-  const elementoRestante = document.getElementById('tiempoRestante');
-  if (tiempoRestante < 0) {
-    elementoRestante.style.color = '#dc3545';
-  } else if (tiempoRestante < 30) {
-    elementoRestante.style.color = '#ffc107';
-  } else {
-    elementoRestante.style.color = '#28a745';
+  if (elementoTiempoRestante) {
+    if (tiempoRestante < 0) {
+      elementoTiempoRestante.style.color = '#dc3545';
+    } else if (tiempoRestante < 30) {
+      elementoTiempoRestante.style.color = '#ffc107';
+    } else {
+      elementoTiempoRestante.style.color = '#28a745';
+    }
   }
+  
+  // 🔄 NUEVA: Verificación automática del estado
+  verificarEstadoAutomaticamente();
+  
+  // Actualizar estado visual del árbol
+  setTimeout(() => {
+    actualizarEstadoVisualDelArbol();
+  }, 100);
+  
+  console.log('✅ Resumen actualizado - Restante:', tiempoRestante, 'min');
 }
 
 // Crear planificación
@@ -2240,56 +3363,882 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Validar orden consecutivo de temas
+// CORRECCIÓN: En scriptsPlanificacion.html
+// Reemplazar la función validarOrdenConsecutivo() existente
+
 function validarOrdenConsecutivo(nodoSeleccionado, arbolCompleto) {
-  // Buscar el nodo en el árbol completo para obtener contexto
-  function encontrarNodoEnArbol(arbol, idBuscado) {
-    for (let tema of arbol) {
-      if (tema.id === idBuscado) return { nodo: tema, padre: null };
-      
-      if (tema.hijos && tema.hijos.length > 0) {
-        const resultado = encontrarNodoEnArbol(tema.hijos, idBuscado);
-        if (resultado.nodo) return { nodo: resultado.nodo, padre: tema };
-      }
-    }
-    return { nodo: null, padre: null };
+  console.log('🔍 Validando orden SOLO dentro del mismo bloque y tema padre para:', nodoSeleccionado.id);
+  
+  // 1. Obtener el tema que se quiere seleccionar
+  const nodoCompleto = encontrarNodoEnArbolCompleto(nodoSeleccionado.id, arbolCompleto);
+  if (!nodoCompleto) {
+    console.log('❌ Nodo no encontrado');
+    return { esConsecutivo: true };
   }
   
-  const { nodo, padre } = encontrarNodoEnArbol(arbolCompleto, nodoSeleccionado.id);
+  // 2. Obtener el tema padre original del nodo seleccionado
+  const temaPadreOriginal = obtenerTemaPadreOriginal(nodoCompleto, arbolCompleto);
+  console.log('👨‍👧‍👦 Tema padre original del nuevo tema:', temaPadreOriginal.nombreCompleto);
   
-  if (!padre) return { esConsecutivo: true }; // Tema padre, no hay orden que validar
+  // 3. Obtener el bloque del tema seleccionado
+  const bloqueDelTema = obtenerBloqueDelTema(nodoCompleto.id);
+  console.log('📦 Bloque del tema:', bloqueDelTema);
   
-  // Obtener hermanos del mismo padre
-  const hermanos = padre.hijos.sort((a, b) => {
+  // 4. Filtrar temas ya seleccionados DEL MISMO BLOQUE
+  const temasDelMismoBloque = temasSeleccionados.filter(t => t.bloque === bloqueDelTema);
+  console.log('📋 Temas ya seleccionados del mismo bloque:', temasDelMismoBloque.length);
+  
+  if (temasDelMismoBloque.length === 0) {
+    console.log('✅ Primer tema del bloque - libre elección');
+    return { esConsecutivo: true };
+  }
+  
+  // 5. Verificar si algún tema del mismo bloque pertenece al mismo tema padre original
+  let hayTemasDelMismoTemaPadre = false;
+  
+  for (const temaDelBloque of temasDelMismoBloque) {
+    const nodoExistente = encontrarNodoEnArbolCompleto(temaDelBloque.id, arbolCompleto);
+    if (nodoExistente) {
+      const temaPadreOriginalExistente = obtenerTemaPadreOriginal(nodoExistente, arbolCompleto);
+      
+      if (temaPadreOriginalExistente.id === temaPadreOriginal.id) {
+        hayTemasDelMismoTemaPadre = true;
+        break;
+      }
+    }
+  }
+  
+  if (!hayTemasDelMismoTemaPadre) {
+    console.log('✅ Primer tema de este tema padre original en el bloque - libre elección');
+    return { esConsecutivo: true };
+  }
+  
+  console.log('🔍 Hay temas del mismo tema padre original - validando orden...');
+  
+  // 6. Generar orden plano SOLO de este tema padre original
+  const ordenDelTemaPadre = generarOrdenPlanoDelTemaPadre(temaPadreOriginal);
+  
+  console.log('📋 Orden del tema padre original:');
+  ordenDelTemaPadre.forEach((tema, index) => {
+    console.log(`   ${index}: ${tema.prenombre || ''} ${tema.nombre} (ID: ${tema.id})`);
+  });
+  
+  // 7. Encontrar posición del tema seleccionado dentro de su tema padre original
+  const posicionEnTemaPadre = ordenDelTemaPadre.findIndex(tema => tema.id === nodoSeleccionado.id);
+  
+  if (posicionEnTemaPadre === -1) {
+    console.log('❌ Tema no encontrado en orden del tema padre');
+    return { esConsecutivo: true };
+  }
+  
+  console.log('📍 Posición en tema padre:', posicionEnTemaPadre);
+  
+  // 8. Verificar temas anteriores SOLO del mismo tema padre original
+  const temasAnterioresEnTemaPadre = ordenDelTemaPadre.slice(0, posicionEnTemaPadre);
+  console.log('⏮️ Temas anteriores en tema padre a verificar:', temasAnterioresEnTemaPadre.length);
+  
+  // 9. Verificar cuáles faltan (considerando descendientes)
+  const temasSaltados = [];
+  
+  for (const temaAnterior of temasAnterioresEnTemaPadre) {
+    const estaSeleccionadoOCompleto = verificarSiTemaEstaSeleccionadoCompleto(temaAnterior.id, arbolCompleto, bloqueDelTema);
+    
+    console.log(`   Verificando ${temaAnterior.prenombre || ''} ${temaAnterior.nombre}: ${estaSeleccionadoOCompleto ? 'OK' : 'FALTA'}`);
+    
+    if (!estaSeleccionadoOCompleto) {
+      temasSaltados.push(temaAnterior);
+    }
+  }
+  
+  console.log('⚠️ Temas saltados en tema padre:', temasSaltados.length);
+  
+  // 10. Si hay temas saltados → advertencia
+  if (temasSaltados.length > 0) {
+    const mensaje = 'Orden alterado dentro del tema padre original 📊\n\n' +
+                   'Tema padre original: "' + temaPadreOriginal.nombreCompleto + '"\n' +
+                   'Bloque: "' + bloqueDelTema + '"\n\n' +
+                   'Te estás saltando temas en el orden:\n\n' + 
+                   temasSaltados.slice(0, 3).map(t => '• ' + (t.prenombre || '') + ' ' + t.nombre).join('\n') +
+                   (temasSaltados.length > 3 ? '\n... y ' + (temasSaltados.length - 3) + ' más' : '') + '\n\n' +
+                   'Tema que quieres seleccionar: ' + (nodoCompleto.prenombre || '') + ' ' + nodoCompleto.nombre + '\n\n' +
+                   '¿Quieres continuar saltándote el orden?';
+    
+    return {
+      esConsecutivo: false,
+      mensaje: mensaje,
+      temasSaltados: temasSaltados,
+      requiereAdvertencia: true,
+      temaPadreOriginal: temaPadreOriginal.nombreCompleto
+    };
+  }
+  
+  console.log('✅ Orden respetado dentro del tema padre original');
+  return { esConsecutivo: true };
+}
+
+// Nueva función para obtener el bloque de un tema
+function obtenerBloqueDelTema(idTema) {
+  const tema = temasSeleccionados.find(t => t.id === idTema);
+  if (tema) return tema.bloque;
+  
+  // Si no está seleccionado, intentar deducir el bloque del tema en el árbol
+  // Por ahora retornar undefined para indicar que no se puede determinar
+  return undefined;
+}
+
+// Función para generar orden plano SOLO de un tema padre original
+function generarOrdenPlanoDelTemaPadre(temaPadreOriginal) {
+  const ordenPlano = [];
+  
+  function recorrerRecursivamente(nodos, nivel = 0) {
+    const nodosOrdenados = nodos.sort((a, b) => {
+      const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+      const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+      return numA - numB;
+    });
+    
+    nodosOrdenados.forEach(nodo => {
+      ordenPlano.push({
+        id: nodo.id,
+        nombre: nodo.nombre,
+        prenombre: nodo.prenombre,
+        nombreCompleto: nodo.nombreCompleto,
+        estado: nodo.estado,
+        nivel: nivel
+      });
+      
+      if (nodo.hijos && nodo.hijos.length > 0) {
+        recorrerRecursivamente(nodo.hijos, nivel + 1);
+      }
+    });
+  }
+  
+  // Empezar desde el tema padre original
+  recorrerRecursivamente([temaPadreOriginal]);
+  
+  return ordenPlano;
+}
+
+// Función mejorada para verificar si tema está seleccionado/completo (considerando descendientes)
+function verificarSiTemaEstaSeleccionadoCompleto(idTema, arbolCompleto, bloqueEspecifico) {
+  console.log('🔍 Verificando si tema está completo (incluyendo descendientes):', idTema);
+  
+  // 1. Verificar si está directamente seleccionado del mismo bloque
+  const seleccionDirecta = temasSeleccionados.some(t => 
+    t.id === idTema && t.bloque === bloqueEspecifico
+  );
+  if (seleccionDirecta) {
+    console.log('   ✅ Selección directa en el bloque');
+    return true;
+  }
+  
+  // 2. Verificar si está completado
+  const nodoTema = encontrarNodoEnArbolCompleto(idTema, arbolCompleto);
+  if (nodoTema && nodoTema.estado === 'completado') {
+    console.log('   ✅ Ya completado anteriormente');
+    return true;
+  }
+  
+  // 3. Verificar si está incluido por selección de ancestro como "padre"
+  if (nodoTema) {
+    let nodoActual = nodoTema;
+    while (nodoActual) {
+      const padreDirecto = obtenerTemaPadreReal(nodoActual, arbolCompleto);
+      if (!padreDirecto) break;
+      
+      const padreSeleccionadoCompleto = temasSeleccionados.some(t => 
+        t.id === padreDirecto.id && t.tipo === 'padre' && t.bloque === bloqueEspecifico
+      );
+      
+      if (padreSeleccionadoCompleto) {
+        console.log('   ✅ Incluido por selección del ancestro:', padreDirecto.nombreCompleto);
+        return true;
+      }
+      
+      nodoActual = padreDirecto;
+    }
+  }
+  
+  // 4. NUEVO: Verificar si todos sus descendientes están seleccionados (auto-completado)
+  if (nodoTema && nodoTema.hijos && nodoTema.hijos.length > 0) {
+    const todosLosDescendientes = obtenerTodosLosDescendientes(nodoTema, arbolCompleto);
+    const descendientesHoja = todosLosDescendientes.filter(d => !d.hijos || d.hijos.length === 0);
+    
+    if (descendientesHoja.length > 0) {
+      const todosDescendientesSeleccionados = descendientesHoja.every(descendiente => 
+        temasSeleccionados.some(t => t.id === descendiente.id && t.bloque === bloqueEspecifico) ||
+        descendiente.estado === 'completado'
+      );
+      
+      if (todosDescendientesSeleccionados) {
+        console.log('   ✅ Auto-completado: todos los descendientes están seleccionados');
+        return true;
+      }
+    }
+  }
+  
+  console.log('   ❌ No está completo');
+  return false;
+}
+
+// NUEVA FUNCIÓN: Verificar si un tema está seleccionado (considerando padre vs hijos)
+function verificarSiTemaEstaSeleccionado(idTema, arbolCompleto) {
+  console.log('🔍 Verificando si tema está seleccionado:', idTema);
+  
+  // 1. Verificar si el tema está directamente en la lista
+  const seleccionDirecta = temasSeleccionados.some(t => t.id === idTema);
+  if (seleccionDirecta) {
+    console.log('   ✅ Selección directa encontrada');
+    return true;
+  }
+  
+  // 2. Verificar si el tema está incluido por selección de su padre
+  const nodoTema = encontrarNodoEnArbolCompleto(idTema, arbolCompleto);
+  if (!nodoTema) {
+    console.log('   ❌ Nodo no encontrado');
+    return false;
+  }
+  
+  // 3. Buscar si algún ancestro está seleccionado como "padre"
+  let nodoActual = nodoTema;
+  while (nodoActual) {
+    const padreDirecto = obtenerTemaPadreReal(nodoActual, arbolCompleto);
+    if (!padreDirecto) break;
+    
+    // Verificar si el padre directo está seleccionado como tema padre (tipo: 'padre')
+    const padreSeleccionadoCompleto = temasSeleccionados.some(t => 
+      t.id === padreDirecto.id && t.tipo === 'padre'
+    );
+    
+    if (padreSeleccionadoCompleto) {
+      console.log('   ✅ Incluido por selección del padre:', padreDirecto.nombreCompleto);
+      return true;
+    }
+    
+    nodoActual = padreDirecto;
+  }
+  
+  console.log('   ❌ No está seleccionado');
+  return false;
+}
+
+// Mantener la función existente para generar orden plano
+function generarOrdenPlanoCompleto(arbol) {
+  const ordenPlano = [];
+  
+  function recorrerRecursivamente(nodos, nivel = 0) {
+    // Ordenar nodos por prenombre antes de procesarlos
+    const nodosOrdenados = nodos.sort((a, b) => {
+      const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+      const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+      return numA - numB;
+    });
+    
+    nodosOrdenados.forEach(nodo => {
+      // Añadir el nodo actual al orden plano
+      ordenPlano.push({
+        id: nodo.id,
+        nombre: nodo.nombre,
+        prenombre: nodo.prenombre,
+        nombreCompleto: nodo.nombreCompleto,
+        estado: nodo.estado,
+        nivel: nivel
+      });
+      
+      // Procesar hijos recursivamente
+      if (nodo.hijos && nodo.hijos.length > 0) {
+        recorrerRecursivamente(nodo.hijos, nivel + 1);
+      }
+    });
+  }
+  
+  recorrerRecursivamente(arbol);
+  
+  console.log('🌳 Orden plano generado con', ordenPlano.length, 'temas');
+  return ordenPlano;
+}
+
+// Función para generar orden plano COMPLETO del árbol
+function generarOrdenPlanoCompleto(arbol) {
+  const ordenPlano = [];
+  
+  function recorrerRecursivamente(nodos, nivel = 0) {
+    // Ordenar nodos por prenombre antes de procesarlos
+    const nodosOrdenados = nodos.sort((a, b) => {
+      const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+      const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+      return numA - numB;
+    });
+    
+    nodosOrdenados.forEach(nodo => {
+      // Añadir el nodo actual al orden plano
+      ordenPlano.push({
+        id: nodo.id,
+        nombre: nodo.nombre,
+        prenombre: nodo.prenombre,
+        nombreCompleto: nodo.nombreCompleto,
+        estado: nodo.estado,
+        nivel: nivel
+      });
+      
+      // Procesar hijos recursivamente
+      if (nodo.hijos && nodo.hijos.length > 0) {
+        recorrerRecursivamente(nodo.hijos, nivel + 1);
+      }
+    });
+  }
+  
+  recorrerRecursivamente(arbol);
+  
+  console.log('🌳 Orden plano generado con', ordenPlano.length, 'temas');
+  return ordenPlano;
+}
+
+// Función auxiliar para verificar si el padre está seleccionado como tema completo
+function verificarSiPadreEstaSeleccionadoComoTodo(nodo, arbolCompleto) {
+  const padreDirecto = obtenerTemaPadreReal(nodo, arbolCompleto);
+  if (!padreDirecto) return false;
+  
+  // Verificar si el padre directo está seleccionado como "padre" (tema completo)
+  return temasSeleccionados.some(t => t.id === padreDirecto.id && t.tipo === 'padre');
+}
+
+// Función auxiliar para verificar excepción por tiempo específica
+function verificarExcepcionPorTiempoParaTema(nodo, arbolCompleto) {
+  // Obtener el tema padre directo del nodo
+  const padreDirecto = obtenerTemaPadreReal(nodo, arbolCompleto);
+  if (!padreDirecto) return false;
+  
+  // Si el padre directo tiene tiempo definido y NO cabe en el tiempo restante
+  const tiempoRestante = tiempoTotalDisponible - tiempoUsado;
+  const tiempoPadreDirecto = padreDirecto.tiempoMinutos || 0;
+  
+  if (tiempoPadreDirecto > tiempoRestante && tiempoPadreDirecto > 0) {
+    console.log('⏱️ Excepción por tiempo para:', nodo.prenombre + ' ' + nodo.nombre);
+    console.log('   Padre directo:', padreDirecto.nombreCompleto, 'necesita', tiempoPadreDirecto, 'min');
+    console.log('   Tiempo restante:', tiempoRestante, 'min');
+    return true;
+  }
+  
+  return false;
+}
+
+// Función auxiliar para verificar si el padre directo está seleccionado como tema padre
+function verificarSiPadreDirectoEstaSeleccionado(nodo, arbolCompleto) {
+  const padreDirecto = obtenerTemaPadreReal(nodo, arbolCompleto);
+  if (!padreDirecto) return false;
+  
+  return temasSeleccionados.some(t => t.id === padreDirecto.id && t.tipo === 'padre');
+}
+
+// Función auxiliar mejorada para verificar excepción por tiempo
+function verificarExcepcionPorTiempoDetallada(nodo, arbolCompleto) {
+  // Obtener el tema padre directo del nodo
+  const padreDirecto = obtenerTemaPadreReal(nodo, arbolCompleto);
+  if (!padreDirecto) return false;
+  
+  // Si el padre directo tiene tiempo definido y no cabe en el tiempo restante
+  const tiempoRestante = tiempoTotalDisponible - tiempoUsado;
+  const tiempoPadreDirecto = padreDirecto.tiempoMinutos || 0;
+  
+  if (tiempoPadreDirecto > tiempoRestante && tiempoPadreDirecto > 0) {
+    console.log('⏱️ Excepción por tiempo detectada para padre directo:', 
+               padreDirecto.nombreCompleto, 
+               'Tiempo padre:', tiempoPadreDirecto, 'min, Restante:', tiempoRestante, 'min');
+    return true;
+  }
+  
+  return false;
+}
+
+// Función auxiliar para generar orden plano del árbol
+function generarOrdenPlanoDelArbol(arbol) {
+  const ordenPlano = [];
+  
+  function recorrerNodos(nodos) {
+    nodos.forEach(nodo => {
+      // Solo añadir nodos que pueden ser seleccionados (hojas o padres sin tiempo específico)
+      if (nodo.esHoja || (nodo.hijos && nodo.hijos.length > 0)) {
+        ordenPlano.push(nodo);
+      }
+      
+      // Recorrer hijos recursivamente
+      if (nodo.hijos && nodo.hijos.length > 0) {
+        recorrerNodos(nodo.hijos);
+      }
+    });
+  }
+  
+  recorrerNodos(arbol);
+  
+  // Ordenar por prenombre numérico
+  return ordenPlano.sort((a, b) => {
     const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
     const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
     return numA - numB;
   });
+}
+
+// Función auxiliar para verificar si el padre está seleccionado
+function verificarSiPadreEstaSeleccionado(nodo, arbolCompleto) {
+  const padre = obtenerTemaPadreReal(nodo, arbolCompleto);
+  if (!padre) return false;
   
-  // Encontrar posición del nodo actual
-  const posicionActual = hermanos.findIndex(h => h.id === nodoSeleccionado.id);
+  return temasSeleccionados.some(t => t.id === padre.id && t.tipo === 'padre');
+}
+
+// Función auxiliar para verificar excepción por tiempo
+function verificarExcepcionPorTiempo(nodo, arbolCompleto) {
+  // Obtener el tema padre
+  const padre = obtenerTemaPadreReal(nodo, arbolCompleto);
+  if (!padre) return false;
   
-  // Verificar si hay hermanos anteriores sin completar/seleccionar
-  const hermanosPreviosSinCompletar = [];
-  for (let i = 0; i < posicionActual; i++) {
-    const hermano = hermanos[i];
-    const yaSeleccionado = temasSeleccionados.some(t => t.id === hermano.id);
-    const completado = hermano.estado === 'completado';
+  // Si el padre tiene tiempo definido y no cabe en el tiempo restante
+  const tiempoRestante = tiempoTotalDisponible - tiempoUsado;
+  const tiempoPadre = padre.tiempo || 0;
+  
+  if (tiempoPadre > tiempoRestante && tiempoPadre > 0) {
+    console.log('⏱️ Excepción por tiempo detectada para:', padre.nombreCompleto, 
+               'Tiempo padre:', tiempoPadre, 'Restante:', tiempoRestante);
+    return true;
+  }
+  
+  return false;
+}
+
+function manejarAdvertenciaConDobleNivel(tipoAdvertencia, claveAdvertencia, mensaje, idTema, callback) {
+  console.log('⚠️ Manejando advertencia:', tipoAdvertencia, 'clave:', claveAdvertencia);
+  
+  // Inicializar contadores si no existen
+  if (tipoAdvertencia === 'orden') {
+    if (!advertenciasOrdenMostradas[claveAdvertencia]) {
+      advertenciasOrdenMostradas[claveAdvertencia] = 0;
+    }
+    advertenciasOrdenMostradas[claveAdvertencia]++;
     
-    if (!yaSeleccionado && !completado) {
-      hermanosPreviosSinCompletar.push(hermano);
+    const veces = advertenciasOrdenMostradas[claveAdvertencia];
+    console.log('📊 Advertencia de orden mostrada', veces, 'veces para:', claveAdvertencia);
+    
+    if (veces === 1) {
+      // PRIMERA VEZ: Advertir y NO permitir
+      alert('🚫 PRIMERA ADVERTENCIA - No permitido\n\n' + mensaje + 
+           '\n\n❌ Esta vez NO se permitirá la selección.' +
+           '\n✅ Si insistes, la próxima vez SÍ se permitirá.');
+      return false; // No permitir
+      
+    } else {
+      // SEGUNDA VEZ O MÁS: Advertir pero SÍ permitir
+      const confirmar = confirm('⚠️ SEGUNDA ADVERTENCIA - Libertad total\n\n' + mensaje + 
+                               '\n\n✅ Esta vez SÍ puedes continuar si quieres.' +
+                               '\n🔄 Tienes libertad total para organizar tu estudio.' +
+                               '\n\n¿Quieres continuar?');
+      return confirmar; // Permitir si confirma
+    }
+    
+  } else if (tipoAdvertencia === 'bloques') {
+    if (!advertenciasBloquesMostradas[claveAdvertencia]) {
+      advertenciasBloquesMostradas[claveAdvertencia] = 0;
+    }
+    advertenciasBloquesMostradas[claveAdvertencia]++;
+    
+    const veces = advertenciasBloquesMostradas[claveAdvertencia];
+    console.log('📊 Advertencia de bloques mostrada', veces, 'veces para:', claveAdvertencia);
+    
+    if (veces === 1) {
+      // PRIMERA VEZ: Advertir y NO permitir
+      alert('🚫 PRIMERA ADVERTENCIA - No permitido\n\n' + mensaje + 
+           '\n\n❌ Esta vez NO se permitirá la selección.' +
+           '\n✅ Si insistes, la próxima vez SÍ se permitirá.');
+      return false; // No permitir
+      
+    } else {
+      // SEGUNDA VEZ O MÁS: Advertir pero SÍ permitir
+      const confirmar = confirm('⚠️ SEGUNDA ADVERTENCIA - Libertad total\n\n' + mensaje + 
+                               '\n\n✅ Esta vez SÍ puedes continuar si quieres.' +
+                               '\n🔄 Tienes libertad total para organizar tu estudio.' +
+                               '\n\n¿Quieres continuar?');
+      return confirmar; // Permitir si confirma
     }
   }
   
-  if (hermanosPreviosSinCompletar.length > 0) {
+  return true; // Por defecto permitir
+}
+
+// Función para resetear advertencias (útil al crear nueva planificación)
+function resetearAdvertencias() {
+  advertenciasOrdenMostradas = {};
+  advertenciasBloquesMostradas = {};
+  console.log('🔄 Advertencias reseteadas');
+}
+
+// CORRECCIÓN 24: En scriptsPlanificacion.html
+// AÑADIR estas nuevas funciones (no reemplazar)
+
+function obtenerTemaPadreOriginal(nodo, arbolCompleto) {
+  console.log('🔍 Buscando tema padre original para:', nodo.nombreCompleto);
+  
+  // Buscar recursivamente hacia arriba hasta encontrar el tema padre original (sin id_padre)
+  function buscarHaciaArriba(nodoActual) {
+    // Si este nodo no tiene id_padre, es un tema padre original
+    if (!nodoActual.idPadre) {
+      return nodoActual;
+    }
+    
+    // Buscar el padre de este nodo
+    const padre = encontrarNodoEnArbolCompleto(nodoActual.idPadre, arbolCompleto);
+    if (!padre) {
+      console.log('❌ No se encontró el padre con id:', nodoActual.idPadre);
+      return nodoActual; // Si no se encuentra el padre, asumir que este es el original
+    }
+    
+    // Continuar buscando hacia arriba
+    return buscarHaciaArriba(padre);
+  }
+  
+  const temaPadreOriginal = buscarHaciaArriba(nodo);
+  console.log('✅ Tema padre original encontrado:', temaPadreOriginal.nombreCompleto);
+  return temaPadreOriginal;
+}
+
+function obtenerTemasPadreOriginalesSeleccionados() {
+  const temasPadreOriginales = new Set();
+  const detallesPorPadre = {};
+  
+  temasSeleccionados.forEach(temaSeleccionado => {
+    const nodo = encontrarNodoEnArbolCompleto(temaSeleccionado.id, window.arbolCompletoGlobal);
+    if (nodo) {
+      const temaPadreOriginal = obtenerTemaPadreOriginal(nodo, window.arbolCompletoGlobal);
+      const idPadreOriginal = temaPadreOriginal.id;
+      
+      temasPadreOriginales.add(idPadreOriginal);
+      
+      if (!detallesPorPadre[idPadreOriginal]) {
+        detallesPorPadre[idPadreOriginal] = {
+          padre: temaPadreOriginal,
+          temasSeleccionados: [],
+          bloque: temaSeleccionado.bloque
+        };
+      }
+      detallesPorPadre[idPadreOriginal].temasSeleccionados.push(temaSeleccionado);
+    }
+  });
+  
+  console.log('📊 Temas padre originales seleccionados:', Array.from(temasPadreOriginales));
+  console.log('📊 Detalles por padre original:', detallesPorPadre);
+  
+  return { ids: temasPadreOriginales, detalles: detallesPorPadre };
+}
+
+function verificarSiDebiaContinuarTemaPadreOriginal(nodoNuevo, nombreBloque) {
+  console.log('🔍 Verificando si debía continuar tema padre original para:', nodoNuevo.nombreCompleto);
+  
+  // Obtener tema padre original del nuevo nodo
+  const temaPadreOriginalNuevo = obtenerTemaPadreOriginal(nodoNuevo, window.arbolCompletoGlobal);
+  
+  // Obtener temas padre originales ya seleccionados del mismo bloque
+  const { detalles } = obtenerTemasPadreOriginalesSeleccionados();
+  
+  // Filtrar solo los del mismo bloque
+  const padresOriginalesDelMismoBloque = Object.values(detalles).filter(d => d.bloque === nombreBloque);
+  
+  if (padresOriginalesDelMismoBloque.length === 0) {
+    console.log('✅ No hay temas padre originales del mismo bloque - libre elección');
+    return { debiaContinuar: false };
+  }
+  
+  // Verificar si el nuevo tema pertenece a algún tema padre original ya empezado
+  const perteneceAPadreYaEmpezado = padresOriginalesDelMismoBloque.some(d => 
+    d.padre.id === temaPadreOriginalNuevo.id
+  );
+  
+  if (perteneceAPadreYaEmpezado) {
+    console.log('✅ Pertenece a tema padre original ya empezado - correcto');
+    return { debiaContinuar: false }; // Es correcto continuar
+  }
+  
+  // Verificar si hay temas padre originales con progreso que sería mejor continuar
+  const padresConProgreso = padresOriginalesDelMismoBloque.filter(d => {
+    // Verificar si tiene hijos incompletos
+    const todosLosHijosDelPadre = obtenerTodosLosDescendientes(d.padre, window.arbolCompletoGlobal);
+    const hijosSeleccionados = d.temasSeleccionados.map(t => t.id);
+    const hijosIncompletos = todosLosHijosDelPadre.filter(hijo => 
+      !hijosSeleccionados.includes(hijo.id) && hijo.estado !== 'completado'
+    );
+    
+    return hijosIncompletos.length > 0; // Tiene hijos pendientes
+  });
+  
+  if (padresConProgreso.length > 0) {
+    const padreARecomendar = padresConProgreso[0];
     return {
-      esConsecutivo: false,
-      mensaje: 'Te estás saltando el orden. Temas anteriores pendientes: ' + 
-               hermanosPreviosSinCompletar.map(h => h.prenombre || h.nombre).join(', '),
-      temasSaltados: hermanosPreviosSinCompletar
+      debiaContinuar: true,
+      mensaje: 'Recomendación de continuidad 📚\n\n' +
+               'Ya tienes progreso en el tema padre original:\n' +
+               '"' + padreARecomendar.padre.nombreCompleto + '"\n\n' +
+               'Temas seleccionados: ' + padreARecomendar.temasSeleccionados.length + '\n\n' +
+               'Se recomienda completar este tema antes de empezar otro tema padre original.\n' +
+               'Esto mejora la retención y el progreso sistemático.\n\n' +
+               '¿Quieres continuar con el nuevo tema de todas formas?',
+      temaPadreARecomendar: padreARecomendar.padre
     };
   }
   
-  return { esConsecutivo: true };
+  console.log('✅ No hay conflictos de continuidad');
+  return { debiaContinuar: false };
+}
+
+// Función auxiliar para obtener todos los descendientes de un tema padre
+function obtenerTodosLosDescendientes(temaPadre, arbolCompleto) {
+  const descendientes = [];
+  
+  function recopilarDescendientes(nodo) {
+    if (nodo.hijos && nodo.hijos.length > 0) {
+      nodo.hijos.forEach(hijo => {
+        descendientes.push(hijo);
+        recopilarDescendientes(hijo); // Recursión para nietos, bisnietos, etc.
+      });
+    }
+  }
+  
+  recopilarDescendientes(temaPadre);
+  return descendientes;
+}
+
+// Función para mostrar debug en ventana de alerta (para el usuario)
+function mostrarDebugEstado() {
+  const estado = debugEstadoSeleccion();
+  
+  let mensaje = '🐛 DEBUG - Estado de Selección:\n\n';
+  mensaje += `📋 Temas en lista: ${estado.temasEnLista}\n`;
+  mensaje += `✅ Checkboxes marcados: ${estado.checkboxesMarcados}\n`;
+  mensaje += `🔄 Sincronizado: ${estado.sincronizado ? 'SÍ' : 'NO'}\n\n`;
+  mensaje += `⏱️ Tiempo usado: ${estado.tiempoUsado} min\n`;
+  mensaje += `💯 Tiempo real: ${estado.tiempoReal} min\n`;
+  mensaje += `📦 Bloques activos: ${estado.bloquesActivos}\n\n`;
+  
+  if (!estado.sincronizado) {
+    mensaje += '⚠️ PROBLEMA DETECTADO:\n';
+    mensaje += 'La interfaz no está sincronizada con la lista.\n';
+    mensaje += 'Usa el botón "Reparar Estado" para solucionarlo.';
+  } else {
+    mensaje += '✅ Todo está funcionando correctamente.';
+  }
+  
+  alert(mensaje);
+}
+
+// Función para verificar automáticamente el estado cada vez que se actualiza
+function verificarEstadoAutomaticamente() {
+  // Esta función se ejecuta después de cada cambio
+  setTimeout(() => {
+    const estado = debugEstadoSeleccion();
+    
+    if (!estado.sincronizado) {
+      console.warn('⚠️ PROBLEMA DE SINCRONIZACIÓN DETECTADO AUTOMÁTICAMENTE');
+      console.warn('   Se recomienda usar el botón de reparar estado');
+      
+      // Mostrar advertencia visual (opcional)
+      const contenedorReglas = document.getElementById('informacionReglas');
+      if (contenedorReglas) {
+        let advertencia = contenedorReglas.querySelector('.advertencia-sincronizacion');
+        if (!advertencia) {
+          advertencia = document.createElement('div');
+          advertencia.className = 'advertencia-sincronizacion';
+          advertencia.style.cssText = 'background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;';
+          advertencia.innerHTML = '⚠️ <strong>Problema detectado:</strong> La interfaz no está sincronizada. Usa el botón "Reparar Estado".';
+          contenedorReglas.appendChild(advertencia);
+        }
+      }
+    } else {
+      // Quitar advertencia si existe
+      const advertencia = document.querySelector('.advertencia-sincronizacion');
+      if (advertencia) {
+        advertencia.remove();
+      }
+    }
+  }, 500); // Esperar 500ms para que termine cualquier proceso de actualización
+}
+
+function actualizarEstadoVisualDelArbol() {
+  // Función para actualizar el estado visual del árbol según los temas seleccionados
+  console.log('🎨 Actualizando estado visual del árbol');
+  
+  if (temasSeleccionados.length === 0) {
+    return; // No hay nada que actualizar
+  }
+  
+  // Obtener información de temas padre originales seleccionados
+  const { detalles } = obtenerTemasPadreOriginalesSeleccionados();
+  
+  // Marcar visualmente los temas padre originales con progreso
+  Object.values(detalles).forEach(detalle => {
+    const temaPadreOriginal = detalle.padre;
+    const temasSeleccionadosCount = detalle.temasSeleccionados.length;
+    
+    // Buscar el elemento visual del tema padre original
+    const checkboxesEnPagina = document.querySelectorAll('input[type="checkbox"]');
+    checkboxesEnPagina.forEach(checkbox => {
+      const idTemaCheckbox = parseInt(checkbox.getAttribute('onchange')?.match(/\d+/)?.[0]);
+      if (idTemaCheckbox === temaPadreOriginal.id) {
+        const contenedor = checkbox.closest('div');
+        if (contenedor) {
+          // Añadir badge de progreso
+          let badge = contenedor.querySelector('.badge-progreso');
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'badge-progreso';
+            badge.style.cssText = 'background: #4caf50; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; margin-left: 10px;';
+            checkbox.parentElement.appendChild(badge);
+          }
+          badge.textContent = `${temasSeleccionadosCount} seleccionados`;
+        }
+      }
+    });
+  });
+}
+
+// CORRECCIÓN 34: En scriptsPlanificacion.html
+// AÑADIR esta nueva función de debug (no reemplazar)
+
+function debugEstadoSeleccion() {
+  console.log('🐛 ===== DEBUG ESTADO SELECCIÓN =====');
+  
+  // 1. Estado de la lista global
+  console.log('📋 Lista global temasSeleccionados:', temasSeleccionados.length, 'temas');
+  temasSeleccionados.forEach((tema, index) => {
+    console.log(`   ${index + 1}. ID: ${tema.id}, Tiempo: ${tema.tiempo}min, Bloque: ${tema.bloque}, Tipo: ${tema.tipo}`);
+  });
+  
+  // 2. Estado de checkboxes en la interfaz
+  console.log('✅ Estado de checkboxes en la interfaz:');
+  const todosLosCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+  let checkboxesMarcados = 0;
+  
+  todosLosCheckboxes.forEach(checkbox => {
+    if (checkbox.checked) {
+      const onchangeAttr = checkbox.getAttribute('onchange');
+      const match = onchangeAttr ? onchangeAttr.match(/toggleSeleccionTemaConValidacion\(this,\s*(\d+)/) : null;
+      const idTemaCheckbox = match ? parseInt(match[1]) : 'Desconocido';
+      
+      console.log(`   ✅ Checkbox marcado - ID: ${idTemaCheckbox}, Disabled: ${checkbox.disabled}`);
+      checkboxesMarcados++;
+    }
+  });
+  
+  console.log(`📊 Total checkboxes marcados: ${checkboxesMarcados}`);
+  
+  // 3. Verificar sincronización
+  const discrepancia = checkboxesMarcados !== temasSeleccionados.length;
+  if (discrepancia) {
+    console.warn('⚠️ DISCREPANCIA DETECTADA:');
+    console.warn(`   Lista global: ${temasSeleccionados.length} temas`);
+    console.warn(`   Checkboxes marcados: ${checkboxesMarcados}`);
+    console.warn('   Esto puede causar problemas en la validación de orden');
+  } else {
+    console.log('✅ Sincronización correcta entre lista global y interfaz');
+  }
+  
+  // 4. Estado de tiempo
+  console.log('⏱️ Estado de tiempo:');
+  console.log(`   Tiempo total disponible: ${tiempoTotalDisponible} min`);
+  console.log(`   Tiempo usado (calculado): ${tiempoUsado} min`);
+  
+  // Calcular tiempo real sumando la lista
+  const tiempoRealCalculado = temasSeleccionados.reduce((total, tema) => total + tema.tiempo, 0);
+  console.log(`   Tiempo real (sumando lista): ${tiempoRealCalculado} min`);
+  
+  if (tiempoUsado !== tiempoRealCalculado) {
+    console.warn('⚠️ DISCREPANCIA EN TIEMPO:');
+    console.warn(`   Variable tiempoUsado: ${tiempoUsado} min`);
+    console.warn(`   Suma real de lista: ${tiempoRealCalculado} min`);
+  }
+  
+  // 5. Estado de bloques
+  console.log('📦 Bloques activos:', bloquesActivos);
+  
+  console.log('🐛 ===== FIN DEBUG =====');
+  
+  // Devolver información para uso externo
+  return {
+    temasEnLista: temasSeleccionados.length,
+    checkboxesMarcados: checkboxesMarcados,
+    sincronizado: !discrepancia,
+    tiempoUsado: tiempoUsado,
+    tiempoReal: tiempoRealCalculado,
+    bloquesActivos: bloquesActivos.length
+  };
+}
+
+// Función para reparar discrepancias automáticamente
+function repararEstadoSeleccion() {
+  console.log('🔧 Reparando estado de selección...');
+  
+  const estadoAntes = debugEstadoSeleccion();
+  
+  if (!estadoAntes.sincronizado) {
+    console.log('🔧 Sincronizando checkboxes con lista global...');
+    
+    // Desmarcar TODOS los checkboxes primero
+    const todosLosCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+    todosLosCheckboxes.forEach(checkbox => {
+      checkbox.checked = false;
+      checkbox.disabled = false;
+      
+      // Limpiar estilos
+      const contenedor = checkbox.closest('div[style*="padding"]');
+      if (contenedor) {
+        contenedor.style.opacity = '';
+        contenedor.style.backgroundColor = '';
+        
+        // Remover badges
+        const badges = contenedor.querySelectorAll('.badge-auto, span[style*="background: #2196f3"]');
+        badges.forEach(badge => badge.remove());
+      }
+    });
+    
+    // Marcar solo los que están en la lista global
+    temasSeleccionados.forEach(tema => {
+      const checkbox = encontrarCheckboxPorIdTema(tema.id);
+      if (checkbox) {
+        checkbox.checked = true;
+        
+        // Si es hijo automático, aplicar estilo especial
+        if (tema.tipo === 'hijo_automatico') {
+          checkbox.disabled = true;
+          
+          const contenedor = checkbox.closest('div[style*="padding"]');
+          if (contenedor) {
+            contenedor.style.opacity = '0.7';
+            contenedor.style.backgroundColor = '#e3f2fd';
+            
+            const badge = document.createElement('span');
+            badge.className = 'badge-auto';
+            badge.textContent = 'AUTO';
+            badge.style.cssText = 'background: #2196f3; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 10px;';
+            checkbox.parentElement.appendChild(badge);
+          }
+        }
+        
+        console.log('✅ Checkbox marcado para tema:', tema.id);
+      } else {
+        console.warn('⚠️ No se encontró checkbox para tema en lista:', tema.id);
+      }
+    });
+    
+    // Recalcular tiempo
+    tiempoUsado = temasSeleccionados.reduce((total, tema) => total + tema.tiempo, 0);
+    console.log('⏱️ Tiempo recalculado:', tiempoUsado, 'min');
+    
+    // Actualizar interfaz
+    actualizarResumenTiempo();
+    
+    console.log('✅ Reparación completada');
+  } else {
+    console.log('✅ No se detectaron problemas - no se requiere reparación');
+  }
+  
+  const estadoDespues = debugEstadoSeleccion();
+  return estadoDespues;
 }
 
 </script>
