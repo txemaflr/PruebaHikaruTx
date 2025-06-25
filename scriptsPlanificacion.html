@@ -3320,9 +3320,359 @@ function actualizarResumenTiempo() {
 }
 
 // Crear planificación
+// 8. FUNCIÓN PRINCIPAL: Crear planificación (REEMPLAZAR LA EXISTENTE)
 function crearPlanificacion() {
-  alert('🚧 Crear planificación - En desarrollo...');
+  console.log('📝 Iniciando creación de planificación...');
+  
+  // Validaciones finales
+  const validacion = validarAntesDeCrear();
+  if (!validacion.valido) {
+    alert('⚠️ ' + validacion.mensaje);
+    return;
+  }
+  
+  // Recopilar datos
+  const datosplanificacion = recopilarDatosPlanificacion();
+  console.log('📊 Datos recopilados:', datosplanificacion);
+  
+  // Mostrar confirmación
+  const confirmacion = mostrarConfirmacionCreacion(datosplanificacion);
+  if (!confirmacion) {
+    return;
+  }
+  
+  // Deshabilitar botón y mostrar loading
+  const btnCrear = document.getElementById('btnSiguiente');
+  btnCrear.disabled = true;
+  btnCrear.textContent = '⏳ Creando planificación...';
+  
+  // Llamar al backend
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ Planificación creada:', resultado);
+      mostrarExitoCreacion(resultado);
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error al crear planificación:', error);
+      mostrarErrorCreacion(error);
+    })
+    .crearPlanificacionCompleta(datosplanificacion);
 }
+
+
+// 9. Validaciones finales antes de crear
+function validarAntesDeCrear() {
+  console.log('🔍 Validando antes de crear planificación...');
+  
+  // Validar que hay temas seleccionados
+  if (temasSeleccionados.length === 0) {
+    return {
+      valido: false,
+      mensaje: 'Debes seleccionar al menos un tema para estudiar.\n\nVuelve al paso anterior y selecciona algunos temas.'
+    };
+  }
+  
+  // Validar fecha
+  const fechaInput = document.getElementById('fechaPlanificacion');
+  if (!fechaInput || !fechaInput.value) {
+    return {
+      valido: false,
+      mensaje: 'Fecha no válida.\n\nVuelve al paso 1 y selecciona una fecha.'
+    };
+  }
+  
+  // Validar oposición activa
+  if (!oposicionActiva || !oposicionActiva.id) {
+    return {
+      valido: false,
+      mensaje: 'No hay oposición activa.\n\nConfigura una oposición activa antes de crear planificaciones.'
+    };
+  }
+  
+  // Validar tiempo disponible
+  if (tiempoTotalDisponible <= 0) {
+    return {
+      valido: false,
+      mensaje: 'No hay tiempo disponible para estudiar.\n\nRevisa las horas previstas y los repasos del día.'
+    };
+  }
+  
+  console.log('✅ Validaciones pasadas');
+  return { valido: true };
+}
+
+
+// 10. Recopilar datos de la planificación
+function recopilarDatosPlanificacion() {
+  const fechaInput = document.getElementById('fechaPlanificacion');
+  const horasInput = document.getElementById('horasEstudio');
+  
+  const tiempoPrevisto = parseFloat(horasInput.value) * 60; // en minutos
+  const tiempoRepasos = window.tiempoRepasosDelDia || 0;
+  const tiempoEstudio = window.tiempoRealParaTemas || (tiempoPrevisto - tiempoRepasos);
+  
+  // Contar bloques únicos
+  const bloquesUnicos = [...new Set(temasSeleccionados.map(t => t.bloque))];
+  
+  return {
+    fecha: fechaInput.value,
+    idOposicion: oposicionActiva.id,
+    tiempoPrevisto: tiempoPrevisto,
+    tiempoRepasos: tiempoRepasos,
+    tiempoEstudio: tiempoEstudio,
+    temasSeleccionados: temasSeleccionados,
+    numeroBloqures: bloquesUnicos.length
+  };
+}
+
+// 11. Mostrar confirmación antes de crear
+function mostrarConfirmacionCreacion(datos) {
+  const temasPrincipales = datos.temasSeleccionados.filter(t => t.tipo !== 'hijo_automatico');
+  const hijosAutomaticos = datos.temasSeleccionados.filter(t => t.tipo === 'hijo_automatico');
+  
+  let mensaje = '📝 Confirmar creación de planificación\n\n';
+  mensaje += `📅 Fecha: ${datos.fecha}\n`;
+  mensaje += `📚 Oposición: ${oposicionActiva.nombre}\n\n`;
+  mensaje += `⏱️ Tiempo previsto: ${Math.round(datos.tiempoPrevisto / 60 * 10) / 10}h\n`;
+  mensaje += `📖 Tiempo para estudio: ${Math.round(datos.tiempoEstudio / 60 * 10) / 10}h\n`;
+  if (datos.tiempoRepasos > 0) {
+    mensaje += `🔄 Tiempo repasos: ${Math.round(datos.tiempoRepasos / 60 * 10) / 10}h\n`;
+  }
+  mensaje += `\n📋 Temas principales: ${temasPrincipales.length}\n`;
+  if (hijosAutomaticos.length > 0) {
+    mensaje += `👶 Subtemas automáticos: ${hijosAutomaticos.length}\n`;
+  }
+  mensaje += `📦 Bloques: ${datos.numeroBloqures}\n\n`;
+  mensaje += `📝 Esta planificación guardará tu intención de estudio.\n`;
+  mensaje += `🔄 Los repasos se crearán automáticamente cuando\n`;
+  mensaje += `    marques los temas como completados.\n\n`;
+  mensaje += `¿Confirmas la creación de esta planificación?`;
+  
+  return confirm(mensaje);
+}
+
+// 12. Mostrar éxito después de crear
+function mostrarExitoCreacion(resultado) {
+  // Restaurar botón
+  const btnCrear = document.getElementById('btnSiguiente');
+  btnCrear.disabled = false;
+  btnCrear.textContent = 'Crear Planificación';
+  
+  // Mostrar mensaje de éxito
+  alert('🎉 ¡Planificación creada correctamente!\n\n' +
+        `📝 ID: ${resultado.idPlanificacion}\n` +
+        `📚 Temas planificados: ${resultado.temasCreados}\n\n` +
+        '✅ La planificación se ha guardado correctamente.\n\n' +
+        '🔄 Los repasos se crearán automáticamente cuando\n' +
+        '   marques los temas como completados durante el estudio.');
+  
+  // Cerrar modal y actualizar calendario
+  cerrarModal();
+  
+  // Actualizar calendario si es necesario
+  if (typeof renderizarCalendario === 'function') {
+    renderizarCalendario();
+  }
+}
+
+// 13. Mostrar error si falla la creación
+function mostrarErrorCreacion(error) {
+  // Restaurar botón
+  const btnCrear = document.getElementById('btnSiguiente');
+  btnCrear.disabled = false;
+  btnCrear.textContent = 'Crear Planificación';
+  
+  // Mostrar error
+  alert('❌ Error al crear la planificación\n\n' +
+        'Detalles: ' + error.message + '\n\n' +
+        'Revisa los datos e inténtalo de nuevo.\n' +
+        'Si el problema persiste, contacta al administrador.');
+}
+
+// 14. Cargar planificaciones en el calendario
+function cargarPlanificacionesEnCalendario() {
+  const año = mesActual.getFullYear();
+  const mes = mesActual.getMonth();
+  
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      console.log('📅 Planificaciones cargadas:', planificaciones.length);
+      mostrarPlanificacionesEnCalendario(planificaciones);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar planificaciones:', error);
+    })
+    .getPlanificacionesDelMes(año, mes);
+}
+
+// 15. Mostrar planificaciones en el calendario
+function mostrarPlanificacionesEnCalendario(planificaciones) {
+  planificaciones.forEach(plan => {
+    const dia = plan.fecha.getDate();
+    const contenedorDia = document.getElementById(`contenido-${plan.fecha.getFullYear()}-${plan.fecha.getMonth()}-${dia}`);
+    
+    if (contenedorDia) {
+      let html = '';
+      html += '<div style="background: #e3f2fd; padding: 2px 4px; border-radius: 3px; margin: 1px 0; font-size: 9px;">';
+      html += `📚 ${plan.numeroTemas} temas`;
+      html += '</div>';
+      
+      contenedorDia.innerHTML = html;
+    }
+  });
+}
+
+// 16. Mostrar detalle del día seleccionado
+function mostrarDetalleDiaSeleccionado(dia) {
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+  
+  // Buscar planificación para este día
+  google.script.run
+    .withSuccessHandler(function(detalle) {
+      if (detalle) {
+        mostrarDetallePlanificacion(detalle);
+      } else {
+        mostrarDiaSinPlanificacion(fechaSeleccionada);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar detalle:', error);
+    })
+    .getDetallePlanificacion(fechaSeleccionada);
+}
+
+// Ejemplo de uso en el calendario (modificar función seleccionarDia)
+function seleccionarDiaConPlanificacion(dia) {
+  // ... código existente de seleccionarDia ...
+  
+  // Cargar detalle de planificación para este día
+  mostrarDetalleDiaSeleccionado(dia);
+}
+
+// 17. FRONTEND: Interfaz para marcar tema como completado
+function mostrarModalCompletarTema(idProgreso, nombreTema) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+  
+  modal.innerHTML = `
+    <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%;">
+      <h4>✅ Completar tema</h4>
+      <p><strong>Tema:</strong> ${nombreTema}</p>
+      
+      <label style="display: block; margin: 15px 0 5px 0;">Tiempo real dedicado (minutos):</label>
+      <input type="number" id="tiempoRealDedicado" min="1" max="600" value="30" style="width: 100%; padding: 8px;">
+      
+      <label style="display: block; margin: 15px 0 5px 0;">Nota personal (opcional):</label>
+      <textarea id="notaPersonal" rows="3" style="width: 100%; padding: 8px;" placeholder="¿Cómo te ha ido? ¿Qué has aprendido?"></textarea>
+      
+      <div style="text-align: center; margin-top: 20px;">
+        <button onclick="cerrarModalCompletar()" style="background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin-right: 10px;">
+          Cancelar
+        </button>
+        <button onclick="confirmarCompletarTema(${idProgreso})" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px;">
+          ✅ Marcar como completado
+        </button>
+      </div>
+    </div>
+  `;
+  
+  modal.id = 'modalCompletarTema';
+  document.body.appendChild(modal);
+}
+
+// 18. FRONTEND: Confirmar completar tema
+function confirmarCompletarTema(idProgreso) {
+  const tiempoReal = parseInt(document.getElementById('tiempoRealDedicado').value);
+  const nota = document.getElementById('notaPersonal').value.trim();
+  
+  if (!tiempoReal || tiempoReal < 1) {
+    alert('⚠️ Introduce un tiempo válido (mínimo 1 minuto)');
+    return;
+  }
+  
+  // Deshabilitar botón
+  const btn = document.querySelector('button[onclick="confirmarCompletarTema(' + idProgreso + ')"]');
+  btn.disabled = true;
+  btn.textContent = '⏳ Completando...';
+  
+  // Llamar al backend
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      if (resultado.success) {
+        alert('🎉 ¡Tema completado!\n\n' +
+              `🔄 Se han programado ${resultado.repasosCreados} repasos automáticamente.\n\n` +
+              'Los repasos aparecerán en días futuros según el sistema de repetición espaciada.');
+        
+        cerrarModalCompletar();
+        
+        // Actualizar la interfaz si es necesario
+        if (typeof actualizarDetallePlanificacion === 'function') {
+          actualizarDetallePlanificacion();
+        }
+      } else {
+        alert('❌ Error al completar tema: ' + resultado.error);
+        btn.disabled = false;
+        btn.textContent = '✅ Marcar como completado';
+      }
+    })
+    .withFailureHandler(function(error) {
+      alert('❌ Error de conexión: ' + error.message);
+      btn.disabled = false;
+      btn.textContent = '✅ Marcar como completado';
+    })
+    .marcarTemaComoCompletado(idProgreso, tiempoReal, nota || null);
+}
+
+// 19. FRONTEND: Cerrar modal de completar
+function cerrarModalCompletar() {
+  const modal = document.getElementById('modalCompletarTema');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// 20. BACKEND: Obtener progreso de temas de una planificación específica
+function getProgresoTemasPlanificacion(idPlanificacion) {
+  try {
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    const data = progresoSheet.getDataRange().getValues();
+    
+    const temas = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][progresoColumns['id_planificacion']] == idPlanificacion) {
+        const idTema = data[i][progresoColumns['id_tema']];
+        const tema = getTemaById(idTema);
+        
+        temas.push({
+          idProgreso: data[i][progresoColumns['id_progreso']],
+          idTema: idTema,
+          nombre: tema.nombre,
+          prenombre: tema.prenombre,
+          nombreCompleto: (tema.prenombre || '') + ' ' + tema.nombre,
+          tiempoAsignado: data[i][progresoColumns['tiempo_asignado_minutos']],
+          tiempoDedicado: data[i][progresoColumns['tiempo_dedicado_minutos']] || 0,
+          estado: data[i][progresoColumns['estado']],
+          tipoSeleccion: data[i][progresoColumns['tipo_seleccion']],
+          fechaCompletado: data[i][progresoColumns['fecha_completado']],
+          nota: data[i][progresoColumns['nota']] || ''
+        });
+      }
+    }
+    
+    return temas;
+    
+  } catch (error) {
+    console.error('Error al obtener progreso de temas:', error);
+    return [];
+  }
+}
+
+
+
+
+
 
 // Event listener para cambio de horas
 document.addEventListener('DOMContentLoaded', function() {
