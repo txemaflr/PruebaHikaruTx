@@ -1219,3 +1219,331 @@ function testOposicionActiva() {
   console.log('Oposición activa:', activa);
   return activa;
 }
+
+
+// ==========================================
+// BACKEND - AÑADIR A planificacion.gs
+// ==========================================
+
+// 1. FUNCIÓN PRINCIPAL: Crear planificación completa
+function crearPlanificacionCompleta(datosplanificacion) {
+  try {
+    console.log('📝 Creando planificación completa:', datosplanificacion);
+    
+    // Validar datos de entrada
+    if (!datosplanificacion.fecha || !datosplanificacion.idOposicion || 
+        !datosplanificacion.temasSeleccionados || datosplanificacion.temasSeleccionados.length === 0) {
+      throw new Error('Datos de planificación incompletos');
+    }
+    
+    // 1. Verificar que no existe planificación para esta fecha
+    const planificacionExistente = verificarPlanificacionExistente(datosplanificacion.fecha, datosplanificacion.idOposicion);
+    if (planificacionExistente) {
+      throw new Error('Ya existe una planificación para esta fecha en esta oposición');
+    }
+    
+    // 2. Crear registro principal en Planificacion_Diaria
+    const idPlanificacion = crearRegistroPlanificacionDiaria(datosplanificacion);
+    
+    // 3. Crear registros en Progreso_Temas para cada tema seleccionado
+    const progresoIds = crearRegistrosProgresoTemas(idPlanificacion, datosplanificacion.temasSeleccionados);
+    
+    // NOTA: Los repasos NO se crean aquí, solo cuando se marca tema como completado
+    
+    // 4. Retornar resultado
+    return {
+      success: true,
+      idPlanificacion: idPlanificacion,
+      temasCreados: progresoIds.length,
+      mensaje: 'Planificación creada correctamente'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error al crear planificación:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// 2. Verificar planificación existente
+function verificarPlanificacionExistente(fecha, idOposicion) {
+  try {
+    const planSheet = getGoogleSheet('Planificacion_Diaria');
+    const planColumns = getColumnIndices('Planificacion_Diaria');
+    const data = planSheet.getDataRange().getValues();
+    
+    const fechaBuscar = new Date(fecha);
+    fechaBuscar.setHours(0, 0, 0, 0);
+    
+    for (let i = 1; i < data.length; i++) {
+      const fechaFilaBuscar = new Date(data[i][planColumns['fecha']]);
+      fechaFilaBuscar.setHours(0, 0, 0, 0);
+      
+      if (fechaFilaBuscar.getTime() === fechaBuscar.getTime() && 
+          data[i][planColumns['id_oposicion']] == idOposicion) {
+        return {
+          id: data[i][planColumns['id_planificacion']],
+          fecha: data[i][planColumns['fecha']]
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error al verificar planificación existente:', error);
+    return null;
+  }
+}
+
+// 3. Crear registro principal en Planificacion_Diaria
+function crearRegistroPlanificacionDiaria(datos) {
+  try {
+    const planSheet = getGoogleSheet('Planificacion_Diaria');
+    const planColumns = getColumnIndices('Planificacion_Diaria');
+    
+    const idPlanificacion = generateUniqueId(planSheet, planColumns['id_planificacion'] + 1);
+    
+    const nuevoPlan = [];
+    nuevoPlan[planColumns['id_planificacion']] = idPlanificacion;
+    nuevoPlan[planColumns['fecha']] = new Date(datos.fecha);
+    nuevoPlan[planColumns['id_oposicion']] = datos.idOposicion;
+    nuevoPlan[planColumns['tiempo_previsto_minutos']] = datos.tiempoPrevisto;
+    nuevoPlan[planColumns['tiempo_repasos_minutos']] = datos.tiempoRepasos;
+    nuevoPlan[planColumns['tiempo_estudio_minutos']] = datos.tiempoEstudio;
+    nuevoPlan[planColumns['numero_temas']] = datos.temasSeleccionados.length;
+    nuevoPlan[planColumns['numero_bloques']] = datos.numeroBloqures;
+    nuevoPlan[planColumns['estado']] = 'planificado';
+    nuevoPlan[planColumns['fecha_creacion']] = new Date();
+    
+    planSheet.appendRow(nuevoPlan);
+    
+    console.log('✅ Registro principal creado con ID:', idPlanificacion);
+    return idPlanificacion;
+    
+  } catch (error) {
+    console.error('Error al crear registro principal:', error);
+    throw error;
+  }
+}
+
+// 4. Crear registros en Progreso_Temas
+function crearRegistrosProgresoTemas(idPlanificacion, temasSeleccionados) {
+  try {
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    
+    const registrosCreados = [];
+    
+    temasSeleccionados.forEach(tema => {
+      // Solo crear registros para temas principales (no hijos automáticos)
+      if (tema.tipo !== 'hijo_automatico') {
+        const idProgreso = generateUniqueId(progresoSheet, progresoColumns['id_progreso'] + 1);
+        
+        const nuevoProgreso = [];
+        nuevoProgreso[progresoColumns['id_progreso']] = idProgreso;
+        nuevoProgreso[progresoColumns['id_planificacion']] = idPlanificacion;
+        nuevoProgreso[progresoColumns['id_tema']] = tema.id;
+        nuevoProgreso[progresoColumns['tiempo_asignado_minutos']] = tema.tiempo;
+        nuevoProgreso[progresoColumns['estado']] = 'planificado';
+        nuevoProgreso[progresoColumns['tipo_seleccion']] = tema.tipo; // 'padre' o 'hijo'
+        nuevoProgreso[progresoColumns['fecha_planificado']] = new Date();
+        
+        progresoSheet.appendRow(nuevoProgreso);
+        registrosCreados.push(idProgreso);
+        
+        console.log('✅ Progreso creado para tema:', tema.id, 'con ID:', idProgreso);
+      }
+    });
+    
+    return registrosCreados;
+    
+  } catch (error) {
+    console.error('Error al crear registros de progreso:', error);
+    throw error;
+  }
+}
+
+
+// 5. NUEVA FUNCIÓN: Marcar tema como completado (AQUÍ se crean los repasos)
+function marcarTemaComoCompletado(idProgreso, tiempoRealDedicado, nota) {
+  try {
+    console.log('✅ Marcando tema como completado:', idProgreso);
+    
+    // 1. Actualizar estado en Progreso_Temas
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    const data = progresoSheet.getDataRange().getValues();
+    
+    let idTema = null;
+    let fila = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][progresoColumns['id_progreso']] == idProgreso) {
+        idTema = data[i][progresoColumns['id_tema']];
+        fila = i + 1;
+        break;
+      }
+    }
+    
+    if (fila === -1) {
+      throw new Error('Progreso no encontrado');
+    }
+    
+    // Actualizar estado a completado
+    progresoSheet.getRange(fila, progresoColumns['estado'] + 1).setValue('completado');
+    progresoSheet.getRange(fila, progresoColumns['fecha_completado'] + 1).setValue(new Date());
+    progresoSheet.getRange(fila, progresoColumns['tiempo_dedicado_minutos'] + 1).setValue(tiempoRealDedicado);
+    if (nota) {
+      progresoSheet.getRange(fila, progresoColumns['nota'] + 1).setValue(nota);
+    }
+    
+    // 2. AHORA SÍ crear los repasos automáticamente
+    const repasosCreados = programarRepasosParaTema(idTema, new Date());
+    
+    console.log('✅ Tema completado y repasos programados:', repasosCreados.length);
+    
+    return {
+      success: true,
+      repasosCreados: repasosCreados.length,
+      mensaje: 'Tema marcado como completado y repasos programados'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error al completar tema:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// 6. Programar repasos para un tema específico (SOLO cuando se completa)
+function programarRepasosParaTema(idTema, fechaCompletado) {
+  try {
+    const repasosSheet = getGoogleSheet('Repasos_Programados');
+    const repasosColumns = getColumnIndices('Repasos_Programados');
+    
+    const fechaBase = new Date(fechaCompletado);
+    const intervalosRepasos = [1, 3, 7, 15, 30]; // días
+    const repasosCreados = [];
+    
+    intervalosRepasos.forEach((dias, index) => {
+      const fechaRepaso = new Date(fechaBase);
+      fechaRepaso.setDate(fechaBase.getDate() + dias);
+      
+      const idRepaso = generateUniqueId(repasosSheet, repasosColumns['id_repaso'] + 1);
+      
+      const nuevoRepaso = [];
+      nuevoRepaso[repasosColumns['id_repaso']] = idRepaso;
+      nuevoRepaso[repasosColumns['id_tema']] = idTema;
+      nuevoRepaso[repasosColumns['numero_repaso']] = index + 1;
+      nuevoRepaso[repasosColumns['fecha_programada']] = fechaRepaso;
+      nuevoRepaso[repasosColumns['estado']] = 'pendiente';
+      nuevoRepaso[repasosColumns['fecha_creacion']] = new Date();
+      
+      repasosSheet.appendRow(nuevoRepaso);
+      repasosCreados.push(idRepaso);
+    });
+    
+    console.log('✅ Repasos programados para tema:', idTema, '→', repasosCreados.length, 'repasos');
+    return repasosCreados;
+    
+  } catch (error) {
+    console.error('Error al programar repasos para tema:', error);
+    return [];
+  }
+}
+
+// 6. Obtener planificaciones para calendario
+function getPlanificacionesDelMes(año, mes) {
+  try {
+    const planSheet = getGoogleSheet('Planificacion_Diaria');
+    const planColumns = getColumnIndices('Planificacion_Diaria');
+    const data = planSheet.getDataRange().getValues();
+    
+    const planificaciones = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      const fecha = new Date(data[i][planColumns['fecha']]);
+      
+      if (fecha.getFullYear() === año && fecha.getMonth() === mes) {
+        planificaciones.push({
+          id: data[i][planColumns['id_planificacion']],
+          fecha: fecha,
+          estado: data[i][planColumns['estado']],
+          numeroTemas: data[i][planColumns['numero_temas']],
+          tiempoEstudio: data[i][planColumns['tiempo_estudio_minutos']]
+        });
+      }
+    }
+    
+    return planificaciones;
+    
+  } catch (error) {
+    console.error('Error al obtener planificaciones del mes:', error);
+    return [];
+  }
+}
+
+// 7. Obtener detalle de una planificación específica
+function getDetallePlanificacion(idPlanificacion) {
+  try {
+    // Obtener datos principales
+    const planSheet = getGoogleSheet('Planificacion_Diaria');
+    const planColumns = getColumnIndices('Planificacion_Diaria');
+    const planData = planSheet.getDataRange().getValues();
+    
+    let planificacion = null;
+    for (let i = 1; i < planData.length; i++) {
+      if (planData[i][planColumns['id_planificacion']] == idPlanificacion) {
+        planificacion = {
+          id: planData[i][planColumns['id_planificacion']],
+          fecha: planData[i][planColumns['fecha']],
+          idOposicion: planData[i][planColumns['id_oposicion']],
+          tiempoPrevisto: planData[i][planColumns['tiempo_previsto_minutos']],
+          tiempoEstudio: planData[i][planColumns['tiempo_estudio_minutos']],
+          tiempoRepasos: planData[i][planColumns['tiempo_repasos_minutos']],
+          numeroTemas: planData[i][planColumns['numero_temas']],
+          estado: planData[i][planColumns['estado']]
+        };
+        break;
+      }
+    }
+    
+    if (!planificacion) {
+      throw new Error('Planificación no encontrada');
+    }
+    
+    // Obtener temas de la planificación
+    const progresoSheet = getGoogleSheet('Progreso_Temas');
+    const progresoColumns = getColumnIndices('Progreso_Temas');
+    const progresoData = progresoSheet.getDataRange().getValues();
+    
+    const temas = [];
+    for (let i = 1; i < progresoData.length; i++) {
+      if (progresoData[i][progresoColumns['id_planificacion']] == idPlanificacion) {
+        const idTema = progresoData[i][progresoColumns['id_tema']];
+        const tema = getTemaById(idTema);
+        
+        temas.push({
+          id: idTema,
+          nombre: tema.nombre,
+          prenombre: tema.prenombre,
+          nombreCompleto: (tema.prenombre || '') + ' ' + tema.nombre,
+          tiempoAsignado: progresoData[i][progresoColumns['tiempo_asignado_minutos']],
+          estado: progresoData[i][progresoColumns['estado']],
+          tipoSeleccion: progresoData[i][progresoColumns['tipo_seleccion']]
+        });
+      }
+    }
+    
+    planificacion.temas = temas;
+    return planificacion;
+    
+  } catch (error) {
+    console.error('Error al obtener detalle de planificación:', error);
+    throw error;
+  }
+}
