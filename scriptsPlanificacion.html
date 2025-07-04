@@ -3489,32 +3489,51 @@ function mostrarErrorCreacion(error) {
         'Si el problema persiste, contacta al administrador.');
 }
 
-// 14. Cargar planificaciones en el calendario
+// 📅 FUNCIÓN 1: Cargar planificaciones en el calendario
 function cargarPlanificacionesEnCalendario() {
   const año = mesActual.getFullYear();
   const mes = mesActual.getMonth();
   
+  console.log('📅 Cargando planificaciones para:', año, mes + 1);
+  
   google.script.run
     .withSuccessHandler(function(planificaciones) {
-      console.log('📅 Planificaciones cargadas:', planificaciones.length);
+      console.log('✅ Planificaciones recibidas:', planificaciones.length);
       mostrarPlanificacionesEnCalendario(planificaciones);
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar planificaciones:', error);
+      console.error('❌ Error al cargar planificaciones:', error);
     })
     .getPlanificacionesDelMes(año, mes);
 }
 
-// 15. Mostrar planificaciones en el calendario
+
+// 📅 FUNCIÓN 2: Mostrar planificaciones en los días del calendario
 function mostrarPlanificacionesEnCalendario(planificaciones) {
   planificaciones.forEach(plan => {
-    const dia = plan.fecha.getDate();
-    const contenedorDia = document.getElementById(`contenido-${plan.fecha.getFullYear()}-${plan.fecha.getMonth()}-${dia}`);
+    const fecha = new Date(plan.fecha);
+    const dia = fecha.getDate();
+    const contenedorDia = document.getElementById(`contenido-${fecha.getFullYear()}-${fecha.getMonth()}-${dia}`);
     
     if (contenedorDia) {
       let html = '';
-      html += '<div style="background: #e3f2fd; padding: 2px 4px; border-radius: 3px; margin: 1px 0; font-size: 9px;">';
-      html += `📚 ${plan.numeroTemas} temas`;
+      
+      // Color según estado
+      let colorFondo = '#e3f2fd'; // azul por defecto
+      let icono = '📚';
+      
+      if (plan.estado === 'completado') {
+        colorFondo = '#e8f5e9';
+        icono = '✅';
+      } else if (plan.estado === 'en_progreso') {
+        colorFondo = '#fff3e0';
+        icono = '🔄';
+      }
+      
+      html += `<div style="background: ${colorFondo}; padding: 3px; border-radius: 3px; margin: 1px 0; font-size: 10px; cursor: pointer;" `;
+      html += `onclick="mostrarDetallePlanificacion('${plan.id}')" title="Ver detalle de planificación">`;
+      html += `${icono} ${plan.numeroTemas} temas`;
+      html += `<br><small style="font-size: 8px;">${Math.round(plan.tiempoEstudio / 60)}h</small>`;
       html += '</div>';
       
       contenedorDia.innerHTML = html;
@@ -3522,23 +3541,29 @@ function mostrarPlanificacionesEnCalendario(planificaciones) {
   });
 }
 
-// 16. Mostrar detalle del día seleccionado
-function mostrarDetalleDiaSeleccionado(dia) {
-  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+// 📅 FUNCIÓN 3: Mostrar detalle de planificación específica
+function mostrarDetallePlanificacion(idPlanificacion) {
+  console.log('📝 Mostrando detalle de planificación:', idPlanificacion);
   
-  // Buscar planificación para este día
+  // Mostrar loading en el detalle del día
+  document.getElementById('contenidoDetalleDia').innerHTML = 
+    '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Cargando detalle...</div>';
+  
   google.script.run
     .withSuccessHandler(function(detalle) {
       if (detalle) {
-        mostrarDetallePlanificacion(detalle);
+        renderizarDetallePlanificacion(detalle);
       } else {
-        mostrarDiaSinPlanificacion(fechaSeleccionada);
+        document.getElementById('contenidoDetalleDia').innerHTML = 
+          '<div style="color: red; text-align: center; padding: 20px;">❌ Planificación no encontrada</div>';
       }
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar detalle:', error);
+      console.error('❌ Error al cargar detalle:', error);
+      document.getElementById('contenidoDetalleDia').innerHTML = 
+        '<div style="color: red; text-align: center; padding: 20px;">❌ Error: ' + error.message + '</div>';
     })
-    .getDetallePlanificacion(fechaSeleccionada);
+    .getDetallePlanificacion(idPlanificacion);
 }
 
 // Ejemplo de uso en el calendario (modificar función seleccionarDia)
@@ -3547,6 +3572,263 @@ function seleccionarDiaConPlanificacion(dia) {
   
   // Cargar detalle de planificación para este día
   mostrarDetalleDiaSeleccionado(dia);
+}
+
+// 📅 FUNCIÓN 4: Renderizar detalle completo de planificación
+function renderizarDetallePlanificacion(detalle) {
+  console.log('🎨 Renderizando detalle:', detalle);
+  
+  const contenedor = document.getElementById('contenidoDetalleDia');
+  
+  // Calcular estadísticas
+  const temasCompletados = detalle.temas.filter(t => t.estado === 'completado').length;
+  const temasEnProgreso = detalle.temas.filter(t => t.estado === 'en_progreso').length;
+  const temasPendientes = detalle.temas.filter(t => t.estado === 'planificado').length;
+  
+  const tiempoTotalAsignado = detalle.temas.reduce((total, tema) => total + (tema.tiempoAsignado || 0), 0);
+  const tiempoTotalDedicado = detalle.temas.reduce((total, tema) => total + (tema.tiempoDedicado || 0), 0);
+  
+  let html = '';
+  
+  // Header con información general
+  html += '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #007bff;">';
+  html += '<h4 style="margin: 0 0 10px 0; color: #007bff;">📝 Detalle de Planificación</h4>';
+  
+  // Info básica
+  html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px;">';
+  html += '<div><strong>📅 Fecha:</strong> ' + new Date(detalle.fecha).toLocaleDateString('es-ES') + '</div>';
+  html += '<div><strong>📚 Oposición:</strong> ' + (detalle.nombreOposicion || 'No disponible') + '</div>';
+  html += '<div><strong>⏱️ Tiempo previsto:</strong> ' + Math.round(detalle.tiempoPrevisto / 60 * 10) / 10 + 'h</div>';
+  html += '<div><strong>📖 Tiempo estudio:</strong> ' + Math.round(detalle.tiempoEstudio / 60 * 10) / 10 + 'h</div>';
+  html += '</div>';
+  
+  // Estadísticas de progreso
+  html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">';
+  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
+  html += '<div style="font-size: 20px; font-weight: bold; color: #007bff;">' + detalle.temas.length + '</div>';
+  html += '<div style="font-size: 12px; color: #666;">Total</div>';
+  html += '</div>';
+  
+  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
+  html += '<div style="font-size: 20px; font-weight: bold; color: #28a745;">' + temasCompletados + '</div>';
+  html += '<div style="font-size: 12px; color: #666;">Completados</div>';
+  html += '</div>';
+  
+  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
+  html += '<div style="font-size: 20px; font-weight: bold; color: #ffc107;">' + temasEnProgreso + '</div>';
+  html += '<div style="font-size: 12px; color: #666;">En progreso</div>';
+  html += '</div>';
+  
+  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
+  html += '<div style="font-size: 20px; font-weight: bold; color: #6c757d;">' + temasPendientes + '</div>';
+  html += '<div style="font-size: 12px; color: #666;">Pendientes</div>';
+  html += '</div>';
+  html += '</div>';
+  
+  html += '</div>';
+  
+  // Lista de temas
+  html += '<div style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+  html += '<h5 style="margin: 0 0 15px 0;">📋 Temas de la planificación</h5>';
+  
+  if (detalle.temas.length === 0) {
+    html += '<p style="text-align: center; color: #666; padding: 20px;">No hay temas en esta planificación</p>';
+  } else {
+    detalle.temas.forEach(tema => {
+      // Color y icono según estado
+      let colorBorde = '#6c757d';
+      let colorFondo = '#f8f9fa';
+      let icono = '⭕';
+      
+      if (tema.estado === 'completado') {
+        colorBorde = '#28a745';
+        colorFondo = '#d4edda';
+        icono = '✅';
+      } else if (tema.estado === 'en_progreso') {
+        colorBorde = '#ffc107';
+        colorFondo = '#fff3cd';
+        icono = '🔄';
+      }
+      
+      html += '<div style="border-left: 4px solid ' + colorBorde + '; background: ' + colorFondo + '; padding: 12px; margin-bottom: 10px; border-radius: 5px;">';
+      html += '<div style="display: flex; justify-content: space-between; align-items: start;">';
+      
+      // Información del tema
+      html += '<div style="flex: 1;">';
+      html += '<div style="font-weight: bold; margin-bottom: 5px;">';
+      html += icono + ' ' + tema.nombreCompleto;
+      html += '</div>';
+      
+      // Tiempos
+      html += '<div style="font-size: 13px; color: #666;">';
+      html += '⏱️ Asignado: ' + (tema.tiempoAsignado || 0) + ' min';
+      if (tema.tiempoDedicado > 0) {
+        html += ' | Dedicado: ' + tema.tiempoDedicado + ' min';
+      }
+      if (tema.tipoSeleccion) {
+        html += ' | Tipo: ' + tema.tipoSeleccion;
+      }
+      html += '</div>';
+      
+      // Fecha y nota si está completado
+      if (tema.estado === 'completado' && tema.fechaCompletado) {
+        html += '<div style="font-size: 12px; color: #28a745; margin-top: 5px;">';
+        html += '✅ Completado: ' + new Date(tema.fechaCompletado).toLocaleDateString('es-ES');
+        html += '</div>';
+      }
+      
+      if (tema.nota) {
+        html += '<div style="font-size: 12px; color: #666; margin-top: 5px; font-style: italic;">';
+        html += '💭 ' + tema.nota;
+        html += '</div>';
+      }
+      
+      html += '</div>';
+      
+      // Botones de acción para temas pendientes
+      if (tema.estado === 'planificado') {
+        html += '<div style="margin-left: 15px;">';
+        html += '<button onclick="marcarTemaComoCompletadoDesdeDetalle(' + tema.idProgreso + ', \'' + tema.nombreCompleto.replace(/'/g, "\\'") + '\')" ';
+        html += 'style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; cursor: pointer;">';
+        html += '✅ Completar';
+        html += '</button>';
+        html += '</div>';
+      }
+      
+      html += '</div>';
+      html += '</div>';
+    });
+  }
+  
+  html += '</div>';
+  
+  // Botón para nueva planificación
+  html += '<div style="text-align: center; margin-top: 20px;">';
+  html += '<button onclick="nuevaPlanificacion()" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">';
+  html += '➕ Nueva Planificación';
+  html += '</button>';
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
+}
+
+// 📅 FUNCIÓN 5: Marcar tema como completado desde el detalle
+function marcarTemaComoCompletadoDesdeDetalle(idProgreso, nombreTema) {
+  const tiempoReal = prompt('⏱️ ¿Cuántos minutos dedicaste al tema "' + nombreTema + '"?', '30');
+  
+  if (!tiempoReal || isNaN(tiempoReal) || tiempoReal < 1) {
+    alert('⚠️ Tiempo no válido');
+    return;
+  }
+  
+  const nota = prompt('💭 Nota personal (opcional):', '');
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      if (resultado.success) {
+        alert('🎉 ¡Tema completado!\n\nSe han programado ' + resultado.repasosCreados + ' repasos automáticamente.');
+        // Recargar el detalle
+        const idPlanificacion = obtenerIdPlanificacionActual();
+        if (idPlanificacion) {
+          mostrarDetallePlanificacion(idPlanificacion);
+        }
+      } else {
+        alert('❌ Error: ' + resultado.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      alert('❌ Error de conexión: ' + error.message);
+    })
+    .marcarTemaComoCompletado(idProgreso, parseInt(tiempoReal), nota || null);
+}
+
+// 📅 FUNCIÓN 6: Actualizar renderizado del calendario para cargar planificaciones
+// AÑADIR al final de la función renderizarCalendario() existente:
+function renderizarCalendarioConPlanificaciones() {
+  // Llamar a la función original
+  renderizarCalendario();
+  
+  // Cargar planificaciones después de renderizar
+  setTimeout(() => {
+    cargarPlanificacionesEnCalendario();
+  }, 100);
+}
+
+// 📅 FUNCIÓN 7: Actualizar función de seleccionar día para mostrar detalle automáticamente
+function seleccionarDiaConDetalle(dia) {
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  const esDiaPasado = fechaSeleccionada < hoy;
+  
+  diaSeleccionado = dia;
+  renderizarCalendario(); // Re-renderizar para mostrar selección
+  
+  // Actualizar título
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
+  
+  document.getElementById('tituloDetalleDia').textContent = tituloFecha + (esDiaPasado ? ' (Solo lectura)' : '');
+  
+  // Buscar planificación para este día
+  buscarPlanificacionDelDia(fechaSeleccionada);
+}
+
+// 📅 FUNCIÓN 8: Buscar planificación específica de un día
+function buscarPlanificacionDelDia(fecha) {
+  const contenedor = document.getElementById('contenidoDetalleDia');
+  contenedor.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Buscando planificación...</div>';
+  
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      if (planificaciones && planificaciones.length > 0) {
+        // Hay planificación para este día
+        mostrarDetallePlanificacion(planificaciones[0].id);
+      } else {
+        // No hay planificación para este día
+        mostrarDiaSinPlanificacion(fecha);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al buscar planificación:', error);
+      mostrarDiaSinPlanificacion(fecha);
+    })
+    .getPlanificacionesDelMes(fecha.getFullYear(), fecha.getMonth());
+}
+
+// 📅 FUNCIÓN 9: Mostrar día sin planificación
+function mostrarDiaSinPlanificacion(fecha) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fecha.setHours(0, 0, 0, 0);
+  
+  const esFuturo = fecha >= hoy;
+  const contenedor = document.getElementById('contenidoDetalleDia');
+  
+  let html = '<div style="text-align: center; padding: 40px;">';
+  
+  if (esFuturo) {
+    html += '<div style="color: #666; margin-bottom: 20px;">';
+    html += '<i class="fas fa-calendar-plus" style="font-size: 48px; opacity: 0.3;"></i>';
+    html += '</div>';
+    html += '<h4 style="color: #666;">Sin planificación</h4>';
+    html += '<p style="color: #999; margin-bottom: 20px;">Este día no tiene planificación de estudio.</p>';
+    html += '<button onclick="nuevaPlanificacion()" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px;">';
+    html += '➕ Crear Planificación';
+    html += '</button>';
+  } else {
+    html += '<div style="color: #999; margin-bottom: 20px;">';
+    html += '<i class="fas fa-calendar-times" style="font-size: 48px; opacity: 0.3;"></i>';
+    html += '</div>';
+    html += '<h4 style="color: #999;">Día pasado sin planificación</h4>';
+    html += '<p style="color: #666;">Este día no tuvo planificación de estudio.</p>';
+  }
+  
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
 }
 
 // 17. FRONTEND: Interfaz para marcar tema como completado
@@ -3826,102 +4108,79 @@ function validarOrdenConsecutivo(nodoSeleccionado, arbolCompleto) {
   return { esConsecutivo: true };
 }
 
-// Nueva función para obtener el bloque de un tema
+// 🔧 CORRECCIÓN 1: Función mejorada para obtener bloque del tema
 function obtenerBloqueDelTema(idTema) {
-  const tema = temasSeleccionados.find(t => t.id === idTema);
-  if (tema) return tema.bloque;
+  console.log('🔍 Obteniendo bloque para tema:', idTema);
   
-  // Si no está seleccionado, intentar deducir el bloque del tema en el árbol
-  // Por ahora retornar undefined para indicar que no se puede determinar
-  return undefined;
-}
-
-// Función para generar orden plano SOLO de un tema padre original
-function generarOrdenPlanoDelTemaPadre(temaPadreOriginal) {
-  const ordenPlano = [];
-  
-  function recorrerRecursivamente(nodos, nivel = 0) {
-    const nodosOrdenados = nodos.sort((a, b) => {
-      const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
-      const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
-      return numA - numB;
-    });
-    
-    nodosOrdenados.forEach(nodo => {
-      ordenPlano.push({
-        id: nodo.id,
-        nombre: nodo.nombre,
-        prenombre: nodo.prenombre,
-        nombreCompleto: nodo.nombreCompleto,
-        estado: nodo.estado,
-        nivel: nivel
-      });
-      
-      if (nodo.hijos && nodo.hijos.length > 0) {
-        recorrerRecursivamente(nodo.hijos, nivel + 1);
-      }
-    });
+  // 1. Buscar en temas ya seleccionados (más rápido)
+  const temaSeleccionado = temasSeleccionados.find(t => t.id === idTema);
+  if (temaSeleccionado && temaSeleccionado.bloque) {
+    console.log('✅ Bloque encontrado en seleccionados:', temaSeleccionado.bloque);
+    return temaSeleccionado.bloque;
   }
   
-  // Empezar desde el tema padre original
-  recorrerRecursivamente([temaPadreOriginal]);
+  // 2. Buscar en el árbol completo global
+  if (window.arbolCompletoGlobal) {
+    const nodo = encontrarNodoEnArbolCompleto(idTema, window.arbolCompletoGlobal);
+    if (nodo && nodo.idBloque) {
+      // Obtener nombre del bloque desde los datos globales
+      const nombreBloque = window.bloquesInfoGlobal ? window.bloquesInfoGlobal[nodo.idBloque] : `Bloque_${nodo.idBloque}`;
+      console.log('✅ Bloque encontrado en árbol:', nombreBloque);
+      return nombreBloque;
+    }
+  }
   
-  return ordenPlano;
+  // 3. Buscar en todos los elementos de la interfaz como último recurso
+  const todosLosCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+  for (let checkbox of todosLosCheckboxes) {
+    const onchangeAttr = checkbox.getAttribute('onchange');
+    if (onchangeAttr) {
+      const match = onchangeAttr.match(/toggleSeleccionTemaConValidacion\(this,\s*(\d+),\s*\d+,\s*'([^']+)'/);
+      if (match && parseInt(match[1]) === idTema) {
+        console.log('✅ Bloque encontrado en interfaz:', match[2]);
+        return match[2];
+      }
+    }
+  }
+  
+  console.warn('⚠️ No se pudo determinar el bloque para tema:', idTema);
+  return 'Bloque_Desconocido';
 }
 
-// Función mejorada para verificar si tema está seleccionado/completo (considerando descendientes)
+// 🔧 CORRECCIÓN 2: Función simplificada para verificar tema completo
 function verificarSiTemaEstaSeleccionadoCompleto(idTema, arbolCompleto, bloqueEspecifico) {
-  console.log('🔍 Verificando si tema está completo (incluyendo descendientes):', idTema);
+  console.log('🔍 Verificando completitud del tema:', idTema, 'en bloque:', bloqueEspecifico);
   
-  // 1. Verificar si está directamente seleccionado del mismo bloque
+  // 1. ✅ SELECCIÓN DIRECTA en el mismo bloque
   const seleccionDirecta = temasSeleccionados.some(t => 
     t.id === idTema && t.bloque === bloqueEspecifico
   );
   if (seleccionDirecta) {
-    console.log('   ✅ Selección directa en el bloque');
+    console.log('   ✅ Seleccionado directamente');
     return true;
   }
   
-  // 2. Verificar si está completado
+  // 2. ✅ ESTADO COMPLETADO (de sesiones anteriores)
   const nodoTema = encontrarNodoEnArbolCompleto(idTema, arbolCompleto);
   if (nodoTema && nodoTema.estado === 'completado') {
-    console.log('   ✅ Ya completado anteriormente');
+    console.log('   ✅ Completado anteriormente');
     return true;
   }
   
-  // 3. Verificar si está incluido por selección de ancestro como "padre"
+  // 3. ✅ INCLUIDO POR PADRE (selección de tema padre completo)
   if (nodoTema) {
-    let nodoActual = nodoTema;
-    while (nodoActual) {
-      const padreDirecto = obtenerTemaPadreReal(nodoActual, arbolCompleto);
-      if (!padreDirecto) break;
-      
-      const padreSeleccionadoCompleto = temasSeleccionados.some(t => 
-        t.id === padreDirecto.id && t.tipo === 'padre' && t.bloque === bloqueEspecifico
-      );
-      
-      if (padreSeleccionadoCompleto) {
-        console.log('   ✅ Incluido por selección del ancestro:', padreDirecto.nombreCompleto);
-        return true;
-      }
-      
-      nodoActual = padreDirecto;
-    }
-  }
-  
-  // 4. NUEVO: Verificar si todos sus descendientes están seleccionados (auto-completado)
-  if (nodoTema && nodoTema.hijos && nodoTema.hijos.length > 0) {
-    const todosLosDescendientes = obtenerTodosLosDescendientes(nodoTema, arbolCompleto);
-    const descendientesHoja = todosLosDescendientes.filter(d => !d.hijos || d.hijos.length === 0);
+    // Buscar si algún ancestro directo está seleccionado como 'padre'
+    const ancestrosDirectos = obtenerAncestrosDirectos(nodoTema, arbolCompleto);
     
-    if (descendientesHoja.length > 0) {
-      const todosDescendientesSeleccionados = descendientesHoja.every(descendiente => 
-        temasSeleccionados.some(t => t.id === descendiente.id && t.bloque === bloqueEspecifico) ||
-        descendiente.estado === 'completado'
+    for (const ancestro of ancestrosDirectos) {
+      const ancestroSeleccionadoComoPadre = temasSeleccionados.some(t => 
+        t.id === ancestro.id && 
+        t.tipo === 'padre' && 
+        t.bloque === bloqueEspecifico
       );
       
-      if (todosDescendientesSeleccionados) {
-        console.log('   ✅ Auto-completado: todos los descendientes están seleccionados');
+      if (ancestroSeleccionadoComoPadre) {
+        console.log('   ✅ Incluido por ancestro padre:', ancestro.nombreCompleto);
         return true;
       }
     }
@@ -3929,6 +4188,128 @@ function verificarSiTemaEstaSeleccionadoCompleto(idTema, arbolCompleto, bloqueEs
   
   console.log('   ❌ No está completo');
   return false;
+}
+
+// 🔧 CORRECCIÓN 3: Nueva función para obtener ancestros directos
+function obtenerAncestrosDirectos(nodo, arbolCompleto) {
+  const ancestros = [];
+  let nodoActual = nodo;
+  
+  while (nodoActual) {
+    const padreDirecto = obtenerTemaPadreReal(nodoActual, arbolCompleto);
+    if (padreDirecto) {
+      ancestros.push(padreDirecto);
+      nodoActual = padreDirecto;
+    } else {
+      break;
+    }
+  }
+  
+  return ancestros;
+}
+
+// 🔧 CORRECCIÓN 4: Función de validación de orden mejorada y simplificada
+function validarOrdenConsecutivoMejorado(nodoSeleccionado, arbolCompleto) {
+  console.log('🔍 === VALIDACIÓN DE ORDEN MEJORADA ===');
+  console.log('🎯 Validando tema:', nodoSeleccionado.id);
+  
+  // 1. Obtener información del tema seleccionado
+  const nodoCompleto = encontrarNodoEnArbolCompleto(nodoSeleccionado.id, arbolCompleto);
+  if (!nodoCompleto) {
+    console.log('❌ Nodo no encontrado');
+    return { esConsecutivo: true };
+  }
+  
+  const temaPadreOriginal = obtenerTemaPadreOriginal(nodoCompleto, arbolCompleto);
+  const bloqueDelTema = obtenerBloqueDelTema(nodoCompleto.id);
+  
+  console.log('👨‍👧‍👦 Tema padre original:', temaPadreOriginal.nombreCompleto);
+  console.log('📦 Bloque:', bloqueDelTema);
+  
+  // 2. Obtener temas ya seleccionados del mismo bloque
+  const temasDelMismoBloque = temasSeleccionados.filter(t => t.bloque === bloqueDelTema);
+  console.log('📋 Temas del mismo bloque ya seleccionados:', temasDelMismoBloque.length);
+  
+  if (temasDelMismoBloque.length === 0) {
+    console.log('✅ Primer tema del bloque - LIBRE ELECCIÓN');
+    return { esConsecutivo: true };
+  }
+  
+  // 3. Verificar si hay temas del mismo tema padre original en el bloque
+  let hayTemasDelMismoTemaPadre = false;
+  for (const temaDelBloque of temasDelMismoBloque) {
+    const nodoExistente = encontrarNodoEnArbolCompleto(temaDelBloque.id, arbolCompleto);
+    if (nodoExistente) {
+      const temaPadreOriginalExistente = obtenerTemaPadreOriginal(nodoExistente, arbolCompleto);
+      if (temaPadreOriginalExistente.id === temaPadreOriginal.id) {
+        hayTemasDelMismoTemaPadre = true;
+        break;
+      }
+    }
+  }
+  
+  if (!hayTemasDelMismoTemaPadre) {
+    console.log('✅ Primer tema de este tema padre en el bloque - LIBRE ELECCIÓN');
+    return { esConsecutivo: true };
+  }
+  
+  console.log('🔍 Hay temas del mismo tema padre - VALIDANDO ORDEN...');
+  
+  // 4. Generar orden plano SOLO del tema padre original
+  const ordenDelTemaPadre = generarOrdenPlanoDelTemaPadre(temaPadreOriginal);
+  console.log('📋 Orden del tema padre (' + ordenDelTemaPadre.length + ' temas):');
+  ordenDelTemaPadre.forEach((tema, index) => {
+    console.log(`   ${index + 1}. ${tema.prenombre || ''} ${tema.nombre} (ID: ${tema.id})`);
+  });
+  
+  // 5. Encontrar posición del tema seleccionado
+  const posicionEnTemaPadre = ordenDelTemaPadre.findIndex(tema => tema.id === nodoSeleccionado.id);
+  if (posicionEnTemaPadre === -1) {
+    console.log('❌ Tema no encontrado en orden');
+    return { esConsecutivo: true }; // Si no se puede determinar, permitir
+  }
+  
+  console.log('📍 Posición del tema seleccionado:', posicionEnTemaPadre + 1);
+  
+  // 6. Verificar temas anteriores que faltan
+  const temasAnteriores = ordenDelTemaPadre.slice(0, posicionEnTemaPadre);
+  const temasSaltados = [];
+  
+  console.log('⏮️ Verificando', temasAnteriores.length, 'temas anteriores...');
+  
+  for (const temaAnterior of temasAnteriores) {
+    const estaCompleto = verificarSiTemaEstaSeleccionadoCompleto(temaAnterior.id, arbolCompleto, bloqueDelTema);
+    console.log(`   ${temaAnterior.prenombre || ''} ${temaAnterior.nombre}: ${estaCompleto ? '✅ OK' : '❌ FALTA'}`);
+    
+    if (!estaCompleto) {
+      temasSaltados.push(temaAnterior);
+    }
+  }
+  
+  // 7. Resultado final
+  if (temasSaltados.length > 0) {
+    console.log('⚠️ ORDEN ALTERADO - Temas saltados:', temasSaltados.length);
+    
+    const mensaje = '📊 Orden alterado dentro del tema padre\n\n' +
+                   `Tema padre: "${temaPadreOriginal.nombreCompleto}"\n` +
+                   `Bloque: "${bloqueDelTema}"\n\n` +
+                   'Temas que te saltas:\n' + 
+                   temasSaltados.slice(0, 3).map(t => `• ${t.prenombre || ''} ${t.nombre}`).join('\n') +
+                   (temasSaltados.length > 3 ? `\n... y ${temasSaltados.length - 3} más` : '') + '\n\n' +
+                   `Tema que quieres: ${nodoCompleto.prenombre || ''} ${nodoCompleto.nombre}\n\n` +
+                   '¿Continuar saltándote el orden?';
+    
+    return {
+      esConsecutivo: false,
+      mensaje: mensaje,
+      temasSaltados: temasSaltados,
+      requiereAdvertencia: true,
+      temaPadreOriginal: temaPadreOriginal.nombreCompleto
+    };
+  }
+  
+  console.log('✅ ORDEN RESPETADO');
+  return { esConsecutivo: true };
 }
 
 // NUEVA FUNCIÓN: Verificar si un tema está seleccionado (considerando padre vs hijos)
