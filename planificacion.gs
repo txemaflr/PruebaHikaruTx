@@ -1456,9 +1456,11 @@ function programarRepasosParaTema(idTema, fechaCompletado) {
   }
 }
 
-// 6. Obtener planificaciones para calendario
+// 📅 BACKEND: Obtener planificaciones de un mes específico (CORREGIR LA EXISTENTE)
 function getPlanificacionesDelMes(año, mes) {
   try {
+    console.log('📅 Obteniendo planificaciones del mes:', año, mes + 1);
+    
     const planSheet = getGoogleSheet('Planificacion_Diaria');
     const planColumns = getColumnIndices('Planificacion_Diaria');
     const data = planSheet.getDataRange().getValues();
@@ -1472,17 +1474,19 @@ function getPlanificacionesDelMes(año, mes) {
         planificaciones.push({
           id: data[i][planColumns['id_planificacion']],
           fecha: fecha,
-          estado: data[i][planColumns['estado']],
-          numeroTemas: data[i][planColumns['numero_temas']],
-          tiempoEstudio: data[i][planColumns['tiempo_estudio_minutos']]
+          estado: data[i][planColumns['estado']] || 'planificado',
+          numeroTemas: data[i][planColumns['numero_temas']] || 0,
+          tiempoEstudio: data[i][planColumns['tiempo_estudio_minutos']] || 0,
+          tiempoPrevisto: data[i][planColumns['tiempo_previsto_minutos']] || 0
         });
       }
     }
     
+    console.log('✅ Planificaciones encontradas:', planificaciones.length);
     return planificaciones;
     
   } catch (error) {
-    console.error('Error al obtener planificaciones del mes:', error);
+    console.error('❌ Error al obtener planificaciones del mes:', error);
     return [];
   }
 }
