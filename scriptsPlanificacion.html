@@ -380,12 +380,70 @@ function mostrarPlanificacionesEnCalendario(planificaciones) {
 function cargarDetalleDia(fecha, esDiaPasado) {
   const contenedor = document.getElementById('contenidoDetalleDia');
   
+  // Mostrar loading inicial
+  contenedor.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+  
+  // Buscar planificación para esta fecha
+  const fechaStr = fecha.getFullYear() + '-' + 
+    String(fecha.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(fecha.getDate()).padStart(2, '0');
+  
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      // Buscar planificación para esta fecha específica
+      const planDelDia = planificaciones.find(p => {
+        const fechaPlan = new Date(p.fecha);
+        const fechaBuscar = new Date(fecha);
+        fechaPlan.setHours(0, 0, 0, 0);
+        fechaBuscar.setHours(0, 0, 0, 0);
+        return fechaPlan.getTime() === fechaBuscar.getTime();
+      });
+      
+      if (planDelDia) {
+        // Existe planificación - cargar detalle completo
+        cargarDetallePlanificacionCompleta(planDelDia.id, esDiaPasado);
+      } else {
+        // No existe planificación - mostrar interfaz para crear
+        mostrarInterfazSinPlanificacion(esDiaPasado);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al buscar planificación:', error);
+      mostrarInterfazSinPlanificacion(esDiaPasado);
+    })
+    .getPlanificacionesDelMes(fecha.getFullYear(), fecha.getMonth());
+}
+
+function cargarDetallePlanificacionCompleta(idPlanificacion, esDiaPasado) {
+  const contenedor = document.getElementById('contenidoDetalleDia');
+  
+  google.script.run
+    .withSuccessHandler(function(detalle) {
+      if (detalle) {
+        renderizarDetallePlanificacion(detalle, esDiaPasado);
+      } else {
+        mostrarInterfazSinPlanificacion(esDiaPasado);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar detalle:', error);
+      contenedor.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">❌ Error: ' + error.message + '</div>';
+    })
+    .getDetallePlanificacion(idPlanificacion);
+}
+
+function mostrarInterfazSinPlanificacion(esDiaPasado) {
+  const contenedor = document.getElementById('contenidoDetalleDia');
+  
   if (esDiaPasado) {
     contenedor.innerHTML = 
       '<div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-bottom: 15px;">' +
       '<strong>ℹ️ Día pasado:</strong> Solo puedes consultar la información, no modificar.' +
       '</div>' +
-      '<p style="color: #999;">Cargando información del día...</p>';
+      '<div style="text-align: center; padding: 40px; color: #666;">' +
+      '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br><br>' +
+      'Sin planificación registrada' +
+      '</div>';
   } else {
     contenedor.innerHTML = 
       '<div style="text-align: center; padding: 40px;">' +
