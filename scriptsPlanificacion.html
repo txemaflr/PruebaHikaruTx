@@ -1,76 +1,93 @@
+
 <script>
-// scriptsPlanificacion.html - REESCRITURA LIMPIA
-// Siguiendo la estructura de scriptsBloques.html y scriptsConceptos.html
+// scriptsPlanificacion.html - VERSIÓN LIMPIA
+// Variables globales
+var mesActual = new Date();
+var diaSeleccionado = null;
+// Variables del modal
+var pasoActual = 1;
+var temasSeleccionados = [];
+var tiempoTotalDisponible = 240; // minutos
+var tiempoUsado = 0;
+var bloquesActivos = [];
+var configuracionActual = null;
+var oposicionActiva = null;
 
-// ====================================
-// VARIABLES GLOBALES
-// ====================================
-
-let oposicionActiva = null;
-let configuracionActual = null;
-let mesActual = new Date();
-let diaSeleccionado = null;
-
-// Estado del modal de planificación
-let estadoPlanificacion = {
-  paso: 1,
-  fecha: null,
-  tiempoPrevisto: 240,
-  tiempoRepasos: 0,
-  tiempoEstudio: 240,
-  temasSeleccionados: [],
-  bloquesActivos: [],
-  repasosDelDia: []
-};
-
-// Sistema de advertencias
-let contadorAdvertencias = {
-  orden: {},
-  bloques: {}
-};
-
-// ====================================
-// FUNCIONES DE INICIALIZACIÓN
-// ====================================
-
+// 1. Inicializar sección de planificación
 function inicializarSeccionPlanificacion() {
   console.log('Inicializando sección Planificación...');
   cargarOposicionActiva();
 }
 
+// 2. Cargar oposición activa
 function cargarOposicionActiva() {
+  var contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+  
+  if (contenedor) {
+    contenedor.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="loading-spinner loading-spinner-large"></div><p>Cargando oposición activa...</p></div>';
+  }
+  
   google.script.run
     .withSuccessHandler(function(oposicion) {
       oposicionActiva = oposicion;
-      mostrarContenidoPrincipal();
-      configurarCalendario();
+      console.log('Oposición activa cargada:', oposicion);
+      
+      // Mostrar interfaz básica
+      if (contenedor) {
+        if (oposicion) {
+          contenedor.innerHTML = 
+            '<div style="background: #d4edda; padding: 20px; border-radius: 8px; text-align: center;">' +
+            '<h3 style="margin: 0; color: #155724;">📚 ' + oposicion.nombre + '</h3>' +
+            '<p style="margin: 10px 0 0 0; color: #155724;">Oposición activa cargada correctamente</p>' +
+            '</div>';
+          
+          // Inicializar calendario básico
+          setTimeout(function() {
+            if (typeof renderizarCalendario === 'function') {
+              renderizarCalendario();
+            }
+            cargarPlanificacionesDelMes();
+          }, 500);
+          
+        } else {
+          contenedor.innerHTML = 
+            '<div style="background: #fff3cd; padding: 20px; border-radius: 8px; text-align: center;">' +
+            '<h3 style="margin: 0; color: #856404;">⚠️ Sin oposición activa</h3>' +
+            '<p style="margin: 10px 0; color: #856404;">No hay ninguna oposición configurada como activa</p>' +
+            '<button onclick="mostrarSelectorOposicion()" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px;">Configurar Oposición</button>' +
+            '</div>';
+        }
+      }
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar oposición activa:', error);
-      mostrarContenidoPrincipal();
+      
+      if (contenedor) {
+        contenedor.innerHTML = 
+          '<div style="background: #f8d7da; padding: 20px; border-radius: 8px; text-align: center;">' +
+          '<h3 style="margin: 0; color: #721c24;">❌ Error de conexión</h3>' +
+          '<p style="margin: 10px 0; color: #721c24;">No se pudo cargar la oposición activa</p>' +
+          '<button onclick="cargarOposicionActiva()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px;">Reintentar</button>' +
+          '</div>';
+      }
+      
+      mostrarError('No se pudo cargar la oposición activa');
     })
     .getOposicionActiva();
 }
 
-function mostrarContenidoPrincipal() {
-  const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+function mostrarSelectorOposicion() {
+  var contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+  if (!contenedor) return;
   
-  if (!oposicionActiva) {
-    mostrarSelectorOposicion(contenedor);
-  } else {
-    mostrarInterfazPrincipal(contenedor);
-  }
-}
-
-function mostrarSelectorOposicion(contenedor) {
-  let html = '<div style="text-align: center; padding: 40px;">';
+  var html = '<div style="text-align: center; padding: 40px;">';
   html += '<h3>Selecciona una oposición para planificar</h3>';
   html += '<p style="color: #666; margin-bottom: 30px;">Solo puedes tener una oposición activa a la vez</p>';
   
   html += '<div style="max-width: 400px; margin: 0 auto;">';
   html += '<label style="display: block; margin-bottom: 10px; text-align: left;">Oposición:</label>';
   html += '<select id="selectorOposicion" style="width: 100%; padding: 10px; margin-bottom: 20px;">';
-  html += '<option value="">-- Selecciona una oposición --</option>';
+  html += '<option value="">-- Cargando oposiciones --</option>';
   html += '</select>';
   
   html += '<button onclick="establecerOposicionActiva()" ';
@@ -83,31 +100,67 @@ function mostrarSelectorOposicion(contenedor) {
   cargarOposicionesDisponibles();
 }
 
-function mostrarInterfazPrincipal(contenedor) {
-  let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
-  html += '<div>';
-  html += '<h3 style="margin: 0; color: #007bff;">📚 ' + oposicionActiva.nombre + '</h3>';
-  html += '<p style="margin: 5px 0 0 0; color: #666;">Oposición activa</p>';
-  html += '</div>';
-  html += '<div>';
-  html += '<button onclick="cambiarOposicion()" style="background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 3px;">Cambiar</button>';
-  html += '</div>';
-  html += '</div>';
+// 3. Mostrar página principal (VERSIÓN CON COMPARACIÓN)
+function mostrarPaginaPrincipal() {
+  const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
   
-  contenedor.innerHTML = html;
+  if (!oposicionActiva) {
+    // No hay oposición activa - mostrar selector
+    let html = '<div style="text-align: center; padding: 40px;">';
+    html += '<h3>Selecciona una oposición para planificar</h3>';
+    html += '<p style="color: #666; margin-bottom: 30px;">Solo puedes tener una oposición activa a la vez</p>';
+    
+    html += '<div style="max-width: 400px; margin: 0 auto;">';
+    html += '<label style="display: block; margin-bottom: 10px; text-align: left;">Oposición:</label>';
+    html += '<select id="selectorOposicion" style="width: 100%; padding: 10px; margin-bottom: 20px;">';
+    html += '<option value="">-- Selecciona una oposición --</option>';
+    html += '</select>';
+    
+    html += '<button onclick="establecerOposicionActiva()" ';
+    html += 'style="background: #007bff; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer;">';
+    html += 'Establecer como activa</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    contenedor.innerHTML = html;
+    cargarOposicionesDisponibles();
+    
+  } else {
+    // Ya hay oposición activa
+    let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
+    html += '<div>';
+    html += '<h3 style="margin: 0; color: #007bff;">📚 ' + oposicionActiva.nombre + '</h3>';
+    html += '<p style="margin: 5px 0 0 0; color: #666;">Oposición activa</p>';
+    html += '</div>';
+    html += '<div>';
+    html += '<button onclick="cambiarOposicion()" style="background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 3px; margin-right: 10px;">Cambiar</button>';
+    html += '<button id="btnCompararOposiciones" onclick="mostrarComparadorOposiciones()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 3px; margin-right: 10px;" disabled>';
+    html += '🔍 Comparar</button>';
+    html += '</div>';
+    html += '</div>';
+    
+    contenedor.innerHTML = html;
+    
+    // Verificar si hay más de una oposición para habilitar comparación
+    verificarOposicionesDisponibles();
+  }
 }
 
-// ====================================
-// FUNCIONES DE OPOSICIONES
-// ====================================
-
+// 4. Cargar oposiciones disponibles
 function cargarOposicionesDisponibles() {
+  var select = document.getElementById('selectorOposicion');
+  if (!select) return;
+  
+  select.innerHTML = '<option value="">-- Cargando oposiciones --</option>';
+  select.disabled = true;
+  
   google.script.run
     .withSuccessHandler(function(oposiciones) {
-      const select = document.getElementById('selectorOposicion');
+      select.disabled = false;
+      select.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
       
       oposiciones.forEach(function(op) {
-        const option = document.createElement('option');
+        var option = document.createElement('option');
         option.value = op.id;
         option.textContent = op.nombre;
         select.appendChild(option);
@@ -115,37 +168,53 @@ function cargarOposicionesDisponibles() {
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar oposiciones:', error);
-      alert('Error al cargar oposiciones');
+      select.disabled = false;
+      select.innerHTML = '<option value="">Error al cargar</option>';
+      mostrarError('Error al cargar oposiciones');
     })
     .getOposicionesParaPlanificacion();
 }
 
+// 5. Establecer oposición activa
 function establecerOposicionActiva() {
-  const idOposicion = document.getElementById('selectorOposicion').value;
+  var idOposicion = document.getElementById('selectorOposicion').value;
   
   if (!idOposicion) {
-    alert('Selecciona una oposición');
+    mostrarAdvertencia('Selecciona una oposición antes de continuar');
     return;
   }
   
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Configurando...';
+  
   google.script.run
     .withSuccessHandler(function() {
-      alert('Oposición establecida correctamente');
-      cargarOposicionActiva();
+      btn.disabled = false;
+      btn.textContent = 'Establecer como activa';
+      mostrarExito('Oposición establecida correctamente');
+      
+      // Recargar la sección
+      setTimeout(function() {
+        cargarOposicionActiva();
+      }, 1000);
     })
     .withFailureHandler(function(error) {
       console.error('Error al establecer oposición activa:', error);
-      alert('Error al establecer oposición activa');
+      btn.disabled = false;
+      btn.textContent = 'Establecer como activa';
+      mostrarError('No se pudo establecer la oposición activa');
     })
     .setOposicionActiva(idOposicion);
 }
 
+// 6. Cambiar oposición activa (VERSIÓN CON CANCELAR)
 function cambiarOposicion() {
   const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
   
   let html = '<div style="text-align: center; padding: 40px;">';
   html += '<h3>Cambiar oposición activa</h3>';
-  html += '<p style="color: #666; margin-bottom: 30px;">Actual: <strong>' + oposicionActiva.nombre + '</strong></p>';
+  html += '<p style="color: #666; margin-bottom: 30px;">Actualmente: <strong>' + oposicionActiva.nombre + '</strong></p>';
   
   html += '<div style="max-width: 400px; margin: 0 auto;">';
   html += '<label style="display: block; margin-bottom: 10px; text-align: left;">Nueva oposición:</label>';
@@ -166,15 +235,37 @@ function cambiarOposicion() {
   html += '</div>';
   
   contenedor.innerHTML = html;
+  
+  // Cargar oposiciones (excluyendo la actual)
   cargarOposicionesParaCambio();
 }
 
+// 7. Verificar si hay más oposiciones para habilitar comparación
+function verificarOposicionesDisponibles() {
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      const btnComparar = document.getElementById('btnCompararOposiciones');
+      if (btnComparar && oposiciones.length > 1) {
+        btnComparar.disabled = false;
+        btnComparar.title = 'Comparar con otras oposiciones';
+      }
+    })
+    .getOposicionesOrdenadas();
+}
+
+// 8. Mostrar comparador de oposiciones
+function mostrarComparadorOposiciones() {
+  mostrarAdvertencia('Próximo paso: Implementar modal de comparación');
+}
+
+// 9. Cargar oposiciones para cambio (excluyendo la actual)
 function cargarOposicionesParaCambio() {
   google.script.run
     .withSuccessHandler(function(oposiciones) {
       const select = document.getElementById('selectorNuevaOposicion');
       
       oposiciones.forEach(function(op) {
+        // Excluir la oposición actualmente activa
         if (op.id != oposicionActiva.id) {
           const option = document.createElement('option');
           option.value = op.id;
@@ -183,128 +274,125 @@ function cargarOposicionesParaCambio() {
         }
       });
     })
-    .getOposicionesParaPlanificacion();
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar oposiciones:', error);
+      alert('Error al cargar oposiciones');
+    })
+    .getOposicionesOrdenadas();
 }
 
+// 10. Cancelar cambio de oposición
 function cancelarCambioOposicion() {
-  mostrarContenidoPrincipal();
+  // Volver a mostrar la página principal con la oposición actual
+  mostrarPaginaPrincipal();
 }
 
+// 11. Confirmar cambio de oposición
 function confirmarCambioOposicion() {
   const idNuevaOposicion = document.getElementById('selectorNuevaOposicion').value;
   
   if (!idNuevaOposicion) {
-    alert('Selecciona una oposición');
+    mostrarAdvertencia('Selecciona una nueva oposición');
     return;
   }
   
   google.script.run
     .withSuccessHandler(function() {
-      alert('Oposición cambiada correctamente');
+      mostrarExito('Oposición cambiada correctamente', '🔄 Actualizado');
       cargarOposicionActiva();
     })
     .withFailureHandler(function(error) {
       console.error('Error al cambiar oposición:', error);
-      alert('Error al cambiar oposición');
+      mostrarError('Error al cambiar oposición', 'Error de conexión');
     })
     .setOposicionActiva(idNuevaOposicion);
 }
 
-// ====================================
-// FUNCIONES DEL CALENDARIO
-// ====================================
-
-function configurarCalendario() {
-  renderizarCalendario();
-  cargarPlanificacionesDelMes();
-  
-  // Auto-seleccionar día actual si estamos en el mes actual
-  const hoy = new Date();
-  if (mesActual.getMonth() === hoy.getMonth() && mesActual.getFullYear() === hoy.getFullYear()) {
-    setTimeout(() => {
-      seleccionarDia(hoy.getDate());
-    }, 100);
-  }
-}
-
-function renderizarCalendario() {
-  const año = mesActual.getFullYear();
-  const mes = mesActual.getMonth();
-  
-  // Actualizar título
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  document.getElementById('tituloMes').textContent = meses[mes] + ' ' + año;
-  
-  // Calcular primer día (lunes = 0)
-  let primerDia = new Date(año, mes, 1).getDay();
-  primerDia = primerDia === 0 ? 6 : primerDia - 1;
-  
-  const diasEnMes = new Date(año, mes + 1, 0).getDate();
-  const hoy = new Date();
-  
-  // Generar HTML del calendario
-  let html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">';
-  
-  // Encabezados de días
-  const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  diasSemana.forEach(dia => {
-    html += '<div style="text-align: center; font-weight: bold; padding: 8px; color: #666; font-size: 12px;">' + dia + '</div>';
-  });
-  
-  // Días vacíos al inicio
-  for (let i = 0; i < primerDia; i++) {
-    html += '<div></div>';
-  }
-  
-  // Días del mes
-  for (let dia = 1; dia <= diasEnMes; dia++) {
-    const fecha = new Date(año, mes, dia);
-    const esHoy = fecha.toDateString() === hoy.toDateString();
-    const esSeleccionado = diaSeleccionado === dia;
-    
-    // Estilos del día
-    let estilos = 'min-height: 80px; border: 1px solid #ddd; border-radius: 5px; padding: 5px; cursor: pointer; ';
-    estilos += 'display: flex; flex-direction: column; justify-content: space-between; ';
-    
-    if (esHoy) {
-      estilos += 'border: 2px solid #2196f3; background: #e3f2fd; ';
-    } else if (esSeleccionado) {
-      estilos += 'background: #f0f0f0; ';
-    } else {
-      estilos += 'background: white; ';
+// Renderizar calendario
+if (typeof renderizarCalendario === 'undefined') {
+  function renderizarCalendario() {
+    var calendarioDiv = document.getElementById('calendario');
+    if (!calendarioDiv) {
+      console.warn('Elemento calendario no encontrado');
+      return;
     }
     
-    html += '<div onclick="seleccionarDia(' + dia + ')" style="' + estilos + '">';
+    var año = mesActual.getFullYear();
+    var mes = mesActual.getMonth();
     
-    // Número del día
-    html += '<div style="font-weight: bold; color: ' + (esHoy ? '#2196f3' : '#333') + ';">' + dia + '</div>';
+    // Actualizar título si existe
+    var tituloMes = document.getElementById('tituloMes');
+    if (tituloMes) {
+      var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      tituloMes.textContent = meses[mes] + ' ' + año;
+    }
     
-    // Contenido del día (se llenará con planificaciones)
-    html += '<div id="contenido-' + año + '-' + mes + '-' + dia + '" style="font-size: 10px; flex: 1;"></div>';
+    // Calendario básico (simplificado)
+    var primerDia = new Date(año, mes, 1).getDay();
+    primerDia = primerDia === 0 ? 6 : primerDia - 1;
+    
+    var diasEnMes = new Date(año, mes + 1, 0).getDate();
+    var hoy = new Date();
+    
+    var html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: 12px;">';
+    
+    // Encabezados
+    var diasSemana = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    diasSemana.forEach(function(dia) {
+      html += '<div style="text-align: center; font-weight: bold; padding: 8px; color: #666;">' + dia + '</div>';
+    });
+    
+    // Días vacíos
+    for (var i = 0; i < primerDia; i++) {
+      html += '<div></div>';
+    }
+    
+    // Días del mes
+    for (var dia = 1; dia <= diasEnMes; dia++) {
+      var fecha = new Date(año, mes, dia);
+      var esHoy = fecha.toDateString() === hoy.toDateString();
+      var esSeleccionado = diaSeleccionado === dia;
+      
+      var estilos = 'min-height: 50px; border: 1px solid #ddd; border-radius: 3px; padding: 5px; cursor: pointer; ';
+      estilos += 'display: flex; flex-direction: column; justify-content: space-between; ';
+      
+      if (esHoy) {
+        estilos += 'border: 2px solid #007bff; background: #e3f2fd; ';
+      } else if (esSeleccionado) {
+        estilos += 'background: #f0f0f0; ';
+      } else {
+        estilos += 'background: white; ';
+      }
+      
+      html += '<div onclick="seleccionarDia(' + dia + ')" style="' + estilos + '">';
+      html += '<div style="font-weight: bold; color: ' + (esHoy ? '#007bff' : '#333') + ';">' + dia + '</div>';
+      html += '<div id="contenido-' + año + '-' + mes + '-' + dia + '" style="font-size: 8px; flex: 1;"></div>';
+      html += '</div>';
+    }
     
     html += '</div>';
+    calendarioDiv.innerHTML = html;
   }
-  
-  html += '</div>';
-  document.getElementById('calendario').innerHTML = html;
 }
 
+
+// Cambiar mes
 function cambiarMes(direccion) {
   mesActual.setMonth(mesActual.getMonth() + direccion);
-  diaSeleccionado = null;
+  diaSeleccionado = null; // Reset selección
   renderizarCalendario();
-  cargarPlanificacionesDelMes();
   limpiarDetalleDia();
 }
 
+// Ir a hoy
 function irAHoy() {
   mesActual = new Date();
   renderizarCalendario();
-  cargarPlanificacionesDelMes();
   seleccionarDia(new Date().getDate());
 }
 
+// Seleccionar día
 function seleccionarDia(dia) {
   const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
   const hoy = new Date();
@@ -314,163 +402,41 @@ function seleccionarDia(dia) {
   const esDiaPasado = fechaSeleccionada < hoy;
   
   diaSeleccionado = dia;
-  renderizarCalendario();
+  renderizarCalendario(); // Re-renderizar para mostrar selección
   
   // Actualizar detalle del día
   const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
   
-  document.getElementById('tituloDetalleDia').textContent = tituloFecha + (esDiaPasado ? ' (Solo lectura)' : '');
-  
-  cargarDetalleDia(fechaSeleccionada, esDiaPasado);
-}
-
-function limpiarDetalleDia() {
-  document.getElementById('tituloDetalleDia').textContent = 'Selecciona un día';
-  document.getElementById('contenidoDetalleDia').innerHTML = 
-    '<p style="text-align: center; color: #666; padding: 40px 0;">' +
-    '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>' +
-    'Selecciona un día del calendario</p>';
-}
-
-function cargarPlanificacionesDelMes() {
-  const año = mesActual.getFullYear();
-  const mes = mesActual.getMonth();
-  
-  google.script.run
-    .withSuccessHandler(function(planificaciones) {
-      mostrarPlanificacionesEnCalendario(planificaciones);
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al cargar planificaciones:', error);
-    })
-    .getPlanificacionesDelMes(año, mes);
-}
-
-function mostrarPlanificacionesEnCalendario(planificaciones) {
-  planificaciones.forEach(plan => {
-    const fecha = new Date(plan.fecha);
-    const dia = fecha.getDate();
-    const contenedorDia = document.getElementById(`contenido-${fecha.getFullYear()}-${fecha.getMonth()}-${dia}`);
-    
-    if (contenedorDia) {
-      let html = '';
-      let colorFondo = '#e3f2fd';
-      let icono = '📚';
-      
-      if (plan.estado === 'completado') {
-        colorFondo = '#e8f5e9';
-        icono = '✅';
-      } else if (plan.estado === 'en_progreso') {
-        colorFondo = '#fff3e0';
-        icono = '🔄';
-      }
-      
-      html += `<div style="background: ${colorFondo}; padding: 3px; border-radius: 3px; margin: 1px 0; font-size: 10px; cursor: pointer;" `;
-      html += `onclick="mostrarDetallePlanificacion('${plan.id}')" title="Ver detalle de planificación">`;
-      html += `${icono} ${plan.numeroTemas} temas`;
-      html += `<br><small style="font-size: 8px;">${Math.round(plan.tiempoEstudio / 60)}h</small>`;
-      html += '</div>';
-      
-      contenedorDia.innerHTML = html;
-    }
-  });
-}
-
-function cargarDetalleDia(fecha, esDiaPasado) {
-  const contenedor = document.getElementById('contenidoDetalleDia');
-  
-  // Mostrar loading inicial
-  contenedor.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
-  
-  // Buscar planificación para esta fecha
-  const fechaStr = fecha.getFullYear() + '-' + 
-    String(fecha.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(fecha.getDate()).padStart(2, '0');
-  
-  google.script.run
-    .withSuccessHandler(function(planificaciones) {
-      // Buscar planificación para esta fecha específica
-      const planDelDia = planificaciones.find(p => {
-        const fechaPlan = new Date(p.fecha);
-        const fechaBuscar = new Date(fecha);
-        fechaPlan.setHours(0, 0, 0, 0);
-        fechaBuscar.setHours(0, 0, 0, 0);
-        return fechaPlan.getTime() === fechaBuscar.getTime();
-      });
-      
-      if (planDelDia) {
-        // Existe planificación - cargar detalle completo
-        cargarDetallePlanificacionCompleta(planDelDia.id, esDiaPasado);
-      } else {
-        // No existe planificación - mostrar interfaz para crear
-        mostrarInterfazSinPlanificacion(esDiaPasado);
-      }
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al buscar planificación:', error);
-      mostrarInterfazSinPlanificacion(esDiaPasado);
-    })
-    .getPlanificacionesDelMes(fecha.getFullYear(), fecha.getMonth());
-}
-
-function cargarDetallePlanificacionCompleta(idPlanificacion, esDiaPasado) {
-  const contenedor = document.getElementById('contenidoDetalleDia');
-  
-  google.script.run
-    .withSuccessHandler(function(detalle) {
-      if (detalle) {
-        renderizarDetallePlanificacion(detalle, esDiaPasado);
-      } else {
-        mostrarInterfazSinPlanificacion(esDiaPasado);
-      }
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al cargar detalle:', error);
-      contenedor.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">❌ Error: ' + error.message + '</div>';
-    })
-    .getDetallePlanificacion(idPlanificacion);
-}
-
-function mostrarInterfazSinPlanificacion(esDiaPasado) {
-  const contenedor = document.getElementById('contenidoDetalleDia');
-  
   if (esDiaPasado) {
-    contenedor.innerHTML = 
+    document.getElementById('tituloDetalleDia').textContent = tituloFecha + ' (Solo lectura)';
+    document.getElementById('contenidoDetalleDia').innerHTML = 
       '<div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-bottom: 15px;">' +
       '<strong>ℹ️ Día pasado:</strong> Solo puedes consultar la información, no modificar.' +
       '</div>' +
-      '<div style="text-align: center; padding: 40px; color: #666;">' +
-      '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br><br>' +
-      'Sin planificación registrada' +
-      '</div>';
+      '<p style="color: #999;">Detalle del día en desarrollo...</p>';
   } else {
-    contenedor.innerHTML = 
-      '<div style="text-align: center; padding: 40px;">' +
-      '<div style="color: #666; margin-bottom: 20px;">' +
-      '<i class="fas fa-calendar-plus" style="font-size: 48px; opacity: 0.3;"></i>' +
-      '</div>' +
-      '<h4 style="color: #666;">Sin planificación</h4>' +
-      '<p style="color: #999; margin-bottom: 20px;">Este día no tiene planificación de estudio.</p>' +
-      '<button onclick="nuevaPlanificacion()" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px;">' +
-      '➕ Crear Planificación' +
-      '</button>' +
-      '</div>';
+    document.getElementById('tituloDetalleDia').textContent = tituloFecha;
+    document.getElementById('contenidoDetalleDia').innerHTML = 
+      '<p style="color: #999;">Día seleccionado: ' + dia + '. Detalle en desarrollo...</p>';
   }
 }
 
-// ====================================
-// FUNCIONES DEL MODAL DE PLANIFICACIÓN
-// ====================================
+// Limpiar detalle del día
+function limpiarDetalleDia() {
+  document.getElementById('tituloDetalleDia').textContent = 'Selecciona un día';
+  document.getElementById('contenidoDetalleDia').innerHTML = '<p style="text-align: center; color: #666; padding: 40px 0;"><i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>Selecciona un día del calendario</p>';
+}
 
+// Abrir modal de nueva planificación
 function nuevaPlanificacion() {
   if (!diaSeleccionado) {
-    alert('⚠️ Primero selecciona un día del calendario');
+    mostrarAdvertencia('Primero selecciona un día del calendario', 'Día no seleccionado');
     return;
   }
   
   if (!oposicionActiva) {
-    alert('⚠️ Debes tener una oposición activa');
+    mostrarError('Debes tener una oposición activa', 'Configuración incompleta');
     return;
   }
   
@@ -481,48 +447,115 @@ function nuevaPlanificacion() {
   fechaSeleccionada.setHours(0, 0, 0, 0);
   
   if (fechaSeleccionada < hoy) {
-    alert('⚠️ No puedes crear planificaciones para días pasados');
+    mostrarAdvertencia('No puedes crear planificaciones para días pasados', 'Fecha no válida');
     return;
   }
   
-  // Resetear estado
+  // Resetear estado usando TUS variables
   resetearEstadoPlanificacion();
   
-  // Establecer fecha automáticamente
+  // Establecer fecha automáticamente usando TUS variables  
   const fechaStr = fechaSeleccionada.getFullYear() + '-' + 
     String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
     String(fechaSeleccionada.getDate()).padStart(2, '0');
-  estadoPlanificacion.fecha = fechaStr;
+
+    // Cargar oposiciones
+  cargarOposiciones();
   
-  // Mostrar modal
+  // Guardar fecha en variable global (crear si no existe)
+  window.fechaPlanificacion = fechaStr;
+  
   document.getElementById('modalNuevaPlanificacion').style.display = 'flex';
   mostrarPaso(1);
-}
 
-function resetearEstadoPlanificacion() {
-  estadoPlanificacion = {
-    paso: 1,
-    fecha: null,
-    tiempoPrevisto: 240,
-    tiempoRepasos: 0,
-    tiempoEstudio: 240,
-    temasSeleccionados: [],
-    bloquesActivos: [],
-    repasosDelDia: []
-  };
+    // Verificar repasos del día seleccionado
+  verificarRepasosDelDia();
+}
   
-  contadorAdvertencias = {
-    orden: {},
-    bloques: {}
-  };
+
+async function validarPaso2() {
+  const horasInput = document.getElementById('horasEstudio');
+  const horas = parseFloat(horasInput.value);
+  
+  if (!horas || horas < 0.5) {
+    mostrarAdvertencia('Introduce un tiempo de estudio válido (mínimo 0.5 horas)', 'Tiempo inválido');
+    horasInput.focus();
+    return false;
+  }
+  
+  if (horas > 12) {
+    const confirmar = await mostrarConfirmacion({
+      titulo: 'Tiempo de estudio muy alto',
+      mensaje: `Has introducido ${horas} horas de estudio. ¿Estás seguro de que es correcto?`,
+      icono: '⚠️',
+      textoConfirmar: 'Sí, continuar',
+      textoCancelar: 'Corregir',
+      tipo: 'normal'
+    });
+    
+    if (!confirmar) {
+      horasInput.focus();
+      return false;
+    }
+  }
+  
+  // Guardar tiempos usando TUS variables
+  tiempoTotalDisponible = horas * 60;
+  
+  // Crear variables para repasos si no existen
+  if (typeof repasosDelDia === 'undefined') {
+    window.repasosDelDia = [];
+  }
+  
+  const tiempoRepasos = repasosDelDia.length * 30;
+  const tiempoEstudioReal = Math.max(0, tiempoTotalDisponible - tiempoRepasos);
+  
+  // Actualizar variable global
+  tiempoTotalDisponible = tiempoEstudioReal;
+  
+  return true;
+}  
+
+  
+function resetearEstadoPlanificacion() {
+  // Resetear todas las variables del modal
+  pasoActual = 1;
+  temasSeleccionados = [];
+  tiempoTotalDisponible = 240; // 4 horas por defecto
+  tiempoUsado = 0;
+  bloquesActivos = [];
+  
+  // Variables que pueden no existir aún (créalas si las necesitas)
+  if (typeof repasosDelDia === 'undefined') {
+    window.repasosDelDia = [];
+  } else {
+    repasosDelDia = [];
+  }
+  
+  if (typeof contadorAdvertencias === 'undefined') {
+    window.contadorAdvertencias = {
+      orden: {},
+      bloques: {}
+    };
+  } else {
+    contadorAdvertencias = {
+      orden: {},
+      bloques: {}
+    };
+  }
+  
+  console.log('Estado de planificación reseteado');
 }
 
+
+// Cerrar modal
 function cerrarModal() {
   document.getElementById('modalNuevaPlanificacion').style.display = 'none';
 }
 
+// Mostrar paso específico
 function mostrarPaso(numeroPaso) {
-  estadoPlanificacion.paso = numeroPaso;
+  pasoActual = numeroPaso; // Usar TU variable
   
   // Ocultar todos los pasos
   document.getElementById('paso1').style.display = 'none';
@@ -532,7 +565,7 @@ function mostrarPaso(numeroPaso) {
   // Mostrar paso actual
   document.getElementById('paso' + numeroPaso).style.display = 'block';
   
-  // Actualizar indicadores
+  // Actualizar indicadores (si los tienes)
   actualizarIndicadoresPasos();
   
   // Actualizar botones
@@ -549,21 +582,49 @@ function mostrarPaso(numeroPaso) {
   }
 }
 
+function mostrarPaso1() {
+  // Por ahora vacía, ya funciona lo básico
+  console.log('Paso 1 cargado');
+}
+
+function mostrarPaso2() {
+  console.log('Paso 2 cargado');
+}
+
+function mostrarPaso3() {
+  console.log('Paso 3 cargado');
+}
+
+function validarPaso1() {
+  const fecha = document.getElementById('fechaPlanificacion')?.value;
+  if (!fecha) {
+    mostrarAdvertencia('Selecciona una fecha para continuar');
+    return false;
+  }
+  window.fechaPlanificacion = fecha;
+  return true;
+}
+
+
+// Actualizar indicadores de pasos
 function actualizarIndicadoresPasos() {
   for (let i = 1; i <= 3; i++) {
     const indicador = document.getElementById('indicadorPaso' + i);
     const circulo = indicador.querySelector('div');
     const texto = indicador.querySelector('span');
     
-    if (i < estadoPlanificacion.paso) {
+    if (i < pasoActual) {
+      // Paso completado
       circulo.style.background = '#28a745';
       circulo.style.color = 'white';
       texto.style.color = '#28a745';
-    } else if (i === estadoPlanificacion.paso) {
+    } else if (i === pasoActual) {
+      // Paso actual
       circulo.style.background = '#007bff';
       circulo.style.color = 'white';
       texto.style.color = '#007bff';
     } else {
+      // Paso pendiente
       circulo.style.background = '#ddd';
       circulo.style.color = '#999';
       texto.style.color = '#999';
@@ -571,214 +632,119 @@ function actualizarIndicadoresPasos() {
   }
 }
 
-function pasoSiguiente() {
-  if (estadoPlanificacion.paso === 1) {
+// Paso siguiente
+async function pasoSiguiente() {
+  if (pasoActual === 1) {
     if (validarPaso1()) {
       mostrarPaso(2);
     }
-  } else if (estadoPlanificacion.paso === 2) {
-    if (validarPaso2()) {
+  } else if (pasoActual === 2) {
+    const valido = await validarPaso2();
+    if (valido) {
       mostrarPaso(3);
     }
-  } else if (estadoPlanificacion.paso === 3) {
-    crearPlanificacion();
+  } else if (pasoActual === 3) {
+    await crearPlanificacion();
   }
 }
 
+// Paso anterior
 function pasoAnterior() {
-  if (estadoPlanificacion.paso > 1) {
-    mostrarPaso(estadoPlanificacion.paso - 1);
+  if (pasoActual > 1) {
+    mostrarPaso(pasoActual - 1);
   }
 }
 
-// ====================================
-// PASOS DEL MODAL
-// ====================================
-
-function mostrarPaso1() {
-  // Establecer fecha automáticamente
-  if (estadoPlanificacion.fecha) {
-    document.getElementById('fechaPlanificacion').value = estadoPlanificacion.fecha;
-    verificarRepasosDelDia();
-  }
-  
-  // Llenar select de oposición (aunque se usa la activa)
+// Cargar oposiciones (conectado al backend)
+function cargarOposiciones() {
   const select = document.getElementById('oposicionPlanificacion');
-  select.innerHTML = '<option value="' + oposicionActiva.id + '">' + oposicionActiva.nombre + '</option>';
-  select.value = oposicionActiva.id;
-  select.disabled = true; // Solo informativo
+  select.innerHTML = '<option value="">-- Cargando oposiciones... --</option>';
+  
+  google.script.run
+    .withSuccessHandler(function(oposiciones) {
+      select.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
+      
+      oposiciones.forEach(function(oposicion) {
+        const option = document.createElement('option');
+        option.value = oposicion.id;
+        option.textContent = oposicion.nombre;
+        select.appendChild(option);
+      });
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar oposiciones:', error);
+      select.innerHTML = '<option value="">-- Error al cargar --</option>';
+    })
+    .getOposicionesParaPlanificacion();
 }
 
-function mostrarPaso2() {
-  // Mostrar repasos del día
-  mostrarRepasosEnPaso2();
-  
-  // Cargar configuración actual
-  cargarConfiguracionActual();
-  
-  // Calcular tiempo inicial
-  actualizarCalculoTiempo();
-  
-  // Configurar event listener
-  const horasInput = document.getElementById('horasEstudio');
-  horasInput.addEventListener('input', actualizarCalculoTiempo);
-}
-
-function mostrarPaso3() {
-  // Actualizar tiempo disponible
-  actualizarTiempoDisponible();
-  
-  // Cargar árbol de temas
-  cargarArbolTemas();
-}
-
-// ====================================
-// VALIDACIONES DE PASOS
-// ====================================
-
-function validarPaso1() {
-  const fecha = document.getElementById('fechaPlanificacion').value;
-  
-  if (!fecha) {
-    alert('⚠️ Selecciona una fecha');
-    return false;
-  }
-  
-  estadoPlanificacion.fecha = fecha;
-  return true;
-}
-
-function validarPaso2() {
-  const horasInput = document.getElementById('horasEstudio');
-  const horas = parseFloat(horasInput.value);
-  
-  if (!horas || horas < 0.5) {
-    alert('⚠️ Introduce un tiempo de estudio válido (mínimo 0.5 horas)');
-    horasInput.focus();
-    return false;
-  }
-  
-  if (horas > 12) {
-    if (!confirm('⚠️ Has introducido ' + horas + ' horas de estudio. ¿Estás seguro?')) {
-      horasInput.focus();
-      return false;
-    }
-  }
-  
-  // Guardar tiempos en estado
-  estadoPlanificacion.tiempoPrevisto = horas * 60;
-  estadoPlanificacion.tiempoRepasos = estadoPlanificacion.repasosDelDia.length * 30;
-  estadoPlanificacion.tiempoEstudio = Math.max(0, estadoPlanificacion.tiempoPrevisto - estadoPlanificacion.tiempoRepasos);
-  
-  return true;
-}
-
-// ====================================
-// FUNCIONES DE REPASOS
-// ====================================
-
+// 8. FUNCIÓN verificarRepasosDelDia() con loading
 function verificarRepasosDelDia() {
-  const fechaInput = document.getElementById('fechaPlanificacion');
+  var fechaInput = document.getElementById('fechaPlanificacion');
   if (!fechaInput.value) return;
   
-  const fechaMs = new Date(fechaInput.value + 'T00:00:00').getTime();
+  // Loading inline en la sección de repasos
+  var alertaDiv = document.getElementById('alertaRepasos');
+  if (alertaDiv) {
+    mostrarLoading(alertaDiv, {
+      mensaje: 'Verificando repasos...',
+      tipo: 'inline'
+    });
+  }
+  
+  var fechaMs = new Date(fechaInput.value + 'T00:00:00').getTime();
   
   google.script.run
     .withSuccessHandler(function(repasos) {
-      estadoPlanificacion.repasosDelDia = repasos || [];
+      if (typeof repasosDelDia === 'undefined') {
+        window.repasosDelDia = [];
+      }
+      repasosDelDia = repasos || [];
+      
+      if (alertaDiv) {
+        ocultarLoading(alertaDiv);
+      }
       mostrarRepasosEnPaso1(repasos);
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar repasos:', error);
-      estadoPlanificacion.repasosDelDia = [];
+      if (typeof repasosDelDia === 'undefined') {
+        window.repasosDelDia = [];
+      }
+      repasosDelDia = [];
+      
+      if (alertaDiv) {
+        ocultarLoading(alertaDiv);
+      }
     })
     .getRepasosDelDia(fechaMs);
 }
 
-function mostrarRepasosEnPaso1(repasos) {
-  const alertaDiv = document.getElementById('alertaRepasos');
-  const listaDiv = document.getElementById('listaRepasos');
-  
-  if (!repasos || repasos.length === 0) {
-    alertaDiv.style.display = 'none';
-    return;
-  }
-  
-  let html = '';
-  let tiempoTotal = 0;
-  
-  repasos.forEach(function(repaso) {
-    html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #ffeaa7;">';
-    html += '<div><strong>R' + repaso.numeroRepaso + ':</strong> ' + repaso.nombreTema + '</div>';
-    html += '<div style="color: #856404; font-size: 12px;">' + repaso.tiempoEstimado + ' min</div>';
-    html += '</div>';
-    tiempoTotal += repaso.tiempoEstimado;
-  });
-  
-  html += '<div style="text-align: right; margin-top: 10px; font-weight: bold; color: #856404;">';
-  html += 'Total repasos: ' + tiempoTotal + ' minutos (' + Math.round(tiempoTotal / 60 * 10) / 10 + ' horas)';
-  html += '</div>';
-  
-  listaDiv.innerHTML = html;
-  alertaDiv.style.display = 'block';
-}
-
-function mostrarRepasosEnPaso2() {
-  const infoDiv = document.getElementById('infoRepasosStepDos');
-  const detalleDiv = document.getElementById('detalleRepasosStepDos');
-  
-  const repasos = estadoPlanificacion.repasosDelDia;
-  
-  if (repasos.length === 0) {
-    infoDiv.style.display = 'none';
-    return;
-  }
-  
-  const tiempoRepasos = repasos.length * 30;
-  
-  let html = '<div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">';
-  html += '<div>';
-  html += '<ul style="margin: 0; padding-left: 20px;">';
-  
-  repasos.forEach(function(repaso) {
-    html += '<li><strong>R' + repaso.numeroRepaso + ':</strong> ' + repaso.nombreTema + ' <span style="color: #856404;">(30 min)</span></li>';
-  });
-  
-  html += '</ul>';
-  html += '</div>';
-  html += '<div style="text-align: center; background: #ffc107; color: white; padding: 10px; border-radius: 5px; min-width: 80px;">';
-  html += '<div style="font-size: 20px; font-weight: bold;">' + tiempoRepasos + ' min</div>';
-  html += '<div style="font-size: 12px;">Total repasos</div>';
-  html += '</div>';
-  html += '</div>';
-  
-  detalleDiv.innerHTML = html;
-  infoDiv.style.display = 'block';
-}
-
-// ====================================
-// FUNCIONES DE CONFIGURACIÓN Y TIEMPO
-// ====================================
-
+// Cargar configuración actual (conectado al backend)
 function cargarConfiguracionActual() {
-  if (!oposicionActiva) return;
+  const idOposicion = document.getElementById('oposicionPlanificacion').value;
+  if (!idOposicion) return;
   
   google.script.run
     .withSuccessHandler(function(config) {
       configuracionActual = config;
       
-      document.getElementById('vueltaActual').textContent = config.vueltaActual || '1';
-      document.getElementById('minutosPorPagina').textContent = calcularMinutosPorPagina(config);
+      document.getElementById('vueltaActual').textContent = config.vueltaActual;
+      
+      const minutosPorPagina = getMinutosPorPaginaLocal(config);
+      document.getElementById('minutosPorPagina').textContent = minutosPorPagina;
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar configuración:', error);
+      // Valores por defecto
       document.getElementById('vueltaActual').textContent = '1';
       document.getElementById('minutosPorPagina').textContent = '30';
     })
-    .getConfiguracionOposicion(oposicionActiva.id);
+    .getConfiguracionOposicion(idOposicion);
 }
 
-function calcularMinutosPorPagina(config) {
+// Función auxiliar para calcular minutos por página localmente
+function getMinutosPorPaginaLocal(config) {
   switch (config.vueltaActual) {
     case 1: return config.minPorPagV1;
     case 2: return config.minPorPagV2;
@@ -787,76 +753,71 @@ function calcularMinutosPorPagina(config) {
   }
 }
 
-function actualizarCalculoTiempo() {
-  const horasInput = document.getElementById('horasEstudio');
-  const horas = parseFloat(horasInput.value) || 4;
-  const minutosPrevistas = horas * 60;
+// Modificar actualizarTiempoDisponible para incluir repasos
+function actualizarTiempoDisponible() {
+  const horas = parseFloat(document.getElementById('horasEstudio').value) || 0;
+  const tiempoEstudio = horas * 60;
+  const tiempoRepasos = window.repasosDelDia ? window.repasosDelDia.length * 30 : 0;
+  const tiempoTotal = tiempoEstudio + tiempoRepasos;
   
-  const tiempoRepasos = estadoPlanificacion.repasosDelDia.length * 30;
-  const tiempoRealEstudio = Math.max(0, minutosPrevistas - tiempoRepasos);
+  tiempoTotalDisponible = tiempoEstudio; // Solo el tiempo de estudio para la planificación
   
-  // Actualizar interfaz
-  document.getElementById('tiempoEstudio').textContent = tiempoRealEstudio + ' min';
-  document.getElementById('tiempoRepasos').textContent = tiempoRepasos + ' min';
-  document.getElementById('tiempoTotalConRepasos').textContent = minutosPrevistas + ' min';
+  document.getElementById('tiempoEstudio').textContent = tiempoEstudio + ' min';
+  document.getElementById('tiempoTotalConRepasos').textContent = tiempoTotal + ' min';
   
-  // Mostrar advertencia si tiempo es muy bajo
-  mostrarAdvertenciaTiempo(tiempoRealEstudio, tiempoRepasos);
+  if (pasoActual === 3) {
+    actualizarResumenTiempo();
+  }
 }
 
-function mostrarAdvertenciaTiempo(tiempoReal, tiempoRepasos) {
-  let advertenciaDiv = document.getElementById('advertenciaTiempo');
+// Mostrar repasos en el paso 2
+function mostrarRepasosEnPasoDos() {
+  const infoDiv = document.getElementById('infoRepasosStepDos');
+  const detalleDiv = document.getElementById('detalleRepasosStepDos');
   
-  if (!advertenciaDiv) {
-    advertenciaDiv = document.createElement('div');
-    advertenciaDiv.id = 'advertenciaTiempo';
-    advertenciaDiv.style.marginTop = '15px';
-    document.getElementById('infoConfiguracion').parentElement.appendChild(advertenciaDiv);
-  }
-  
-  if (tiempoReal <= 30) {
-    let html = '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px;">';
-    html += '<h6 style="color: #721c24; margin: 0 0 10px 0;">⚠️ Advertencia de tiempo</h6>';
+  if (window.repasosDelDia && window.repasosDelDia.length > 0) {
+    const tiempoRepasos = window.repasosDelDia.length * 30;
     
-    if (tiempoReal <= 0) {
-      html += '<p style="margin: 0; color: #721c24;">Los repasos ocupan todo el tiempo disponible. ';
-      html += 'Considera aumentar las horas previstas.</p>';
-    } else {
-      html += '<p style="margin: 0; color: #721c24;">Solo quedan ' + tiempoReal + ' minutos para temas nuevos. ';
-      html += 'Podrás seleccionar muy pocos temas.</p>';
-    }
+    let html = '<div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">';
+    html += '<div>';
+    html += '<ul style="margin: 0; padding-left: 20px;">';
+    window.repasosDelDia.forEach(function(repaso) {
+      html += '<li>' + repaso.nombreTema + ' <span style="color: #856404;">(30 min)</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+    html += '<div style="text-align: center; background: #ffc107; color: white; padding: 10px; border-radius: 5px; min-width: 80px;">';
+    html += '<div style="font-size: 20px; font-weight: bold;">' + tiempoRepasos + ' min</div>';
+    html += '<div style="font-size: 12px;">Total</div>';
+    html += '</div>';
     html += '</div>';
     
-    advertenciaDiv.innerHTML = html;
+    detalleDiv.innerHTML = html;
+    infoDiv.style.display = 'block';
+    
+    // Actualizar el cálculo de tiempo
+    document.getElementById('tiempoRepasos').textContent = tiempoRepasos + ' min';
+    actualizarTiempoDisponible();
   } else {
-    advertenciaDiv.innerHTML = '';
+    infoDiv.style.display = 'none';
+    document.getElementById('tiempoRepasos').textContent = '0 min';
+    actualizarTiempoDisponible();
   }
 }
 
-function actualizarTiempoDisponible() {
-  const tiempoDisponible = estadoPlanificacion.tiempoEstudio;
-  
-  document.getElementById('tiempoTotal').textContent = tiempoDisponible;
-  document.getElementById('tiempoSeleccionado').textContent = '0';
-  document.getElementById('tiempoRestante').textContent = tiempoDisponible;
-  document.getElementById('bloquesUsados').textContent = '0/4';
-}
-
-// ====================================
-// FUNCIONES DEL ÁRBOL DE TEMAS
-// ====================================
-
+// 5. FUNCIÓN cargarArbolTemas() con loading específico
 function cargarArbolTemas() {
-  const contenedor = document.getElementById('arbolTemas');
+  var contenedor = document.getElementById('arbolTemas');
   
   if (!oposicionActiva) {
     contenedor.innerHTML = '<p style="color: red; text-align: center;">Error: No hay oposición activa</p>';
     return;
   }
   
-  const tiempoDisponible = estadoPlanificacion.tiempoEstudio;
+  var tiempoDisponible = tiempoTotalDisponible;
   
-  contenedor.innerHTML = '<p style="text-align: center; color: #666;"><i class="fas fa-spinner fa-spin"></i> Cargando temas...</p>';
+  // Mostrar loading específico para el árbol
+  mostrarLoadingArbol();
   
   google.script.run
     .withSuccessHandler(function(data) {
@@ -874,43 +835,62 @@ function cargarArbolTemas() {
     .getArbolTemasConEstados(oposicionActiva.id, tiempoDisponible);
 }
 
-function renderizarArbolTemas(arbolTemas, bloquesInfo) {
+// Renderizar árbol agrupado por bloques (CORREGIDO)
+function renderizarArbolPorBloques(arbolTemas, minutosPorPagina, bloquesInfo) {
   const contenedor = document.getElementById('arbolTemas');
   
-  // Agrupar por bloques
+  if (!arbolTemas || arbolTemas.length === 0) {
+    contenedor.innerHTML = '<p style="text-align: center; color: #666;">No hay temas vinculados a esta oposición</p>';
+    return;
+  }
+  
+  // Agrupar temas por bloque (USANDO DATOS REALES)
   const temasPorBloque = agruparTemasPorBloque(arbolTemas, bloquesInfo);
   
   let html = '';
   
+  // Renderizar cada bloque
   Object.keys(temasPorBloque).forEach(nombreBloque => {
     const temasDelBloque = temasPorBloque[nombreBloque];
+    const esEspecial = esBloqueBloqueEspecial(nombreBloque);
     
     html += '<div style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
     
-    // Header del bloque
-    html += '<div style="padding: 15px; background: #f8f9fa; border-bottom: 1px solid #eee;">';
-    html += '<h6 style="margin: 0; font-weight: bold;">' + nombreBloque + '</h6>';
+    // Header del bloque (colapsable)
+    html += '<div onclick="toggleBloque(\'' + nombreBloque + '\')" style="padding: 15px; background: #f8f9fa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">';
+    html += '<div>';
+    html += '<h6 style="margin: 0; font-weight: bold;">' + nombreBloque;
+    if (esEspecial) {
+      html += ' <span style="background: #ffc107; color: #212529; padding: 2px 8px; border-radius: 3px; font-size: 11px; margin-left: 8px;">ESPECIAL</span>';
+    }
+    html += '</h6>';
     html += '<small style="color: #666;">' + temasDelBloque.length + ' temas principales</small>';
     html += '</div>';
+    html += '<i id="icono-' + nombreBloque + '" style="transition: transform 0.3s;">▼</i>';
+    html += '</div>';
     
-    // Contenido del bloque
-    html += '<div style="padding: 15px;">';
+    // Contenido del bloque (inicialmente visible)
+    html += '<div id="bloque-' + nombreBloque + '" style="padding: 15px;">';
+    
+    // Renderizar cada tema del bloque
     temasDelBloque.forEach(tema => {
       html += renderizarNodoTema(tema, 0, nombreBloque);
     });
-    html += '</div>';
     
+    html += '</div>';
     html += '</div>';
   });
   
   contenedor.innerHTML = html;
 }
 
+// Agrupar temas por bloque (USANDO DATOS REALES)
 function agruparTemasPorBloque(arbolTemas, bloquesInfo) {
   const temasPorBloque = {};
   
   arbolTemas.forEach(tema => {
-    const nombreBloque = bloquesInfo[tema.idBloque] || 'Sin Bloque';
+    const idBloque = tema.idBloque;
+    const nombreBloque = bloquesInfo[idBloque] || 'Sin Bloque';
     
     if (!temasPorBloque[nombreBloque]) {
       temasPorBloque[nombreBloque] = [];
@@ -919,9 +899,11 @@ function agruparTemasPorBloque(arbolTemas, bloquesInfo) {
     temasPorBloque[nombreBloque].push(tema);
   });
   
+  console.log('📊 Temas agrupados por bloque:', temasPorBloque);
   return temasPorBloque;
 }
 
+// Renderizar nodo de tema con checkbox padre/hijo
 function renderizarNodoTema(nodo, nivel, nombreBloque) {
   const margenIzquierdo = nivel * 20;
   const iconoEstado = getIconoEstado(nodo.estado);
@@ -929,33 +911,49 @@ function renderizarNodoTema(nodo, nivel, nombreBloque) {
   
   let html = '';
   
+  // Contenedor del nodo
   html += '<div style="margin-left: ' + margenIzquierdo + 'px; margin-bottom: 8px;">';
+  
+  // Fila del tema
   html += '<div style="display: flex; align-items: center; padding: 10px; background: ' + colorFondo + '; border: 1px solid #e0e0e0; border-radius: 6px;">';
   
-  // Checkbox solo para temas seleccionables
-  if (nodo.seleccionable) {
-    html += '<input type="checkbox" onchange="toggleSeleccionTema(this, ' + nodo.id + ', ' + nodo.tiempoMinutos + ', \'' + nombreBloque + '\')" ';
-    html += 'style="margin-right: 10px; transform: scale(1.2);">';
+  // Checkbox (para hojas seleccionables O padres seleccionables)
+  if (nodo.seleccionable || nodo.seleccionablePadre) {
+    const yaSeleccionado = temasSeleccionados.some(t => t.id === nodo.id);
+    const tipoSeleccion = nodo.seleccionablePadre ? 'padre' : 'hijo';
+    
+    html += '<input type="checkbox" ';
+    html += 'onchange="toggleSeleccionTemaConValidacion(this, ' + nodo.id + ', ' + nodo.tiempoMinutos + ', \'' + nombreBloque + '\', \'' + tipoSeleccion + '\')" ';
+    html += (yaSeleccionado ? 'checked ' : '');
+    html += 'style="margin-right: 10px; transform: scale(1.2);" ';
+    html += 'title="' + (nodo.seleccionablePadre ? 'Seleccionar tema completo (' + nodo.tiempoTexto + ')' : 'Seleccionar subtema') + '">';
   } else {
     html += '<span style="width: 24px; margin-right: 10px; text-align: center; font-size: 16px;">' + iconoEstado + '</span>';
   }
   
   // Contenido del tema
   html += '<div style="flex: 1;">';
-  html += '<div style="font-weight: ' + (nivel === 0 ? 'bold' : 'normal') + ';">' + nodo.nombreCompleto + '</div>';
+  html += '<div style="font-weight: ' + (nivel === 0 ? 'bold' : 'normal') + '; color: ' + getColorTexto(nodo.estado) + ';">';
+  html += nodo.nombreCompleto;
+  html += '</div>';
+  
   if (nodo.paginas > 0) {
-    html += '<small style="color: #666;">' + nodo.paginas + ' págs • ' + nodo.tiempoTexto + '</small>';
+    html += '<small style="color: #666; font-size: 11px;">';
+    html += nodo.paginas + ' págs • ' + nodo.tiempoTexto;
+    html += '</small>';
   }
   html += '</div>';
   
   // Badge de estado
-  html += '<span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: ' + getColorBadge(nodo.estado) + '; color: white;">';
+  html += '<div style="margin-left: 10px;">';
+  html += '<span style="font-size: 10px; padding: 3px 8px; border-radius: 12px; background: ' + getColorBadge(nodo.estado) + '; color: white; font-weight: bold;">';
   html += getTextoEstado(nodo.estado);
   html += '</span>';
+  html += '</div>';
   
   html += '</div>';
   
-  // Renderizar hijos recursivamente
+  // Renderizar hijos si existen
   if (nodo.hijos && nodo.hijos.length > 0) {
     nodo.hijos.forEach(hijo => {
       html += renderizarNodoTema(hijo, nivel + 1, nombreBloque);
@@ -967,43 +965,64 @@ function renderizarNodoTema(nodo, nivel, nombreBloque) {
   return html;
 }
 
-// ====================================
-// FUNCIONES DE SELECCIÓN DE TEMAS
-// ====================================
-
-function toggleSeleccionTema(checkbox, idTema, tiempoMinutos, nombreBloque) {
+// Toggle selección con validación de orden (FUNCIÓN COMPLETA)
+function toggleSeleccionTemaConValidacion(checkbox, idTema, tiempoMinutos, nombreBloque, tipoSeleccion) {
   if (checkbox.checked) {
-    // Validar selección
-    if (!validarSeleccionTema(tiempoMinutos, nombreBloque)) {
+    // Validar orden consecutivo
+    const nodoSeleccionado = { id: idTema };
+    const validacionOrden = validarOrdenConsecutivo(nodoSeleccionado, window.arbolCompletoGlobal);
+    
+    if (!validacionOrden.esConsecutivo) {
+      const confirmar = confirm('⚠️ ' + validacionOrden.mensaje + '\n\n¿Quieres continuar seleccionando este tema?');
+      if (!confirmar) {
+        checkbox.checked = false;
+        return;
+      }
+    }
+    
+    // Validar límites normales
+    const validacion = validarSeleccionTema(tiempoMinutos, nombreBloque);
+    if (!validacion.valido) {
       checkbox.checked = false;
+      alert('⚠️ ' + validacion.mensaje);
       return;
     }
     
     // Agregar tema
-    estadoPlanificacion.temasSeleccionados.push({
+    temasSeleccionados.push({
       id: idTema,
       tiempo: tiempoMinutos,
       bloque: nombreBloque,
-      tipo: 'hijo'
+      tipo: tipoSeleccion
     });
     
-    // Agregar bloque si no está
-    if (!estadoPlanificacion.bloquesActivos.includes(nombreBloque)) {
-      estadoPlanificacion.bloquesActivos.push(nombreBloque);
+    if (!bloquesActivos.includes(nombreBloque)) {
+      bloquesActivos.push(nombreBloque);
+    }
+    
+    tiempoUsado += tiempoMinutos;
+    
+    // Mostrar mensaje informativo para temas padre
+    if (tipoSeleccion === 'padre') {
+      setTimeout(() => {
+        alert('✅ Tema padre seleccionado completo.\nSe estudiará todo el tema en ' + formatearTiempo(tiempoMinutos) + '.');
+      }, 100);
     }
     
   } else {
     // Quitar tema
-    const index = estadoPlanificacion.temasSeleccionados.findIndex(t => t.id === idTema);
+    const index = temasSeleccionados.findIndex(t => t.id === idTema);
     if (index > -1) {
-      estadoPlanificacion.temasSeleccionados.splice(index, 1);
+      const tema = temasSeleccionados[index];
+      temasSeleccionados.splice(index, 1);
+      tiempoUsado -= tema.tiempo;
       
       // Verificar si quitar bloque
-      const masDelMismoBloque = estadoPlanificacion.temasSeleccionados.some(t => t.bloque === nombreBloque);
+      const masDelMismoBloque = temasSeleccionados.some(t => t.bloque === nombreBloque);
       if (!masDelMismoBloque) {
-        const indexBloque = estadoPlanificacion.bloquesActivos.indexOf(nombreBloque);
+        const indexBloque = bloquesActivos.indexOf(nombreBloque);
         if (indexBloque > -1) {
-          estadoPlanificacion.bloquesActivos.splice(indexBloque, 1);
+          bloquesActivos.splice(indexBloque, 1);
         }
       }
     }
@@ -1012,119 +1031,21 @@ function toggleSeleccionTema(checkbox, idTema, tiempoMinutos, nombreBloque) {
   actualizarResumenTiempo();
 }
 
-function validarSeleccionTema(tiempoMinutos, nombreBloque) {
-  const tiempoUsado = estadoPlanificacion.temasSeleccionados.reduce((total, tema) => total + tema.tiempo, 0);
-  const tiempoDisponible = estadoPlanificacion.tiempoEstudio;
+// Formatear tiempo localmente
+function formatearTiempo(minutos) {
+  if (!minutos || minutos <= 0) return '0m';
   
-  // Validar tiempo
-  if (tiempoUsado + tiempoMinutos > tiempoDisponible) {
-    const exceso = tiempoUsado + tiempoMinutos - tiempoDisponible;
-    alert('⚠️ Excede el tiempo disponible por ' + Math.round(exceso) + ' minutos');
-    return false;
-  }
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
   
-  // Validar límite de bloques (con advertencias)
-  if (!estadoPlanificacion.bloquesActivos.includes(nombreBloque)) {
-    if (estadoPlanificacion.bloquesActivos.length >= 3) {
-      const clave = 'limite_bloques_' + estadoPlanificacion.bloquesActivos.length;
-      
-      if (!contadorAdvertencias.bloques[clave]) {
-        contadorAdvertencias.bloques[clave] = 0;
-      }
-      
-      contadorAdvertencias.bloques[clave]++;
-      
-      if (contadorAdvertencias.bloques[clave] === 1) {
-        alert('⚠️ Límite de bloques recomendado alcanzado.\nTienes ' + estadoPlanificacion.bloquesActivos.length + ' bloques activos.\n\nPrimera advertencia: No se permite esta vez.');
-        return false;
-      } else {
-        const confirmar = confirm('⚠️ Límite de bloques recomendado alcanzado.\nTienes ' + estadoPlanificacion.bloquesActivos.length + ' bloques activos.\n\n¿Quieres continuar de todas formas?');
-        return confirmar;
-      }
-    }
-  }
-  
-  return true;
-}
-
-function actualizarResumenTiempo() {
-  const tiempoUsado = estadoPlanificacion.temasSeleccionados.reduce((total, tema) => total + tema.tiempo, 0);
-  const tiempoDisponible = estadoPlanificacion.tiempoEstudio;
-  const tiempoRestante = tiempoDisponible - tiempoUsado;
-  
-  document.getElementById('tiempoSeleccionado').textContent = tiempoUsado;
-  document.getElementById('tiempoRestante').textContent = tiempoRestante;
-  document.getElementById('bloquesUsados').textContent = estadoPlanificacion.bloquesActivos.length + '/4';
-  
-  // Cambiar colores según estado
-  const elementoRestante = document.getElementById('tiempoRestante');
-  if (tiempoRestante < 0) {
-    elementoRestante.style.color = '#dc3545';
-  } else if (tiempoRestante < 30) {
-    elementoRestante.style.color = '#ffc107';
+  if (horas > 0) {
+    return horas + 'h ' + mins + 'm';
   } else {
-    elementoRestante.style.color = '#28a745';
+    return mins + 'm';
   }
 }
 
-// ====================================
-// FUNCIONES DE CREACIÓN DE PLANIFICACIÓN
-// ====================================
-
-function crearPlanificacion() {
-  // Validaciones finales
-  if (estadoPlanificacion.temasSeleccionados.length === 0) {
-    alert('⚠️ Debes seleccionar al menos un tema');
-    return;
-  }
-  
-  // Recopilar datos
-  const datos = {
-    fecha: estadoPlanificacion.fecha,
-    idOposicion: oposicionActiva.id,
-    tiempoPrevisto: estadoPlanificacion.tiempoPrevisto,
-    tiempoRepasos: estadoPlanificacion.tiempoRepasos,
-    tiempoEstudio: estadoPlanificacion.tiempoEstudio,
-    temasSeleccionados: estadoPlanificacion.temasSeleccionados,
-    numeroBloques: estadoPlanificacion.bloquesActivos.length
-  };
-  
-  // Confirmar creación
-  const mensaje = `¿Crear planificación para ${estadoPlanificacion.fecha}?\n\n` +
-                 `• ${datos.temasSeleccionados.length} temas\n` +
-                 `• ${Math.round(datos.tiempoEstudio / 60 * 10) / 10}h de estudio\n` +
-                 `• ${datos.numeroBloques} bloques`;
-  
-  if (!confirm(mensaje)) return;
-  
-  // Deshabilitar botón
-  const btnCrear = document.getElementById('btnSiguiente');
-  btnCrear.disabled = true;
-  btnCrear.textContent = '⏳ Creando...';
-  
-  // Llamar al backend
-  google.script.run
-    .withSuccessHandler(function(resultado) {
-      alert('🎉 Planificación creada correctamente!\n\n' + resultado.mensaje);
-      cerrarModal();
-      cargarPlanificacionesDelMes();
-      seleccionarDia(diaSeleccionado); // Recargar detalle del día
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error al crear planificación:', error);
-      alert('❌ Error al crear planificación: ' + error.message);
-    })
-    .addPlanificacion(datos)
-    .finally(function() {
-      btnCrear.disabled = false;
-      btnCrear.textContent = 'Crear Planificación';
-    });
-}
-
-// ====================================
-// FUNCIONES AUXILIARES
-// ====================================
-
+// Funciones auxiliares para estilos
 function getIconoEstado(estado) {
   switch (estado) {
     case 'completado': return '✅';
@@ -1138,6 +1059,14 @@ function getColorFondo(estado) {
     case 'completado': return '#e8f5e9';
     case 'en_progreso': return '#fff3e0';
     default: return '#ffffff';
+  }
+}
+
+function getColorTexto(estado) {
+  switch (estado) {
+    case 'completado': return '#2e7d32';
+    case 'en_progreso': return '#ef6c00';
+    default: return '#333333';
   }
 }
 
@@ -1157,112 +1086,274 @@ function getTextoEstado(estado) {
   }
 }
 
-function mostrarDetallePlanificacion(idPlanificacion) {
-  console.log('Mostrar detalle de planificación:', idPlanificacion);
+// Verificar si es bloque especial
+function esBloqueBloqueEspecial(nombreBloque) {
+  const nombre = nombreBloque.toLowerCase();
+  return nombre.includes('geografía') || nombre.includes('geografia') || nombre.includes('callejero');
+}
+
+// Toggle colapsar bloque
+function toggleBloque(nombreBloque) {
+  const contenido = document.getElementById('bloque-' + nombreBloque);
+  const icono = document.getElementById('icono-' + nombreBloque);
   
-  document.getElementById('contenidoDetalleDia').innerHTML = 
-    '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Cargando detalle...</div>';
+  if (contenido.style.display === 'none') {
+    contenido.style.display = 'block';
+    icono.textContent = '▼';
+  } else {
+    contenido.style.display = 'none';
+    icono.textContent = '▶';
+  }
+}
+
+// Toggle selección de tema
+function toggleSeleccionTema(checkbox, idTema, tiempoMinutos, nombreBloque) {
+  if (checkbox.checked) {
+    // Validar selección
+    const validacion = validarSeleccionTema(tiempoMinutos, nombreBloque);
+    if (!validacion.valido) {
+      checkbox.checked = false;
+      alert('⚠️ ' + validacion.mensaje);
+      return;
+    }
+    
+    // Agregar tema
+    temasSeleccionados.push({
+      id: idTema,
+      tiempo: tiempoMinutos,
+      bloque: nombreBloque
+    });
+    
+    if (!bloquesActivos.includes(nombreBloque)) {
+      bloquesActivos.push(nombreBloque);
+    }
+    
+    tiempoUsado += tiempoMinutos;
+    
+  } else {
+    // Quitar tema
+    const index = temasSeleccionados.findIndex(t => t.id === idTema);
+    if (index > -1) {
+      const tema = temasSeleccionados[index];
+      temasSeleccionados.splice(index, 1);
+      tiempoUsado -= tema.tiempo;
+      
+      // Verificar si quitar bloque
+      const masDelMismoBloque = temasSeleccionados.some(t => t.bloque === nombreBloque);
+      if (!masDelMismoBloque) {
+        const indexBloque = bloquesActivos.indexOf(nombreBloque);
+        if (indexBloque > -1) {
+          bloquesActivos.splice(indexBloque, 1);
+        }
+      }
+    }
+  }
+  
+  actualizarResumenTiempo();
+}
+
+// Validar selección de tema
+function validarSeleccionTema(tiempoMinutos, nombreBloque) {
+  // Calcular tiempo usando TUS variables
+  const tiempoUsadoActual = temasSeleccionados.reduce((total, tema) => total + tema.tiempo, 0);
+  
+  // Validar tiempo
+  if (tiempoUsadoActual + tiempoMinutos > tiempoTotalDisponible) {
+    const exceso = tiempoUsadoActual + tiempoMinutos - tiempoTotalDisponible;
+    mostrarAdvertencia(
+      `Este tema excede el tiempo disponible por ${Math.round(exceso)} minutos`, 
+      'Tiempo insuficiente'
+    );
+    return false;
+  }
+  
+  // Validar límite de bloques usando TUS variables
+  if (!bloquesActivos.includes(nombreBloque)) {
+    if (bloquesActivos.length >= 3) {
+      // Crear contador si no existe
+      if (typeof contadorAdvertencias === 'undefined') {
+        window.contadorAdvertencias = { orden: {}, bloques: {} };
+      }
+      
+      const clave = 'limite_bloques_' + bloquesActivos.length;
+      
+      if (!contadorAdvertencias.bloques[clave]) {
+        contadorAdvertencias.bloques[clave] = 0;
+      }
+      
+      contadorAdvertencias.bloques[clave]++;
+      
+      if (contadorAdvertencias.bloques[clave] === 1) {
+        mostrarAdvertencia(
+          `Has alcanzado el límite recomendado de ${bloquesActivos.length} bloques activos. Se recomienda no mezclar más bloques en una sesión.`,
+          'Límite de bloques'
+        );
+        return false;
+      } else {
+        mostrarAdvertencia(
+          `Tienes ${bloquesActivos.length} bloques activos. Aunque no es recomendado, se permite continuar.`,
+          'Advertencia de bloques'
+        );
+        return true;
+      }
+    }
+  }
+  
+  return true;
+}
+
+
+
+// Actualizar resumen de tiempo
+function actualizarResumenTiempo() {
+  const tiempoRestante = tiempoTotalDisponible - tiempoUsado;
+  
+  document.getElementById('tiempoTotal').textContent = tiempoTotalDisponible;
+  document.getElementById('tiempoSeleccionado').textContent = tiempoUsado;
+  document.getElementById('tiempoRestante').textContent = tiempoRestante;
+  document.getElementById('bloquesUsados').textContent = bloquesActivos.length + '/3';
+  
+  // Cambiar colores según estado
+  const elementoRestante = document.getElementById('tiempoRestante');
+  if (tiempoRestante < 0) {
+    elementoRestante.style.color = '#dc3545';
+  } else if (tiempoRestante < 30) {
+    elementoRestante.style.color = '#ffc107';
+  } else {
+    elementoRestante.style.color = '#28a745';
+  }
+}
+
+// 6. FUNCIÓN crearPlanificacion() con loading en modal
+async function crearPlanificacion() {
+  // Validaciones finales
+  if (temasSeleccionados.length === 0) {
+    mostrarAdvertencia('Debes seleccionar al menos un tema', 'Sin temas seleccionados');
+    return;
+  }
+  
+  // Recopilar datos
+  var datos = {
+    fecha: window.fechaPlanificacion || '',
+    idOposicion: oposicionActiva.id,
+    tiempoPrevisto: tiempoTotalDisponible + (repasosDelDia?.length * 30 || 0),
+    tiempoRepasos: repasosDelDia?.length * 30 || 0,
+    tiempoEstudio: tiempoTotalDisponible,
+    temasSeleccionados: temasSeleccionados,
+    numeroBloques: bloquesActivos.length
+  };
+  
+  // Confirmar creación
+  var confirmar = await mostrarConfirmacion({
+    titulo: 'Crear planificación',
+    mensaje: '¿Crear planificación para ' + datos.fecha + '?\n\n• ' + datos.temasSeleccionados.length + ' temas\n• ' + Math.round(datos.tiempoEstudio / 60 * 10) / 10 + 'h de estudio\n• ' + datos.numeroBloques + ' bloques',
+    icono: '📝',
+    textoConfirmar: 'Crear Planificación',
+    textoCancelar: 'Revisar',
+    tipo: 'normal'
+  });
+  
+  if (!confirmar) return;
+  
+  // Loading en todo el modal
+  var modal = document.querySelector('.contenedor-administracion-modal');
+  if (!modal) {
+    modal = document.getElementById('modalNuevaPlanificacion');
+  }
+  
+  mostrarLoading(modal, {
+    mensaje: 'Creando planificación...',
+    tipo: 'overlay'
+  });
+  
+  // Llamar al backend
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      ocultarLoading(modal);
+      mostrarExito(
+        'Planificación creada con ' + resultado.temasCreados + ' temas',
+        '🎉 ¡Planificación lista!'
+      );
+      cerrarModal();
+      cargarPlanificacionesDelMes();
+      seleccionarDia(diaSeleccionado);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al crear planificación:', error);
+      ocultarLoading(modal);
+      mostrarError('No se pudo crear la planificación: ' + error.message, 'Error de creación');
+    })
+    .addPlanificacion(datos);
+}
+
+// 7. FUNCIÓN cargarDetalleDia() con loading
+function cargarDetalleDia(fecha, esDiaPasado) {
+  var contenedor = document.getElementById('contenidoDetalleDia');
+  
+  // Mostrar loading específico para el detalle
+  mostrarLoading(contenedor, {
+    mensaje: 'Cargando información del día...',
+    tipo: 'overlay'
+  });
+  
+  // Buscar planificación para esta fecha
+  var fechaStr = fecha.getFullYear() + '-' + 
+    String(fecha.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(fecha.getDate()).padStart(2, '0');
   
   google.script.run
-    .withSuccessHandler(function(detalle) {
-      if (detalle) {
-        renderizarDetallePlanificacion(detalle);
+    .withSuccessHandler(function(planificaciones) {
+      ocultarLoading(contenedor);
+      
+      // Buscar planificación para esta fecha específica
+      var planDelDia = planificaciones.find(function(p) {
+        var fechaPlan = new Date(p.fecha);
+        var fechaBuscar = new Date(fecha);
+        fechaPlan.setHours(0, 0, 0, 0);
+        fechaBuscar.setHours(0, 0, 0, 0);
+        return fechaPlan.getTime() === fechaBuscar.getTime();
+      });
+      
+      if (planDelDia) {
+        cargarDetallePlanificacionCompleta(planDelDia.id, esDiaPasado);
       } else {
-        document.getElementById('contenidoDetalleDia').innerHTML = 
-          '<div style="color: red; text-align: center; padding: 20px;">❌ Planificación no encontrada</div>';
+        mostrarInterfazSinPlanificacion(esDiaPasado);
       }
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar detalle:', error);
-      document.getElementById('contenidoDetalleDia').innerHTML = 
-        '<div style="color: red; text-align: center; padding: 20px;">❌ Error: ' + error.message + '</div>';
+      console.error('Error al buscar planificación:', error);
+      ocultarLoading(contenedor);
+      mostrarInterfazSinPlanificacion(esDiaPasado);
     })
-    .getDetallePlanificacion(idPlanificacion);
+    .getPlanificacionesDelMes(fecha.getFullYear(), fecha.getMonth());
 }
 
-function renderizarDetallePlanificacion(detalle) {
-  const contenedor = document.getElementById('contenidoDetalleDia');
+// 4. FUNCIÓN cargarPlanificacionesDelMes() con loading en calendario
+function cargarPlanificacionesDelMes() {
+  var año = mesActual.getFullYear();
+  var mes = mesActual.getMonth();
   
-  // Calcular estadísticas
-  const temasCompletados = detalle.temas.filter(t => t.estado === 'completado').length;
-  const temasPendientes = detalle.temas.filter(t => t.estado === 'planificado').length;
+  console.log('Cargando planificaciones para:', año, mes);
   
-  let html = '';
-  
-  // Header con información general
-  html += '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">';
-  html += '<h4 style="margin: 0 0 10px 0; color: #007bff;">📝 Planificación del día</h4>';
-  
-  html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; margin-bottom: 15px;">';
-  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
-  html += '<div style="font-size: 20px; font-weight: bold; color: #007bff;">' + detalle.temas.length + '</div>';
-  html += '<div style="font-size: 12px; color: #666;">Total</div>';
-  html += '</div>';
-  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
-  html += '<div style="font-size: 20px; font-weight: bold; color: #28a745;">' + temasCompletados + '</div>';
-  html += '<div style="font-size: 12px; color: #666;">Completados</div>';
-  html += '</div>';
-  html += '<div style="background: white; padding: 10px; border-radius: 5px;">';
-  html += '<div style="font-size: 20px; font-weight: bold; color: #6c757d;">' + temasPendientes + '</div>';
-  html += '<div style="font-size: 12px; color: #666;">Pendientes</div>';
-  html += '</div>';
-  html += '</div>';
-  
-  html += '<div style="text-align: center;">';
-  html += '<strong>⏱️ Tiempo:</strong> ' + Math.round(detalle.tiempoEstudio / 60 * 10) / 10 + 'h estudio';
-  if (detalle.tiempoRepasos > 0) {
-    html += ' + ' + Math.round(detalle.tiempoRepasos / 60 * 10) / 10 + 'h repasos';
-  }
-  html += '</div>';
-  
-  html += '</div>';
-  
-  // Lista de temas
-  html += '<div style="background: white; border-radius: 8px; padding: 15px;">';
-  html += '<h5 style="margin: 0 0 15px 0;">📋 Temas planificados</h5>';
-  
-  if (detalle.temas.length === 0) {
-    html += '<p style="text-align: center; color: #666;">No hay temas en esta planificación</p>';
-  } else {
-    detalle.temas.forEach(tema => {
-      let colorBorde = '#6c757d';
-      let colorFondo = '#f8f9fa';
-      let icono = '⭕';
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      console.log('Planificaciones cargadas:', planificaciones);
       
-      if (tema.estado === 'completado') {
-        colorBorde = '#28a745';
-        colorFondo = '#d4edda';
-        icono = '✅';
+      if (planificaciones && planificaciones.length > 0 && typeof mostrarPlanificacionesEnCalendario === 'function') {
+        mostrarPlanificacionesEnCalendario(planificaciones);
       }
-      
-      html += '<div style="border-left: 4px solid ' + colorBorde + '; background: ' + colorFondo + '; padding: 12px; margin-bottom: 10px; border-radius: 5px;">';
-      html += '<div style="font-weight: bold;">' + icono + ' ' + tema.nombreCompleto + '</div>';
-      html += '<div style="font-size: 13px; color: #666; margin-top: 5px;">';
-      html += '⏱️ ' + tema.tiempoAsignado + ' min asignados';
-      if (tema.tiempoDedicado > 0) {
-        html += ' | ' + tema.tiempoDedicado + ' min dedicados';
-      }
-      html += '</div>';
-      
-      if (tema.estado === 'planificado') {
-        html += '<button onclick="marcarTemaCompleto(' + tema.idProgreso + ', \'' + tema.nombreCompleto.replace(/'/g, "\\'") + '\')" ';
-        html += 'style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; margin-top: 10px; cursor: pointer;">✅ Completar</button>';
-      }
-      
-      html += '</div>';
-    });
-  }
-  
-  html += '</div>';
-  
-  contenedor.innerHTML = html;
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al cargar planificaciones del mes:', error);
+    })
+    .getPlanificacionesDelMes(año, mes);
 }
 
 function marcarTemaCompleto(idProgreso, nombreTema) {
   const tiempoReal = prompt('⏱️ ¿Cuántos minutos dedicaste al tema "' + nombreTema + '"?', '30');
   
   if (!tiempoReal || isNaN(tiempoReal) || tiempoReal < 1) {
-    alert('⚠️ Tiempo no válido');
+    mostrarAdvertencia('Introduce un tiempo válido en minutos', 'Tiempo no válido');
     return;
   }
   
@@ -1271,18 +1362,880 @@ function marcarTemaCompleto(idProgreso, nombreTema) {
   google.script.run
     .withSuccessHandler(function(resultado) {
       if (resultado.success) {
-        alert('🎉 ¡Tema completado!\n\nSe han programado ' + resultado.repasosCreados + ' repasos automáticamente.');
-        // Recargar el detalle
+        mostrarExito(
+          `Se han programado ${resultado.repasosCreados} repasos automáticamente`,
+          '✅ Tema completado'
+        );
         setTimeout(() => {
           seleccionarDia(diaSeleccionado);
         }, 500);
       } else {
-        alert('❌ Error: ' + resultado.error);
+        mostrarError(`Error: ${resultado.error}`, 'No se pudo completar');
       }
     })
     .withFailureHandler(function(error) {
-      alert('❌ Error de conexión: ' + error.message);
+      mostrarError(`Error de conexión: ${error.message}`, 'Error de red');
     })
     .marcarTemaComoCompletado(idProgreso, parseInt(tiempoReal), nota || null);
 }
+
+
+// Validar orden consecutivo de temas
+function validarOrdenConsecutivo(nodoSeleccionado, arbolCompleto) {
+  // Buscar el nodo en el árbol completo para obtener contexto
+  function encontrarNodoEnArbol(arbol, idBuscado) {
+    for (let tema of arbol) {
+      if (tema.id === idBuscado) return { nodo: tema, padre: null };
+      
+      if (tema.hijos && tema.hijos.length > 0) {
+        const resultado = encontrarNodoEnArbol(tema.hijos, idBuscado);
+        if (resultado.nodo) return { nodo: resultado.nodo, padre: tema };
+      }
+    }
+    return { nodo: null, padre: null };
+  }
+  
+  const { nodo, padre } = encontrarNodoEnArbol(arbolCompleto, nodoSeleccionado.id);
+  
+  if (!padre) return { esConsecutivo: true }; // Tema padre, no hay orden que validar
+  
+  // Obtener hermanos del mismo padre
+  const hermanos = padre.hijos.sort((a, b) => {
+    const numA = parseFloat((a.prenombre || '0').replace(/[^\d.]/g, ''));
+    const numB = parseFloat((b.prenombre || '0').replace(/[^\d.]/g, ''));
+    return numA - numB;
+  });
+  
+  // Encontrar posición del nodo actual
+  const posicionActual = hermanos.findIndex(h => h.id === nodoSeleccionado.id);
+  
+  // Verificar si hay hermanos anteriores sin completar/seleccionar
+  const hermanosPreviosSinCompletar = [];
+  for (let i = 0; i < posicionActual; i++) {
+    const hermano = hermanos[i];
+    const yaSeleccionado = temasSeleccionados.some(t => t.id === hermano.id);
+    const completado = hermano.estado === 'completado';
+    
+    if (!yaSeleccionado && !completado) {
+      hermanosPreviosSinCompletar.push(hermano);
+    }
+  }
+  
+  if (hermanosPreviosSinCompletar.length > 0) {
+    return {
+      esConsecutivo: false,
+      mensaje: 'Te estás saltando el orden. Temas anteriores pendientes: ' + 
+               hermanosPreviosSinCompletar.map(h => h.prenombre || h.nombre).join(', '),
+      temasSaltados: hermanosPreviosSinCompletar
+    };
+  }
+  
+  return { esConsecutivo: true };
+}
+
+// ====================================
+// FUNCIONES CON MANEJO DE ERRORES ROBUSTO
+// Añadir al final de scriptsPlanificacion.html
+// ====================================
+
+// Función mejorada para cargar oposición activa
+function cargarOposicionActivaSegura() {
+  var contexto = 'cargarOposicionActiva';
+  
+  ejecutarSeguro(function() {
+    var contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+    if (contenedor) {
+      mostrarLoading(contenedor, {
+        mensaje: 'Cargando oposición activa...',
+        tipo: 'overlay'
+      });
+    }
+  }, 'mostrarLoadingOposicion');
+  
+  ejecutarConManejadorErrores(
+    google.script.run.getOposicionActivaSegura,
+    contexto,
+    {
+      successHandler: true,
+      mensajeError: 'No se pudo cargar la oposición activa',
+      reintentos: 2
+    }
+  ).then(function(oposicion) {
+    ejecutarSeguro(function() {
+      oposicionActiva = oposicion;
+      
+      var contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+      if (contenedor) {
+        ocultarLoading(contenedor);
+      }
+      
+      console.log('Oposición activa cargada:', oposicion);
+      
+      if (oposicion) {
+        mostrarExito('Oposición cargada: ' + oposicion.nombre, 'Configuración lista');
+        
+        // Continuar con inicialización
+        inicializarCalendarioSeguro();
+      } else {
+        mostrarInfo('No hay oposición activa configurada');
+        mostrarSelectorOposicion();
+      }
+    }, 'procesarResultadoOposicion');
+    
+  }).catch(function(errorInfo) {
+    ejecutarSeguro(function() {
+      var contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+      if (contenedor) {
+        ocultarLoading(contenedor);
+      }
+      
+      // Mostrar interfaz de fallback
+      mostrarSelectorOposicion();
+    }, 'manejarErrorOposicion');
+  });
+}
+
+// Función mejorada para crear planificación
+function crearPlanificacionSegura() {
+  var contexto = 'crearPlanificacion';
+  
+  return ejecutarSeguro(function() {
+    // Validaciones del frontend
+    var erroresValidacion = [];
+    
+    if (temasSeleccionados.length === 0) {
+      erroresValidacion.push('Debes seleccionar al menos un tema');
+    }
+    
+    if (!oposicionActiva || !oposicionActiva.id) {
+      erroresValidacion.push('No hay oposición activa seleccionada');
+    }
+    
+    if (!window.fechaPlanificacion) {
+      erroresValidacion.push('Fecha de planificación no válida');
+    }
+    
+    if (erroresValidacion.length > 0) {
+      mostrarAdvertencia(erroresValidacion.join('\n'), 'Datos incompletos');
+      return Promise.reject(new Error('Validación fallida: ' + erroresValidacion.join(', ')));
+    }
+    
+    // Preparar datos
+    var datos = {
+      fecha: window.fechaPlanificacion,
+      idOposicion: oposicionActiva.id,
+      tiempoPrevisto: tiempoTotalDisponible + (repasosDelDia?.length * 30 || 0),
+      tiempoRepasos: repasosDelDia?.length * 30 || 0,
+      tiempoEstudio: tiempoTotalDisponible,
+      temasSeleccionados: temasSeleccionados,
+      numeroBloques: bloquesActivos.length
+    };
+    
+    // Validar datos en el frontend
+    validarDatos(datos, {
+      fecha: { requerido: true, tipo: 'string' },
+      idOposicion: { requerido: true },
+      temasSeleccionados: { requerido: true }
+    }, 'planificación');
+    
+    return mostrarConfirmacion({
+      titulo: 'Crear planificación',
+      mensaje: '¿Crear planificación para ' + datos.fecha + '?\n\n• ' + datos.temasSeleccionados.length + ' temas\n• ' + Math.round(datos.tiempoEstudio / 60 * 10) / 10 + 'h de estudio\n• ' + datos.numeroBloques + ' bloques',
+      icono: '📝',
+      textoConfirmar: 'Crear Planificación',
+      textoCancelar: 'Revisar',
+      tipo: 'normal'
+    }).then(function(confirmar) {
+      if (!confirmar) {
+        return Promise.reject(new Error('Cancelado por el usuario'));
+      }
+      
+      // Mostrar loading en modal
+      var modal = document.querySelector('.contenedor-administracion-modal') || 
+                 document.getElementById('modalNuevaPlanificacion');
+      
+      if (modal) {
+        mostrarLoading(modal, {
+          mensaje: 'Creando planificación...',
+          tipo: 'overlay'
+        });
+      }
+      
+      // Ejecutar con manejo de errores robusto
+      return ejecutarConManejadorErrores(
+        google.script.run.addPlanificacionSegura,
+        contexto,
+        {
+          parametros: [datos],
+          successHandler: true,
+          mensajeError: 'No se pudo crear la planificación',
+          reintentos: 1 // Solo 1 reintento para operaciones de escritura
+        }
+      ).then(function(resultado) {
+        if (modal) {
+          ocultarLoading(modal);
+        }
+        
+        mostrarExito(
+          'Planificación creada con ' + resultado.temasCreados + ' temas',
+          '🎉 ¡Planificación lista!'
+        );
+        
+        // Limpiar y cerrar
+        cerrarModal();
+        cargarPlanificacionesDelMesSegura();
+        seleccionarDia(diaSeleccionado);
+        
+        return resultado;
+        
+      }).catch(function(errorInfo) {
+        if (modal) {
+          ocultarLoading(modal);
+        }
+        throw errorInfo;
+      });
+    });
+    
+  }, contexto, Promise.reject(new Error('Error en validación inicial')));
+}
+
+// Función mejorada para cargar árbol de temas
+function cargarArbolTemasSeguro() {
+  var contexto = 'cargarArbolTemas';
+  
+  return ejecutarSeguro(function() {
+    var contenedor = document.getElementById('arbolTemas');
+    
+    if (!contenedor) {
+      throw new Error('Contenedor del árbol de temas no encontrado');
+    }
+    
+    if (!oposicionActiva) {
+      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error: No hay oposición activa</p>';
+      return Promise.reject(new Error('No hay oposición activa'));
+    }
+    
+    var tiempoDisponible = tiempoTotalDisponible;
+    
+    // Mostrar loading
+    mostrarLoadingArbol();
+    
+    return ejecutarConManejadorErrores(
+      google.script.run.getArbolTemasConEstadosSeguro,
+      contexto,
+      {
+        parametros: [oposicionActiva.id, tiempoDisponible],
+        successHandler: true,
+        mensajeError: 'No se pudieron cargar los temas',
+        reintentos: 2
+      }
+    ).then(function(data) {
+      if (!data || !data.arbol || data.arbol.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: #999;">No hay temas vinculados a esta oposición</p>';
+        return;
+      }
+      
+      renderizarArbolTemas(data.arbol, data.bloques);
+      
+    }).catch(function(errorInfo) {
+      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error al cargar temas. <button onclick="cargarArbolTemasSeguro()">Reintentar</button></p>';
+    });
+    
+  }, contexto, Promise.reject(new Error('Error al inicializar carga de árbol')));
+}
+
+// Función mejorada para cargar planificaciones del mes
+function cargarPlanificacionesDelMesSegura() {
+  var contexto = 'cargarPlanificacionesDelMes';
+  
+  return ejecutarSeguro(function() {
+    var año = mesActual.getFullYear();
+    var mes = mesActual.getMonth();
+    
+    // Mostrar loading en calendario
+    mostrarLoadingCalendario();
+    
+    return ejecutarConManejadorErrores(
+      google.script.run.getPlanificacionesDelMes,
+      contexto,
+      {
+        parametros: [año, mes],
+        successHandler: true,
+        mensajeError: 'No se pudieron cargar las planificaciones del mes',
+        reintentos: 2
+      }
+    ).then(function(planificaciones) {
+      // Restaurar calendario y mostrar planificaciones
+      renderizarCalendario();
+      
+      if (planificaciones && planificaciones.length > 0) {
+        mostrarPlanificacionesEnCalendario(planificaciones);
+      }
+      
+    }).catch(function(errorInfo) {
+      // Restaurar calendario aunque haya error
+      renderizarCalendario();
+      
+      // Mostrar mensaje de error discreto en el calendario
+      var calendario = document.getElementById('calendario');
+      if (calendario) {
+        var errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'text-align: center; color: #dc3545; font-size: 12px; margin-top: 10px;';
+        errorDiv.innerHTML = 'Error al cargar planificaciones. <a href="#" onclick="cargarPlanificacionesDelMesSegura(); this.parentElement.remove();">Reintentar</a>';
+        calendario.appendChild(errorDiv);
+      }
+    });
+    
+  }, contexto, Promise.reject(new Error('Error al inicializar carga de planificaciones')));
+}
+
+// Función mejorada para inicializar calendario
+function inicializarCalendarioSeguro() {
+  return ejecutarSeguro(function() {
+    renderizarCalendario();
+    return cargarPlanificacionesDelMesSegura();
+  }, 'inicializarCalendario');
+}
+
+// Función wrapper para operaciones de UI críticas
+function ejecutarOperacionUI(operacion, contexto, valorPorDefecto) {
+  return ejecutarSeguro(function() {
+    return operacion();
+  }, 'UI-' + contexto, valorPorDefecto);
+}
+
+// Función de recuperación para errores críticos
+function recuperarAplicacion() {
+  ejecutarSeguro(function() {
+    console.log('🔄 Iniciando recuperación de aplicación...');
+    
+    // Limpiar estados
+    oposicionActiva = null;
+    temasSeleccionados = [];
+    bloquesActivos = [];
+    tiempoUsado = 0;
+    
+    // Ocultar todos los loading
+    var loadingElements = document.querySelectorAll('.loading-overlay, .btn-loading, .select-loading');
+    loadingElements.forEach(function(el) {
+      if (el.classList.contains('loading-overlay')) {
+        el.remove();
+      } else {
+        el.classList.remove('btn-loading', 'select-loading');
+      }
+    });
+    
+    // Reinicializar
+    mostrarInfo('Reiniciando aplicación...', 'Recuperación');
+    setTimeout(function() {
+      inicializarSeccionPlanificacion();
+    }, 1000);
+    
+  }, 'recuperarAplicacion');
+}
+
+// Función para reportar problema al usuario
+function reportarProblema() {
+  var timestamp = new Date().toISOString();
+  var info = {
+    timestamp: timestamp,
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    oposicionActiva: oposicionActiva ? oposicionActiva.id : 'ninguna'
+  };
+  
+  mostrarInfo(
+    'ID del reporte: ' + timestamp + '\n\nIncluye este ID si contactas con soporte.',
+    'Información para soporte'
+  );
+  
+  // Enviar reporte automático
+  enviarLogError({
+    contexto: 'reporteUsuario',
+    mensaje: 'Usuario reportó problema',
+    timestamp: timestamp,
+    datos: info
+  });
+}
+
+console.log('✅ Funciones con manejo de errores robusto cargadas');
+
+// ====================================
+// MEJORAS RESPONSIVE ESPECÍFICAS PARA PLANIFICACIÓN
+// Añadir al final de scriptsPlanificacion.html
+// ====================================
+
+/*
+// Función mejorada para abrir modal de planificación
+function nuevaPlanificacionResponsive() {
+  if (!diaSeleccionado) {
+    mostrarAdvertencia('Primero selecciona un día del calendario', 'Día no seleccionado');
+    return;
+  }
+  
+  if (!oposicionActiva) {
+    mostrarError('Debes tener una oposición activa', 'Configuración incompleta');
+    return;
+  }
+  
+  // Validar que no es día pasado
+  var fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), diaSeleccionado);
+  var hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  if (fechaSeleccionada < hoy) {
+    mostrarAdvertencia('No puedes crear planificaciones para días pasados', 'Fecha no válida');
+    return;
+  }
+  
+  // Resetear estado
+  resetearEstadoPlanificacion();
+  
+  // Establecer fecha
+  var fechaStr = fechaSeleccionada.getFullYear() + '-' + 
+    String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(fechaSeleccionada.getDate()).padStart(2, '0');
+  window.fechaPlanificacion = fechaStr;
+  
+  // Mostrar modal
+  var modal = document.getElementById('modalNuevaPlanificacion');
+  if (modal) {
+    modal.style.display = 'flex';
+    
+    // Optimizar para móvil si es necesario
+    if (typeof optimizarModalMovil === 'function') {
+      optimizarModalMovil(modal);
+    }
+    
+    // Configurar responsive específico
+    configurarModalPlanificacionResponsive(modal);
+  }
+  
+  mostrarPaso(1);
+}
+*/
+
+
+// Configurar modal específicamente para planificación responsive
+function configurarModalPlanificacionResponsive(modal) {
+  if (!modal) return;
+  
+  // Si es móvil, ajustar el modal
+  if (typeof esMobile === 'function' && esMobile()) {
+    // Ajustar altura según contenido
+    ajustarAlturaModalMovil(modal);
+    
+    // Mejorar navegación entre pasos
+    mejorarNavegacionPasosMovil();
+    
+    // Optimizar árbol de temas para táctil
+    setTimeout(function() {
+      optimizarArbolTemasMovil();
+    }, 500);
+  }
+  
+  // Configurar cierre responsivo
+  configurarCierreModalResponsive(modal);
+}
+
+// Ajustar altura del modal en móvil según el paso
+function ajustarAlturaModalMovil(modal) {
+  if (!modal) return;
+  
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+        var pasoVisible = modal.querySelector('.paso-modal[style*="block"]');
+        if (pasoVisible) {
+          ajustarAlturaSegunPaso(modal, pasoVisible);
+        }
+      }
+    });
+  });
+  
+  // Observar cambios en los pasos
+  var pasos = modal.querySelectorAll('.paso-modal');
+  pasos.forEach(function(paso) {
+    observer.observe(paso, { attributes: true, attributeFilter: ['style'] });
+  });
+}
+
+// Ajustar altura según el paso actual
+function ajustarAlturaSegunPaso(modal, pasoVisible) {
+  if (!pasoVisible || !typeof esMobile === 'function' || !esMobile()) return;
+  
+  var alturaContenido = pasoVisible.scrollHeight;
+  var alturaModal = modal.scrollHeight;
+  var alturaVentana = window.innerHeight;
+  
+  // Si el contenido es muy alto, permitir scroll interno
+  if (alturaContenido > alturaVentana * 0.7) {
+    modal.style.height = '85vh';
+    pasoVisible.style.maxHeight = '60vh';
+    pasoVisible.style.overflowY = 'auto';
+  } else {
+    modal.style.height = 'auto';
+    modal.style.maxHeight = '90vh';
+    pasoVisible.style.maxHeight = 'none';
+    pasoVisible.style.overflowY = 'visible';
+  }
+}
+
+// Mejorar navegación entre pasos en móvil
+function mejorarNavegacionPasosMovil() {
+  if (!typeof esMobile === 'function' || !esMobile()) return;
+  
+  var indicadores = document.querySelectorAll('.indicadores-pasos [id^="indicadorPaso"]');
+  indicadores.forEach(function(indicador, index) {
+    // Hacer indicadores más táctiles
+    if (typeof mejorarAccesibilidadMovil === 'function') {
+      mejorarAccesibilidadMovil(indicador);
+    }
+    
+    // Añadir navegación táctil
+    indicador.style.cursor = 'pointer';
+    indicador.addEventListener('touchstart', function() {
+      this.style.transform = 'scale(0.95)';
+    });
+    
+    indicador.addEventListener('touchend', function() {
+      this.style.transform = '';
+    });
+  });
+}
+
+// Optimizar árbol de temas para dispositivos táctiles
+function optimizarArbolTemasMovil() {
+  if (!typeof esMobile === 'function' || !esMobile()) return;
+  
+  var arbolTemas = document.getElementById('arbolTemas');
+  if (!arbolTemas) return;
+  
+  // Mejorar checkboxes para táctil
+  var checkboxes = arbolTemas.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(function(checkbox) {
+    // Área de toque más grande
+    var label = checkbox.closest('div');
+    if (label) {
+      label.style.minHeight = '44px';
+      label.style.display = 'flex';
+      label.style.alignItems = 'center';
+      label.style.padding = '8px';
+      label.style.margin = '2px 0';
+      label.style.borderRadius = '5px';
+      label.style.transition = 'background-color 0.2s';
+      
+      // Feedback visual
+      label.addEventListener('touchstart', function() {
+        this.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+      });
+      
+      label.addEventListener('touchend', function() {
+        var self = this;
+        setTimeout(function() {
+          self.style.backgroundColor = '';
+        }, 150);
+      });
+    }
+    
+    // Hacer checkbox más grande
+    checkbox.style.transform = 'scale(1.3)';
+    checkbox.style.marginRight = '12px';
+  });
+  
+  // Mejorar expansión/colapso de secciones
+  var bloqueHeaders = arbolTemas.querySelectorAll('.bloque-header, .tema-padre');
+  bloqueHeaders.forEach(function(header) {
+    if (typeof mejorarAccesibilidadMovil === 'function') {
+      mejorarAccesibilidadMovil(header);
+    }
+  });
+}
+
+// Configurar cierre responsive del modal
+function configurarCierreModalResponsive(modal) {
+  // Cerrar con swipe hacia abajo en móvil
+  if (typeof esMobile === 'function' && esMobile()) {
+    var startY = 0;
+    var currentY = 0;
+    var modalContent = modal.querySelector('.confirmacion-modal') || modal.firstElementChild;
+    
+    if (modalContent) {
+      modalContent.addEventListener('touchstart', function(e) {
+        startY = e.touches[0].clientY;
+      });
+      
+      modalContent.addEventListener('touchmove', function(e) {
+        currentY = e.touches[0].clientY;
+        var diffY = currentY - startY;
+        
+        // Solo permitir swipe hacia abajo desde la parte superior
+        if (diffY > 0 && startY < 100) {
+          modalContent.style.transform = 'translateY(' + Math.min(diffY, 100) + 'px)';
+          modalContent.style.opacity = Math.max(0.5, 1 - (diffY / 200));
+        }
+      });
+      
+      modalContent.addEventListener('touchend', function() {
+        var diffY = currentY - startY;
+        
+        if (diffY > 80) {
+          // Cerrar modal
+          cerrarModal();
+        } else {
+          // Volver a posición original
+          modalContent.style.transform = '';
+          modalContent.style.opacity = '';
+        }
+      });
+    }
+  }
+}
+/*
+// Función mejorada para mostrar paso con optimizaciones responsive
+function mostrarPasoResponsive(numeroPaso) {
+  pasoActual = numeroPaso;
+  
+  // Ocultar todos los pasos
+  document.getElementById('paso1').style.display = 'none';
+  document.getElementById('paso2').style.display = 'none';
+  document.getElementById('paso3').style.display = 'none';
+  
+  // Mostrar paso actual
+  var pasoActual = document.getElementById('paso' + numeroPaso);
+  pasoActual.style.display = 'block';
+  
+  // Actualizar indicadores
+  if (typeof actualizarIndicadoresPasos === 'function') {
+    actualizarIndicadoresPasos();
+  }
+  
+  // Actualizar botones
+  var btnAnterior = document.getElementById('btnAnterior');
+  var btnSiguiente = document.getElementById('btnSiguiente');
+  
+  if (btnAnterior) {
+    btnAnterior.style.display = numeroPaso > 1 ? 'inline-block' : 'none';
+  }
+  
+  if (btnSiguiente) {
+    btnSiguiente.textContent = numeroPaso === 3 ? 'Crear Planificación' : 'Siguiente ▶';
+  }
+  
+  // Optimizaciones específicas por paso
+  setTimeout(function() {
+    if (numeroPaso === 1) {
+      optimizarPaso1Responsive();
+    } else if (numeroPaso === 2) {
+      optimizarPaso2Responsive();
+    } else if (numeroPaso === 3) {
+      optimizarPaso3Responsive();
+      optimizarArbolTemasMovil();
+    }
+    
+    // Ajustar altura del modal
+    var modal = document.getElementById('modalNuevaPlanificacion');
+    if (modal) {
+      ajustarAlturaSegunPaso(modal, pasoActual);
+    }
+  }, 100);
+}
+*/
+
+
+// Optimizaciones específicas para cada paso
+function optimizarPaso1Responsive() {
+  var inputs = document.querySelectorAll('#paso1 input, #paso1 select');
+  inputs.forEach(function(input) {
+    if (typeof mejorarAccesibilidadMovil === 'function') {
+      mejorarAccesibilidadMovil(input);
+    }
+  });
+}
+
+function optimizarPaso2Responsive() {
+  var inputs = document.querySelectorAll('#paso2 input, #paso2 select');
+  inputs.forEach(function(input) {
+    if (typeof mejorarAccesibilidadMovil === 'function') {
+      mejorarAccesibilidadMovil(input);
+    }
+  });
+  
+  // Mejorar controles de tiempo en móvil
+  var horasInput = document.getElementById('horasEstudio');
+  if (horasInput && typeof esMobile === 'function' && esMobile()) {
+    horasInput.setAttribute('inputmode', 'decimal');
+    horasInput.style.fontSize = '18px';
+  }
+}
+
+function optimizarPaso3Responsive() {
+  var resumenTiempo = document.querySelector('.resumen-tiempo');
+  if (resumenTiempo && typeof esMobile === 'function' && esMobile()) {
+    // Hacer más táctil el resumen
+    resumenTiempo.style.fontSize = '16px';
+    resumenTiempo.style.padding = '15px';
+  }
+}
+
+/*
+// Función para optimizar renderizado del calendario en móvil
+function renderizarCalendarioResponsive() {
+  // Llamar a la función original
+  if (typeof renderizarCalendario === 'function') {
+    renderizarCalendario();
+  }
+  
+  // Aplicar optimizaciones móviles
+  setTimeout(function() {
+    if (typeof optimizarCalendarioMovil === 'function') {
+      optimizarCalendarioMovil();
+    }
+  }, 100);
+}
+
+// Sobrescribir funciones originales si existen
+if (typeof nuevaPlanificacion === 'function') {
+  var nuevaPlanificacionOriginal = nuevaPlanificacion;
+  nuevaPlanificacion = nuevaPlanificacionResponsive;
+}
+
+if (typeof mostrarPaso === 'function') {
+  var mostrarPasoOriginal = mostrarPaso;
+  mostrarPaso = mostrarPasoResponsive;
+}
+
+if (typeof renderizarCalendario === 'function') {
+  var renderizarCalendarioOriginal = renderizarCalendario;
+  //renderizarCalendario = renderizarCalendarioResponsive;
+}
+*/
+console.log('✅ Mejoras responsive para planificación cargadas');
+
+// ====================================
+// CALENDARIO BÁSICO QUE FUNCIONA
+// Añadir al final de scriptsPlanificacion.html
+// ====================================
+
+// Función configurarCalendario() básica
+function configurarCalendario() {
+  console.log('Configurando calendario básico...');
+  renderizarCalendarioBasico();
+  cargarPlanificacionesDelMes();
+}
+
+// Función renderizarCalendario() básica (sin bucles)
+function renderizarCalendarioBasico() {
+  var calendarioDiv = document.getElementById('calendario');
+  if (!calendarioDiv) {
+    console.warn('Elemento calendario no encontrado');
+    return;
+  }
+  
+  var año = mesActual.getFullYear();
+  var mes = mesActual.getMonth();
+  
+  // Actualizar título
+  var tituloMes = document.getElementById('tituloMes');
+  if (tituloMes) {
+    var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    tituloMes.textContent = meses[mes] + ' ' + año;
+  }
+  
+  // Generar calendario
+  var primerDia = new Date(año, mes, 1).getDay();
+  primerDia = primerDia === 0 ? 6 : primerDia - 1;
+  
+  var diasEnMes = new Date(año, mes + 1, 0).getDate();
+  var hoy = new Date();
+  
+  var html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">';
+  
+  // Encabezados de días
+  var diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  diasSemana.forEach(function(dia) {
+    html += '<div style="text-align: center; font-weight: bold; padding: 8px; color: #666; font-size: 12px;">' + dia + '</div>';
+  });
+  
+  // Días vacíos al inicio
+  for (var i = 0; i < primerDia; i++) {
+    html += '<div></div>';
+  }
+  
+  // Días del mes
+  for (var dia = 1; dia <= diasEnMes; dia++) {
+    var fecha = new Date(año, mes, dia);
+    var esHoy = fecha.toDateString() === hoy.toDateString();
+    var esSeleccionado = diaSeleccionado === dia;
+    
+    var estilos = 'min-height: 80px; border: 1px solid #ddd; border-radius: 5px; padding: 5px; cursor: pointer; ';
+    estilos += 'display: flex; flex-direction: column; justify-content: space-between; ';
+    
+    if (esHoy) {
+      estilos += 'border: 2px solid #2196f3; background: #e3f2fd; ';
+    } else if (esSeleccionado) {
+      estilos += 'background: #f0f0f0; ';
+    } else {
+      estilos += 'background: white; ';
+    }
+    
+    html += '<div onclick="seleccionarDia(' + dia + ')" style="' + estilos + '">';
+    html += '<div style="font-weight: bold; color: ' + (esHoy ? '#2196f3' : '#333') + ';">' + dia + '</div>';
+    html += '<div id="contenido-' + año + '-' + mes + '-' + dia + '" style="font-size: 10px; flex: 1;"></div>';
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  calendarioDiv.innerHTML = html;
+  
+  console.log('Calendario renderizado correctamente');
+}
+
+// Reemplazar renderizarCalendario con la versión básica
+if (typeof renderizarCalendario !== 'undefined') {
+  // No sobrescribir, usar alias
+  renderizarCalendario = renderizarCalendarioBasico;
+} else {
+  // Crear nueva
+  function renderizarCalendario() {
+    renderizarCalendarioBasico();
+  }
+}
+
+// Función para navegación del calendario
+function cambiarMes(direccion) {
+  mesActual.setMonth(mesActual.getMonth() + direccion);
+  diaSeleccionado = null;
+  renderizarCalendarioBasico();
+  cargarPlanificacionesDelMes();
+  limpiarDetalleDia();
+}
+
+function irAHoy() {
+  mesActual = new Date();
+  renderizarCalendarioBasico();
+  cargarPlanificacionesDelMes();
+  var hoy = new Date();
+  seleccionarDia(hoy.getDate());
+}
+
+function limpiarDetalleDia() {
+  var detalle = document.getElementById('contenidoDetalleDia');
+  if (detalle) {
+    detalle.innerHTML = 
+      '<p style="text-align: center; color: #666; padding: 40px 0;">' +
+      '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>' +
+      'Selecciona un día del calendario</p>';
+  }
+  
+  var titulo = document.getElementById('tituloDetalleDia');
+  if (titulo) {
+    titulo.textContent = 'Selecciona un día';
+  }
+}
+
+console.log('✅ Calendario básico funcional cargado');
+
 </script>
