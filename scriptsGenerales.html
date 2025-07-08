@@ -93,4 +93,948 @@
         });
 */
 
+// ====================================
+// SISTEMA DE NOTIFICACIONES GLOBAL
+// Añadir al final de scriptsGenerales.html
+// ====================================
+
+// Variables globales
+var confirmacionCallback = null;
+
+// Función temporal con alert hasta implementar toast completo
+function mostrarAdvertencia(mensaje, titulo) {
+  alert('⚠️ ' + (titulo || 'Advertencia') + '\n\n' + mensaje);
+  console.log('Advertencia:', mensaje);
+}
+
+function mostrarError(mensaje, titulo) {
+  alert('❌ ' + (titulo || 'Error') + '\n\n' + mensaje);
+  console.error('Error:', mensaje);
+}
+
+function mostrarExito(mensaje, titulo) {
+  alert('✅ ' + (titulo || 'Éxito') + '\n\n' + mensaje);
+  console.log('Éxito:', mensaje);
+}
+
+function mostrarInfo(mensaje, titulo) {
+  alert('ℹ️ ' + (titulo || 'Información') + '\n\n' + mensaje);
+  console.info('Info:', mensaje);
+}
+
+// Función de confirmación temporal
+function mostrarConfirmacion(config) {
+  return new Promise(function(resolve) {
+    var titulo = config.titulo || 'Confirmar acción';
+    var mensaje = config.mensaje || '¿Estás seguro?';
+    var icono = config.icono || '❓';
+    
+    var textoCompleto = icono + ' ' + titulo + '\n\n' + mensaje;
+    var resultado = confirm(textoCompleto);
+    
+    console.log('Confirmación:', titulo, '- Resultado:', resultado);
+    resolve(resultado);
+  });
+}
+
+// Log para verificar que se carga
+console.log('✅ Sistema de notificaciones temporales cargado en scriptsGenerales');
+
+// Función de inicialización para crear contenedores
+function inicializarSistemaNotificaciones() {
+  // Crear contenedor para futuros toasts
+  if (!document.getElementById('toast-container')) {
+    var container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+    console.log('Contenedor de toasts creado');
+  }
+}
+
+// Inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarSistemaNotificaciones);
+} else {
+  inicializarSistemaNotificaciones();
+}
+
+// ====================================
+// SISTEMA DE LOADING STATES
+// Añadir al final de scriptsGenerales.html
+// ====================================
+
+// Función principal para mostrar loading
+function mostrarLoading(elemento, config) {
+  config = config || {};
+  
+  var opciones = {
+    mensaje: config.mensaje || 'Cargando...',
+    tipo: config.tipo || 'overlay', // overlay, inline, button, skeleton
+    spinner: config.spinner !== false,
+    tamaño: config.tamaño || 'normal' // normal, large, small
+  };
+  
+  // Si es string, buscar el elemento
+  if (typeof elemento === 'string') {
+    elemento = document.getElementById(elemento);
+  }
+  
+  if (!elemento) {
+    console.error('Elemento no encontrado para mostrar loading');
+    return null;
+  }
+  
+  // Crear elementos de loading según el tipo
+  if (opciones.tipo === 'overlay') {
+    return crearLoadingOverlay(elemento, opciones);
+  } else if (opciones.tipo === 'inline') {
+    return crearLoadingInline(elemento, opciones);
+  } else if (opciones.tipo === 'button') {
+    return crearLoadingButton(elemento, opciones);
+  } else if (opciones.tipo === 'skeleton') {
+    return crearLoadingSkeleton(elemento, opciones);
+  }
+}
+
+// Función para ocultar loading
+function ocultarLoading(elemento) {
+  // Si es string, buscar el elemento
+  if (typeof elemento === 'string') {
+    elemento = document.getElementById(elemento);
+  }
+  
+  if (!elemento) return;
+  
+  // Buscar y eliminar overlays
+  var overlay = elemento.querySelector('.loading-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+  
+  // Restaurar contenido original si está guardado
+  if (elemento.dataset.contenidoOriginal) {
+    elemento.innerHTML = elemento.dataset.contenidoOriginal;
+    delete elemento.dataset.contenidoOriginal;
+  }
+  
+  // Quitar clases de loading
+  elemento.classList.remove('btn-loading', 'select-loading', 'seccion-loading');
+  
+  // Restaurar propiedades del botón
+  if (elemento.tagName === 'BUTTON') {
+    elemento.disabled = false;
+    elemento.style.opacity = '';
+  }
+}
+
+// Crear overlay de loading
+function crearLoadingOverlay(elemento, opciones) {
+  // Quitar loading anterior si existe
+  ocultarLoading(elemento);
+  
+  var overlay = document.createElement('div');
+  overlay.className = 'loading-overlay';
+  
+  var container = document.createElement('div');
+  container.className = 'loading-container';
+  
+  if (opciones.spinner) {
+    var spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    if (opciones.tamaño === 'large') {
+      spinner.className += ' loading-spinner-large';
+    }
+    container.appendChild(spinner);
+  }
+  
+  if (opciones.mensaje) {
+    var mensaje = document.createElement('p');
+    mensaje.textContent = opciones.mensaje;
+    container.appendChild(mensaje);
+  }
+  
+  overlay.appendChild(container);
+  
+  // Hacer el elemento padre relativo si no lo es
+  var position = window.getComputedStyle(elemento).position;
+  if (position === 'static') {
+    elemento.style.position = 'relative';
+  }
+  
+  elemento.appendChild(overlay);
+  elemento.classList.add('seccion-loading');
+  
+  return overlay;
+}
+
+// Crear loading inline
+function crearLoadingInline(elemento, opciones) {
+  // Guardar contenido original
+  elemento.dataset.contenidoOriginal = elemento.innerHTML;
+  
+  var container = document.createElement('div');
+  container.className = 'loading-inline';
+  
+  if (opciones.spinner) {
+    var spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    container.appendChild(spinner);
+  }
+  
+  if (opciones.mensaje) {
+    var mensaje = document.createElement('span');
+    mensaje.textContent = opciones.mensaje;
+    container.appendChild(mensaje);
+  }
+  
+  elemento.innerHTML = '';
+  elemento.appendChild(container);
+  
+  return container;
+}
+
+// Crear loading en botón
+function crearLoadingButton(elemento, opciones) {
+  if (elemento.tagName !== 'BUTTON') {
+    console.warn('crearLoadingButton solo funciona con botones');
+    return null;
+  }
+  
+  // Guardar texto original si no está guardado
+  if (!elemento.dataset.textoOriginal) {
+    elemento.dataset.textoOriginal = elemento.textContent;
+  }
+  
+  elemento.disabled = true;
+  elemento.classList.add('btn-loading');
+  
+  if (opciones.mensaje) {
+    elemento.textContent = opciones.mensaje;
+  }
+  
+  return elemento;
+}
+
+// Crear skeleton loading
+function crearLoadingSkeleton(elemento, opciones) {
+  elemento.dataset.contenidoOriginal = elemento.innerHTML;
+  
+  var numLineas = opciones.lineas || 3;
+  var html = '';
+  
+  for (var i = 0; i < numLineas; i++) {
+    var clase = 'skeleton skeleton-line ';
+    if (i === numLineas - 1) {
+      clase += 'short'; // Última línea más corta
+    } else {
+      clase += Math.random() > 0.5 ? 'medium' : 'long';
+    }
+    html += '<div class="' + clase + '"></div>';
+  }
+  
+  elemento.innerHTML = html;
+  return elemento;
+}
+
+// Funciones específicas para componentes comunes
+function mostrarLoadingCalendario() {
+  var calendario = document.getElementById('calendario');
+  if (calendario) {
+    calendario.innerHTML = '<div class="calendario-loading"><div class="loading-spinner loading-spinner-large"></div><p>Cargando calendario...</p></div>';
+  }
+}
+
+function mostrarLoadingArbol() {
+  var arbol = document.getElementById('arbolTemas');
+  if (arbol) {
+    arbol.innerHTML = '<div class="arbol-loading"><div class="loading-spinner loading-spinner-large"></div><p>Cargando temas...</p></div>';
+  }
+}
+
+function mostrarLoadingSelect(selectId, mensaje) {
+  var select = document.getElementById(selectId);
+  if (select) {
+    select.disabled = true;
+    select.classList.add('select-loading');
+    
+    // Añadir opción de loading si no existe
+    var loadingOption = select.querySelector('.loading-option');
+    if (!loadingOption) {
+      var option = document.createElement('option');
+      option.className = 'loading-option';
+      option.textContent = mensaje || 'Cargando...';
+      option.selected = true;
+      select.insertBefore(option, select.firstChild);
+    }
+  }
+}
+
+function ocultarLoadingSelect(selectId) {
+  var select = document.getElementById(selectId);
+  if (select) {
+    select.disabled = false;
+    select.classList.remove('select-loading');
+    
+    // Quitar opción de loading
+    var loadingOption = select.querySelector('.loading-option');
+    if (loadingOption) {
+      loadingOption.remove();
+    }
+  }
+}
+
+// Wrapper para operaciones async con loading automático
+function conLoading(elemento, promesa, config) {
+  var loadingElement = mostrarLoading(elemento, config);
+  
+  return promesa
+    .then(function(resultado) {
+      ocultarLoading(elemento);
+      return resultado;
+    })
+    .catch(function(error) {
+      ocultarLoading(elemento);
+      throw error;
+    });
+}
+
+console.log('✅ Sistema de Loading States cargado en scriptsGenerales');
+
+// ====================================
+// SISTEMA DE GESTIÓN DE ERRORES
+// Añadir al final de scriptsGenerales.html
+// ====================================
+
+// Configuración global de errores
+var configErrores = {
+  logHabilitado: true,
+  reintentoAutomatico: true,
+  maxReintentos: 2,
+  tiempoEsperaReintento: 1000, // ms
+  mostrarDetallesTecnicos: false // false en producción
+};
+
+// Función central para manejar errores
+function manejarError(error, contexto, opciones) {
+  opciones = opciones || {};
+  
+  var infoError = {
+    contexto: contexto || 'Desconocido',
+    mensaje: error.message || error.toString(),
+    timestamp: new Date().toISOString(),
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    stack: error.stack || 'No disponible',
+    datos: opciones.datos || null
+  };
+  
+  // Log del error
+  if (configErrores.logHabilitado) {
+    console.group('🚨 Error capturado');
+    console.error('Contexto:', infoError.contexto);
+    console.error('Mensaje:', infoError.mensaje);
+    console.error('Timestamp:', infoError.timestamp);
+    if (infoError.datos) {
+      console.error('Datos:', infoError.datos);
+    }
+    if (configErrores.mostrarDetallesTecnicos && infoError.stack) {
+      console.error('Stack:', infoError.stack);
+    }
+    console.groupEnd();
+  }
+  
+  // Enviar log al backend (si está configurado)
+  if (opciones.enviarLog !== false) {
+    enviarLogError(infoError);
+  }
+  
+  // Mostrar error al usuario (si no está deshabilitado)
+  if (opciones.mostrarUsuario !== false) {
+    var mensajeUsuario = construirMensajeError(infoError, opciones);
+    mostrarError(mensajeUsuario.mensaje, mensajeUsuario.titulo);
+  }
+  
+  // Ejecutar callback personalizado si existe
+  if (typeof opciones.callback === 'function') {
+    try {
+      opciones.callback(infoError);
+    } catch (callbackError) {
+      console.error('Error en callback de manejo de errores:', callbackError);
+    }
+  }
+  
+  return infoError;
+}
+
+// Construir mensaje amigable para el usuario
+function construirMensajeError(infoError, opciones) {
+  var titulo = opciones.titulo || 'Error';
+  var mensaje = opciones.mensajePersonalizado || infoError.mensaje;
+  
+  // Mensajes amigables para errores comunes
+  if (infoError.mensaje.includes('network') || infoError.mensaje.includes('fetch')) {
+    titulo = 'Error de conexión';
+    mensaje = 'Problema de conectividad. Verifica tu conexión a internet.';
+  } else if (infoError.mensaje.includes('timeout')) {
+    titulo = 'Tiempo agotado';
+    mensaje = 'La operación tardó demasiado. Inténtalo de nuevo.';
+  } else if (infoError.mensaje.includes('permission') || infoError.mensaje.includes('forbidden')) {
+    titulo = 'Sin permisos';
+    mensaje = 'No tienes permisos para realizar esta acción.';
+  } else if (infoError.mensaje.includes('not found') || infoError.mensaje.includes('404')) {
+    titulo = 'No encontrado';
+    mensaje = 'El recurso solicitado no se encontró.';
+  }
+  
+  // Añadir información técnica si está habilitada
+  if (configErrores.mostrarDetallesTecnicos) {
+    mensaje += '\n\nDetalles técnicos: ' + infoError.contexto + ' - ' + infoError.mensaje;
+  }
+  
+  return { titulo: titulo, mensaje: mensaje };
+}
+
+// Enviar log de error al backend
+function enviarLogError(infoError) {
+  // Usar setTimeout para no bloquear la interfaz
+  setTimeout(function() {
+    try {
+      google.script.run
+        .withFailureHandler(function(err) {
+          console.warn('No se pudo enviar log de error al backend:', err);
+        })
+        .logError(infoError);
+    } catch (e) {
+      console.warn('Error al intentar enviar log:', e);
+    }
+  }, 100);
+}
+
+// Wrapper para llamadas a Google Apps Script con manejo de errores
+function ejecutarConManejadorErrores(funcionGAS, contexto, opciones) {
+  opciones = opciones || {};
+  
+  var intentoActual = 0;
+  var maxIntentos = opciones.reintentos || configErrores.maxReintentos;
+  
+  function ejecutarIntento() {
+    return new Promise(function(resolve, reject) {
+      // Configurar manejadores
+      var gasRun = google.script.run;
+      
+      if (opciones.successHandler) {
+        gasRun = gasRun.withSuccessHandler(function(resultado) {
+          resolve(resultado);
+        });
+      }
+      
+      gasRun = gasRun.withFailureHandler(function(error) {
+        intentoActual++;
+        
+        var deberiaReintentar = 
+          configErrores.reintentoAutomatico && 
+          intentoActual < maxIntentos &&
+          esErrorReintentable(error);
+        
+        if (deberiaReintentar) {
+          console.warn(`Reintentando operación (${intentoActual}/${maxIntentos}):`, contexto);
+          
+          setTimeout(function() {
+            ejecutarIntento().then(resolve).catch(reject);
+          }, configErrores.tiempoEsperaReintento * intentoActual);
+        } else {
+          var errorInfo = manejarError(error, contexto, {
+            datos: { intentos: intentoActual, funcionGAS: funcionGAS.name },
+            mostrarUsuario: opciones.mostrarUsuario !== false,
+            mensajePersonalizado: opciones.mensajeError
+          });
+          reject(errorInfo);
+        }
+      });
+      
+      // Ejecutar la función
+      try {
+        if (opciones.parametros && opciones.parametros.length > 0) {
+          funcionGAS.apply(gasRun, opciones.parametros);
+        } else {
+          funcionGAS.call(gasRun);
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+  
+  return ejecutarIntento();
+}
+
+// Determinar si un error es reintentable
+function esErrorReintentable(error) {
+  var mensajeError = error.message || error.toString();
+  
+  // Errores que SÍ se pueden reintentar
+  var erroresReintentables = [
+    'network',
+    'timeout',
+    'fetch',
+    'connection',
+    'temporary',
+    'rate limit',
+    'service unavailable',
+    '503',
+    '502',
+    '504'
+  ];
+  
+  // Errores que NO se deben reintentar
+  var erroresNoReintentables = [
+    'permission',
+    'forbidden',
+    'unauthorized',
+    'not found',
+    '401',
+    '403',
+    '404',
+    'invalid',
+    'malformed'
+  ];
+  
+  var mensajeLower = mensajeError.toLowerCase();
+  
+  // Verificar errores no reintentables primero
+  for (var i = 0; i < erroresNoReintentables.length; i++) {
+    if (mensajeLower.includes(erroresNoReintentables[i])) {
+      return false;
+    }
+  }
+  
+  // Verificar errores reintentables
+  for (var j = 0; j < erroresReintentables.length; j++) {
+    if (mensajeLower.includes(erroresReintentables[j])) {
+      return true;
+    }
+  }
+  
+  // Por defecto, reintentar errores desconocidos
+  return true;
+}
+
+// Función para envolver operaciones críticas con try-catch
+function ejecutarSeguro(funcion, contexto, valorPorDefecto) {
+  try {
+    return funcion();
+  } catch (error) {
+    manejarError(error, contexto, {
+      mostrarUsuario: false // No mostrar al usuario por errores internos
+    });
+    return valorPorDefecto;
+  }
+}
+
+// Handler global para errores no capturados
+window.addEventListener('error', function(event) {
+  manejarError(event.error || new Error(event.message), 'Error global', {
+    datos: {
+      archivo: event.filename,
+      linea: event.lineno,
+      columna: event.colno
+    },
+    mostrarUsuario: false // No mostrar errores de script al usuario
+  });
+});
+
+// Handler global para promesas rechazadas
+window.addEventListener('unhandledrejection', function(event) {
+  manejarError(event.reason, 'Promesa rechazada', {
+    mostrarUsuario: false
+  });
+});
+
+// Configurar modo debug si es necesario
+function habilitarModoDebug() {
+  configErrores.mostrarDetallesTecnicos = true;
+  configErrores.logHabilitado = true;
+  console.log('🔧 Modo debug habilitado para gestión de errores');
+}
+
+// Función de utilidad para validar datos antes de enviar
+function validarDatos(datos, esquema, contexto) {
+  var errores = [];
+  
+  for (var campo in esquema) {
+    var valor = datos[campo];
+    var reglas = esquema[campo];
+    
+    // Verificar requerido
+    if (reglas.requerido && (valor === undefined || valor === null || valor === '')) {
+      errores.push('El campo ' + campo + ' es requerido');
+    }
+    
+    // Verificar tipo
+    if (valor !== undefined && reglas.tipo && typeof valor !== reglas.tipo) {
+      errores.push('El campo ' + campo + ' debe ser de tipo ' + reglas.tipo);
+    }
+    
+    // Verificar longitud mínima
+    if (valor && reglas.minLength && valor.length < reglas.minLength) {
+      errores.push('El campo ' + campo + ' debe tener al menos ' + reglas.minLength + ' caracteres');
+    }
+  }
+  
+  if (errores.length > 0) {
+    throw new Error('Errores de validación en ' + contexto + ': ' + errores.join(', '));
+  }
+  
+  return true;
+}
+
+console.log('✅ Sistema de gestión de errores cargado en scriptsGenerales');
+
+// ====================================
+// MEJORAS RESPONSIVE Y TÁCTILES
+// Añadir al final de scriptsGenerales.html
+// ====================================
+
+// Detectar dispositivo móvil
+function esMobile() {
+  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function esTablet() {
+  return window.innerWidth > 768 && window.innerWidth <= 1024;
+}
+
+// Configuración responsive global
+var configResponsive = {
+  breakpointMobile: 768,
+  breakpointTablet: 1024,
+  orientacionAnterior: window.orientation || screen.orientation?.angle || 0
+};
+
+// Inicializar responsive
+function inicializarResponsive() {
+  // Detectar tipo de dispositivo
+  document.body.classList.toggle('es-mobile', esMobile());
+  document.body.classList.toggle('es-tablet', esTablet());
+  document.body.classList.toggle('es-desktop', !esMobile() && !esTablet());
+  
+  // Configuraciones específicas para móvil
+  if (esMobile()) {
+    configurarTouchMobile();
+    configurarViewportMobile();
+    configurarScrollMobile();
+  }
+  
+  // Listener para cambios de orientación
+  window.addEventListener('orientationchange', manejarCambioOrientacion);
+  window.addEventListener('resize', manejarRedimensionado);
+  
+  console.log('✅ Configuración responsive inicializada');
+}
+
+// Configurar viewport para móvil
+function configurarViewportMobile() {
+  var viewport = document.querySelector('meta[name="viewport"]');
+  if (!viewport) {
+    viewport = document.createElement('meta');
+    viewport.name = 'viewport';
+    document.head.appendChild(viewport);
+  }
+  
+  // Evitar zoom en inputs en iOS
+  viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+}
+
+// Configurar comportamientos táctiles
+function configurarTouchMobile() {
+  // Evitar highlight azul en elementos táctiles
+  document.addEventListener('touchstart', function() {}, true);
+  
+  // Mejorar scroll en iOS
+  document.body.style.webkitOverflowScrolling = 'touch';
+  
+  // Evitar bounce en iOS
+  document.body.addEventListener('touchmove', function(e) {
+    var target = e.target;
+    var scrollable = false;
+    
+    // Permitir scroll solo en elementos scrollables
+    while (target && target !== document.body) {
+      var overflow = window.getComputedStyle(target).overflowY;
+      if (overflow === 'auto' || overflow === 'scroll') {
+        scrollable = true;
+        break;
+      }
+      target = target.parentNode;
+    }
+    
+    if (!scrollable) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+}
+
+// Configurar scroll suave para móvil
+function configurarScrollMobile() {
+  // Scroll suave en elementos específicos
+  var elementosScroll = document.querySelectorAll('#arbolTemas, .modal-content, .confirmacion-modal');
+  
+  elementosScroll.forEach(function(elemento) {
+    elemento.style.webkitOverflowScrolling = 'touch';
+    elemento.style.scrollBehavior = 'smooth';
+  });
+}
+
+// Manejar cambio de orientación
+function manejarCambioOrientacion() {
+  setTimeout(function() {
+    var orientacionActual = window.orientation || screen.orientation?.angle || 0;
+    
+    if (orientacionActual !== configResponsive.orientacionAnterior) {
+      console.log('Cambio de orientación detectado');
+      
+      // Ajustar modal si está abierto
+      var modal = document.querySelector('.contenedor-administracion-modal.visible, #modalNuevaPlanificacion[style*="flex"]');
+      if (modal) {
+        ajustarModalParaOrientacion(modal);
+      }
+      
+      // Re-renderizar calendario si es necesario
+      if (typeof renderizarCalendario === 'function') {
+        setTimeout(renderizarCalendario, 100);
+      }
+      
+      configResponsive.orientacionAnterior = orientacionActual;
+    }
+  }, 150); // Delay para que se complete el cambio
+}
+
+// Manejar redimensionado de ventana
+function manejarRedimensionado() {
+  clearTimeout(window.resizeTimer);
+  window.resizeTimer = setTimeout(function() {
+    // Actualizar clases de dispositivo
+    document.body.classList.toggle('es-mobile', esMobile());
+    document.body.classList.toggle('es-tablet', esTablet());
+    document.body.classList.toggle('es-desktop', !esMobile() && !esTablet());
+    
+    // Ajustar elementos si es necesario
+    if (esMobile()) {
+      configurarTouchMobile();
+    }
+  }, 250);
+}
+
+// Ajustar modal para orientación
+function ajustarModalParaOrientacion(modal) {
+  if (esMobile()) {
+    var esLandscape = window.innerHeight < window.innerWidth;
+    modal.classList.toggle('modo-landscape', esLandscape);
+    
+    if (esLandscape) {
+      modal.style.height = '95vh';
+      modal.style.padding = '10px';
+    } else {
+      modal.style.height = '90vh';
+      modal.style.padding = '15px';
+    }
+  }
+}
+
+// Función para hacer elementos más accesibles en móvil
+function mejorarAccesibilidadMovil(elemento) {
+  if (!elemento || !esMobile()) return;
+  
+  // Añadir área de toque mínima
+  var estilos = window.getComputedStyle(elemento);
+  var altura = parseInt(estilos.height);
+  var ancho = parseInt(estilos.width);
+  
+  if (altura < 44) {
+    elemento.style.minHeight = '44px';
+    elemento.style.paddingTop = Math.max(0, (44 - altura) / 2) + 'px';
+    elemento.style.paddingBottom = Math.max(0, (44 - altura) / 2) + 'px';
+  }
+  
+  if (ancho < 44 && elemento.tagName === 'BUTTON') {
+    elemento.style.minWidth = '44px';
+    elemento.style.paddingLeft = Math.max(8, (44 - ancho) / 2) + 'px';
+    elemento.style.paddingRight = Math.max(8, (44 - ancho) / 2) + 'px';
+  }
+}
+
+// Función para optimizar formularios en móvil
+function optimizarFormularioMovil(formulario) {
+  if (!formulario || !esMobile()) return;
+  
+  var inputs = formulario.querySelectorAll('input, select, textarea');
+  
+  inputs.forEach(function(input) {
+    // Evitar zoom en iOS
+    if (input.type !== 'file') {
+      input.style.fontSize = '16px';
+    }
+    
+    // Mejorar área de toque
+    mejorarAccesibilidadMovil(input);
+    
+    // Configurar teclado virtual apropiado
+    switch (input.type) {
+      case 'email':
+        input.setAttribute('inputmode', 'email');
+        break;
+      case 'tel':
+        input.setAttribute('inputmode', 'tel');
+        break;
+      case 'number':
+        input.setAttribute('inputmode', 'numeric');
+        break;
+      case 'search':
+        input.setAttribute('inputmode', 'search');
+        break;
+    }
+    
+    // Añadir autocorrect y spellcheck apropiados
+    if (input.type === 'text' || input.tagName === 'TEXTAREA') {
+      if (input.name && (input.name.includes('email') || input.name.includes('url'))) {
+        input.setAttribute('autocorrect', 'off');
+        input.setAttribute('spellcheck', 'false');
+      }
+    }
+  });
+}
+
+// Función para mejorar navegación en móvil
+function mejorarNavegacionMovil() {
+  if (!esMobile()) return;
+  
+  var nav = document.querySelector('nav');
+  if (nav) {
+    // Hacer scroll horizontal más suave
+    nav.style.scrollBehavior = 'smooth';
+    nav.style.webkitOverflowScrolling = 'touch';
+    
+    // Centrar elemento activo
+    var botonActivo = nav.querySelector('button.activo, button[style*="background"]');
+    if (botonActivo) {
+      setTimeout(function() {
+        botonActivo.scrollIntoView({ 
+          behavior: 'smooth', 
+          inline: 'center',
+          block: 'nearest' 
+        });
+      }, 100);
+    }
+  }
+}
+
+// Función para optimizar calendario en móvil
+function optimizarCalendarioMovil() {
+  if (!esMobile()) return;
+  
+  var calendario = document.getElementById('calendario');
+  if (!calendario) return;
+  
+  // Mejorar todos los elementos clickeables
+  var diasClickeables = calendario.querySelectorAll('[onclick]');
+  diasClickeables.forEach(function(dia) {
+    mejorarAccesibilidadMovil(dia);
+    
+    // Añadir feedback visual en touch
+    dia.addEventListener('touchstart', function() {
+      this.style.transform = 'scale(0.98)';
+      this.style.transition = 'transform 0.1s';
+    });
+    
+    dia.addEventListener('touchend', function() {
+      var self = this;
+      setTimeout(function() {
+        self.style.transform = '';
+      }, 100);
+    });
+  });
+}
+
+// Función para optimizar modales en móvil
+function optimizarModalMovil(modal) {
+  if (!modal || !esMobile()) return;
+  
+  // Prevenir scroll del body cuando el modal está abierto
+  document.body.style.overflow = 'hidden';
+  
+  // Centrar modal en pantalla
+  modal.style.position = 'fixed';
+  modal.style.top = '50%';
+  modal.style.left = '50%';
+  modal.style.transform = 'translate(-50%, -50%)';
+  
+  // Optimizar formularios dentro del modal
+  optimizarFormularioMovil(modal);
+  
+  // Mejorar botones
+  var botones = modal.querySelectorAll('button');
+  botones.forEach(mejorarAccesibilidadMovil);
+  
+  // Configurar cierre del modal
+  var cerrarModal = function() {
+    document.body.style.overflow = '';
+  };
+  
+  // Buscar botones de cerrar y añadir el comportamiento
+  var botonesCerrar = modal.querySelectorAll('[onclick*="cerrar"], .modal-close, .btn-cancelar');
+  botonesCerrar.forEach(function(btn) {
+    var clickAnterior = btn.onclick;
+    btn.onclick = function(e) {
+      if (clickAnterior) clickAnterior.call(this, e);
+      cerrarModal();
+    };
+  });
+}
+
+// Función utilitaria para mostrar/ocultar elementos según dispositivo
+function mostrarSegunDispositivo(elemento, dispositivos) {
+  if (!elemento) return;
+  
+  var mostrar = false;
+  
+  if (dispositivos.includes('mobile') && esMobile()) mostrar = true;
+  if (dispositivos.includes('tablet') && esTablet()) mostrar = true;
+  if (dispositivos.includes('desktop') && !esMobile() && !esTablet()) mostrar = true;
+  
+  elemento.style.display = mostrar ? '' : 'none';
+}
+
+// Función para debug responsive
+function debugResponsive() {
+  var info = {
+    ancho: window.innerWidth,
+    alto: window.innerHeight,
+    esMobile: esMobile(),
+    esTablet: esTablet(),
+    orientacion: window.orientation || 'no disponible',
+    userAgent: navigator.userAgent,
+    pantallaTactil: 'ontouchstart' in window
+  };
+  
+  console.table(info);
+  return info;
+}
+
+// Auto-inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarResponsive);
+} else {
+  inicializarResponsive();
+}
+
+// Exportar funciones útiles globalmente
+window.optimizarModalMovil = optimizarModalMovil;
+window.optimizarFormularioMovil = optimizarFormularioMovil;
+window.mejorarAccesibilidadMovil = mejorarAccesibilidadMovil;
+window.esMobile = esMobile;
+window.esTablet = esTablet;
+
+console.log('✅ Sistema responsive y táctil cargado');
+
  </script>
