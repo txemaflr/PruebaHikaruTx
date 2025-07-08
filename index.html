@@ -21,6 +21,273 @@
 
 /* En la sección <style> del index.html, añade: */
 
+<!-- AÑADIR AL <style> DE index.html -->
+
+/* ====================================
+   SISTEMA DE NOTIFICACIONES TOAST
+   ================================== */
+
+  .section { display: none; }
+    .section.active { display: block; }
+
+
+/* Container para las notificaciones */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+/* Estilos base de toast */
+.toast {
+  background: white;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  border-left: 4px solid #007bff;
+  transform: translateX(100%);
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+/* Estados del toast */
+.toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.toast.hide {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+/* Tipos de toast */
+.toast-success {
+  border-left-color: #28a745;
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+}
+
+.toast-error {
+  border-left-color: #dc3545;
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+}
+
+.toast-warning {
+  border-left-color: #ffc107;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+}
+
+.toast-info {
+  border-left-color: #17a2b8;
+  background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+}
+
+/* Contenido del toast */
+.toast-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.toast-body {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.4;
+}
+
+.toast-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.toast-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #666;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+/* Barra de progreso para auto-close */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 0 0 8px 8px;
+  transform-origin: left;
+  animation: toastProgress linear;
+}
+
+@keyframes toastProgress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ====================================
+   MODAL DE CONFIRMACIÓN PERSONALIZADO
+   ================================== */
+
+.confirmacion-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+.confirmacion-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.confirmacion-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+}
+
+.confirmacion-overlay.show .confirmacion-modal {
+  transform: scale(1);
+}
+
+.confirmacion-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.confirmacion-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.confirmacion-titulo {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.confirmacion-mensaje {
+  font-size: 16px;
+  color: #666;
+  line-height: 1.5;
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.confirmacion-botones {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.confirmacion-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.confirmacion-btn-cancelar {
+  background: #6c757d;
+  color: white;
+}
+
+.confirmacion-btn-cancelar:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.confirmacion-btn-confirmar {
+  background: #007bff;
+  color: white;
+}
+
+.confirmacion-btn-confirmar:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.confirmacion-btn-peligro {
+  background: #dc3545;
+  color: white;
+}
+
+.confirmacion-btn-peligro:hover {
+  background: #c82333;
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+  .toast-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+  
+  .toast {
+    min-width: auto;
+    max-width: none;
+  }
+  
+  .confirmacion-modal {
+    margin: 20px;
+    padding: 20px;
+  }
+  
+  .confirmacion-botones {
+    flex-direction: column;
+  }
+  
+  .confirmacion-btn {
+    width: 100%;
+  }
+}
+/*FIN de toast para notificaciones*/
+
 .contenedor-administracion {
   width: 350px;
   position: fixed;
@@ -200,7 +467,694 @@
 }
 .section { display: none; }
     .section.active { display: block; }
-  </style>
+
+/* Spinner principal */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(0, 123, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #007bff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+/* Spinner grande para operaciones importantes */
+.loading-spinner-large {
+  width: 40px;
+  height: 40px;
+  border-width: 4px;
+}
+
+/* Animación de rotación */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Contenedor de loading genérico */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: #666;
+}
+
+.loading-container .loading-spinner {
+  margin-bottom: 15px;
+}
+
+.loading-container p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Loading overlay para modals */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  border-radius: 8px;
+}
+
+/* Loading inline para elementos específicos */
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.loading-inline .loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+/* Estados para botones con loading */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s linear infinite;
+}
+
+/* Loading para secciones específicas */
+.seccion-loading {
+  position: relative;
+  min-height: 200px;
+}
+
+.seccion-loading .loading-overlay {
+  position: absolute;
+  background: rgba(248, 249, 250, 0.95);
+}
+
+/* Loading para calendario */
+.calendario-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  color: #666;
+}
+
+/* Loading para árbol de temas */
+.arbol-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.arbol-loading .loading-spinner {
+  margin-bottom: 15px;
+}
+
+/* Loading skeleton (placeholders) */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading-skeleton 1.5s infinite;
+}
+
+.skeleton-line {
+  height: 16px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.skeleton-line.short {
+  width: 60%;
+}
+
+.skeleton-line.medium {
+  width: 80%;
+}
+
+.skeleton-line.long {
+  width: 100%;
+}
+
+@keyframes loading-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Loading para dropdowns/selects */
+.select-loading {
+  position: relative;
+}
+
+.select-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 123, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #007bff;
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .loading-container {
+    padding: 30px 15px;
+  }
+  
+  .loading-spinner-large {
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+  }
+  
+  .arbol-loading {
+    padding: 40px 15px;
+  }
+}
+
+/* ====================================
+   RESPONSIVE DESIGN - CALENDARIO Y PLANIFICACIÓN
+   Añadir al final de la sección <style> en index.html
+   ================================== */
+
+/* Mejoras generales para móvil */
+@media (max-width: 768px) {
+  
+  /* ====================================
+     CALENDARIO RESPONSIVE
+     ================================== */
+  
+  /* Grid principal: De 40% + 60% a layout vertical */
+  #planificacion .grid-principal {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 15px !important;
+    height: auto !important;
+  }
+  
+  /* Calendario móvil */
+  #calendario {
+    font-size: 12px;
+  }
+  
+  #calendario > div {
+    gap: 1px !important;
+  }
+  
+  /* Días del calendario más pequeños pero táctiles */
+  #calendario > div > div {
+    min-height: 60px !important;
+    padding: 3px !important;
+    font-size: 11px;
+  }
+  
+  /* Encabezados de días más pequeños */
+  #calendario > div > div:nth-child(-n+7) {
+    padding: 6px 3px !important;
+    font-size: 10px;
+    font-weight: bold;
+  }
+  
+  /* Contenido del día más compacto */
+  #calendario [id^="contenido-"] {
+    font-size: 8px !important;
+  }
+  
+  #calendario [id^="contenido-"] > div {
+    padding: 2px !important;
+    margin: 1px 0 !important;
+  }
+  
+  /* Controles del calendario */
+  .controles-calendario {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+  
+  .controles-calendario > div {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  /* Botones del calendario más grandes para touch */
+  .controles-calendario button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 16px;
+    padding: 10px 16px;
+  }
+  
+  /* Título del mes más pequeño */
+  #tituloMes {
+    font-size: 16px !important;
+    margin: 0 10px !important;
+  }
+  
+  /* ====================================
+     DETALLE DEL DÍA RESPONSIVE
+     ================================== */
+  
+  #contenidoDetalleDia {
+    padding: 15px;
+    max-height: none;
+    overflow-y: visible;
+  }
+  
+  #tituloDetalleDia {
+    font-size: 18px;
+    margin-bottom: 15px;
+    text-align: center;
+  }
+  
+  /* Estadísticas del detalle más compactas */
+  .estadisticas-dia {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    font-size: 14px;
+  }
+  
+  .estadisticas-dia > div {
+    padding: 8px !important;
+  }
+  
+  .estadisticas-dia > div > div:first-child {
+    font-size: 18px !important;
+  }
+  
+  /* ====================================
+     MODAL DE PLANIFICACIÓN RESPONSIVE
+     ================================== */
+  
+  /* Modal ocupa casi toda la pantalla en móvil */
+  #modalNuevaPlanificacion,
+  .contenedor-administracion-modal {
+    width: 95vw !important;
+    height: 90vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 5vh auto !important;
+    padding: 15px !important;
+  }
+  
+  /* Header del modal más compacto */
+  .modal-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+  }
+  
+  /* Indicadores de pasos en vertical */
+  .indicadores-pasos {
+    flex-direction: column !important;
+    gap: 10px !important;
+    align-items: center;
+  }
+  
+  .indicadores-pasos > div {
+    flex-direction: row !important;
+    gap: 8px;
+  }
+  
+  .indicadores-pasos .separador {
+    display: none !important;
+  }
+  
+  /* Pasos del modal */
+  .paso-modal {
+    padding: 15px 0;
+  }
+  
+  /* Formularios en columna */
+  .grid-formulario {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+  
+  /* Inputs y selects más grandes para touch */
+  .paso-modal input,
+  .paso-modal select,
+  .paso-modal button {
+    min-height: 44px;
+    font-size: 16px; /* Evita zoom en iOS */
+    padding: 10px 12px;
+  }
+  
+  /* Botones del modal stack en móvil */
+  .modal-footer {
+    flex-direction: column !important;
+    gap: 10px;
+  }
+  
+  .modal-footer > div {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+  
+  .modal-footer button {
+    width: 100% !important;
+    margin: 0 !important;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  
+  /* ====================================
+     ÁRBOL DE TEMAS RESPONSIVE
+     ================================== */
+  
+  #arbolTemas {
+    max-height: 350px !important;
+    font-size: 14px;
+  }
+  
+  /* Bloques de temas más compactos */
+  .bloque-temas {
+    margin-bottom: 15px !important;
+  }
+  
+  .bloque-header {
+    padding: 12px !important;
+    font-size: 14px;
+  }
+  
+  .bloque-contenido {
+    padding: 12px !important;
+  }
+  
+  /* Nodos del árbol con mejor espaciado para touch */
+  .nodo-tema {
+    margin-bottom: 6px !important;
+  }
+  
+  .nodo-tema > div {
+    padding: 8px !important;
+    font-size: 13px;
+  }
+  
+  /* Checkboxes más grandes */
+  .nodo-tema input[type="checkbox"] {
+    transform: scale(1.3);
+    margin-right: 12px !important;
+  }
+  
+  /* Márgenes de niveles reducidos */
+  .nivel-1 { margin-left: 15px !important; }
+  .nivel-2 { margin-left: 25px !important; }
+  .nivel-3 { margin-left: 35px !important; }
+  
+  /* ====================================
+     RESUMEN DE TIEMPO RESPONSIVE
+     ================================== */
+  
+  .resumen-tiempo {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    font-size: 14px;
+  }
+  
+  .resumen-tiempo > div {
+    padding: 10px !important;
+  }
+  
+  .resumen-tiempo > div > div:first-child {
+    font-size: 20px !important;
+  }
+  
+  /* ====================================
+     ALERTAS Y AVISOS RESPONSIVE
+     ================================== */
+  
+  .alerta-repasos,
+  .alerta-tiempo,
+  .alerta-bloques {
+    padding: 12px !important;
+    font-size: 14px;
+    margin: 10px 0 !important;
+  }
+  
+  /* ====================================
+     NAVEGACIÓN SUPERIOR RESPONSIVE
+     ================================== */
+  
+  nav {
+    padding: 0.3rem 0 !important;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  nav button {
+    padding: 0.4rem 0.8rem !important;
+    margin: 0 0.3rem !important;
+    font-size: 0.9rem !important;
+    min-width: auto;
+  }
+  
+  /* ====================================
+     CONTENEDOR PRINCIPAL RESPONSIVE
+     ================================== */
+  
+  .container {
+    padding: 0.5rem 1rem !important;
+  }
+  
+  .section {
+    padding: 15px 0;
+  }
+  
+  /* Headers de sección más pequeños */
+  .section h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+    text-align: center;
+  }
+  
+  /* ====================================
+     TOASTS RESPONSIVE
+     ================================== */
+  
+  .toast-container {
+    top: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+    max-width: none !important;
+  }
+  
+  .toast {
+    min-width: auto !important;
+    max-width: none !important;
+    font-size: 14px;
+  }
+  
+  .toast-header {
+    font-size: 13px !important;
+  }
+  
+  .toast-body {
+    font-size: 12px !important;
+  }
+  
+  /* ====================================
+     MODAL DE CONFIRMACIÓN RESPONSIVE
+     ================================== */
+  
+  .confirmacion-modal {
+    margin: 20px !important;
+    padding: 20px !important;
+    max-width: none !important;
+    width: calc(100vw - 40px) !important;
+  }
+  
+  .confirmacion-botones {
+    flex-direction: column !important;
+    gap: 10px;
+  }
+  
+  .confirmacion-btn {
+    width: 100% !important;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  
+  .confirmacion-titulo {
+    font-size: 18px !important;
+  }
+  
+  .confirmacion-mensaje {
+    font-size: 14px !important;
+  }
+  
+  /* ====================================
+     LOADING STATES RESPONSIVE
+     ================================== */
+  
+  .loading-container {
+    padding: 30px 15px !important;
+  }
+  
+  .loading-spinner-large {
+    width: 32px !important;
+    height: 32px !important;
+    border-width: 3px !important;
+  }
+  
+  .arbol-loading {
+    padding: 40px 15px !important;
+    font-size: 14px;
+  }
+  
+  /* ====================================
+     UTILIDADES GENERALES RESPONSIVE
+     ================================== */
+  
+  /* Ocultar elementos no esenciales en móvil */
+  .solo-desktop {
+    display: none !important;
+  }
+  
+  /* Mostrar elementos solo en móvil */
+  .solo-mobile {
+    display: block !important;
+  }
+  
+  /* Textos más legibles */
+  body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  /* Mejores áreas de toque */
+  button, 
+  input[type="checkbox"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Enlaces y botones pequeños con área de toque ampliada */
+  a, 
+  button,
+  .clickable {
+    position: relative;
+  }
+  
+  a:before,
+  button:before,
+  .clickable:before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    z-index: -1;
+  }
+}
+
+/* ====================================
+   BREAKPOINT PARA TABLETS (768px - 1024px)
+   ================================== */
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  
+  /* Modal ligeramente más grande en tablet */
+  #modalNuevaPlanificacion,
+  .contenedor-administracion-modal {
+    width: 85vw !important;
+    height: 85vh !important;
+  }
+  
+  /* Grid del calendario ajustado para tablet */
+  .grid-principal {
+    grid-template-columns: 45% 55% !important;
+  }
+  
+  /* Calendario en tablet */
+  #calendario > div > div {
+    min-height: 70px !important;
+    font-size: 12px;
+  }
+  
+  /* Resumen de tiempo en una sola fila */
+  .resumen-tiempo {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+/* ====================================
+   MODO LANDSCAPE EN MÓVIL
+   ================================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+  
+  /* Modal más compacto en landscape */
+  #modalNuevaPlanificacion,
+  .contenedor-administracion-modal {
+    height: 95vh !important;
+    padding: 10px !important;
+  }
+  
+  /* Indicadores de pasos en horizontal de nuevo */
+  .indicadores-pasos {
+    flex-direction: row !important;
+  }
+  
+  .indicadores-pasos .separador {
+    display: block !important;
+    width: 20px;
+    height: 2px;
+    background: #ddd;
+  }
+  
+  /* Calendario más compacto */
+  #calendario > div > div {
+    min-height: 50px !important;
+  }
+  
+  /* Grid principal vuelve a ser horizontal si hay espacio */
+  .grid-principal {
+    display: grid !important;
+    grid-template-columns: 40% 60% !important;
+  }
+}
+
+</style>
 
   
 </head>
@@ -768,7 +1722,7 @@
   <div id="contenidoPrincipalPlanificacion">
     <p style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>
   </div>
-  
+
   <!-- Controles del calendario -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <div>
@@ -961,7 +1915,7 @@
 
 
   </div>
-    <?!= include('scriptsGenerales') ?>
+  <?!= include('scriptsGenerales') ?>
   <?!= include('scriptsOposiciones') ?>
   <?!= include('scriptsBloques') ?>
   <?!= include('scriptsTemas') ?>
@@ -970,5 +1924,6 @@
   <?!= include('scriptsTest') ?>
   <?!= include('scriptsPlanificacion') ?>
   <?!= include('scriptsRepasos') ?>
+
 </body>
 </html>
