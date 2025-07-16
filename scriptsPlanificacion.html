@@ -15,8 +15,45 @@ var oposicionActiva = null;
 
 // 1. Inicializar sección de planificación
 function inicializarSeccionPlanificacion() {
-  console.log('Inicializando sección Planificación...');
-  cargarOposicionActiva();
+  console.log('🚀 Inicializando sección Planificación mejorada...');
+  
+  const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
+  
+  if (contenedor) {
+    contenedor.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="loading-spinner loading-spinner-large"></div><p>Cargando configuración...</p></div>';
+  }
+  
+  // Cargar oposición activa
+  google.script.run
+    .withSuccessHandler(function(oposicion) {
+      oposicionActiva = oposicion;
+      console.log('✅ Oposición activa cargada:', oposicion);
+      
+      if (oposicion) {
+        // Mostrar interfaz principal mejorada
+        mostrarPantallaPrincipalMejorada();
+        
+        // Inicializar calendario después de mostrar la interfaz
+        setTimeout(inicializarCalendarioConNuevaFuncion, 500);
+        
+      } else {
+        // No hay oposición activa - mostrar selector
+        mostrarSelectorOposicion();
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error al cargar oposición activa:', error);
+      
+      if (contenedor) {
+        contenedor.innerHTML = 
+          '<div style="background: #f8d7da; padding: 20px; border-radius: 8px; text-align: center;">' +
+          '<h3 style="margin: 0; color: #721c24;">❌ Error de conexión</h3>' +
+          '<p style="margin: 10px 0; color: #721c24;">No se pudo cargar la configuración</p>' +
+          '<button onclick="inicializarSeccionPlanificacion()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px;">Reintentar</button>' +
+          '</div>';
+      }
+    })
+    .getOposicionActiva();
 }
 
 // 2. Cargar oposición activa
@@ -100,50 +137,91 @@ function mostrarSelectorOposicion() {
   cargarOposicionesDisponibles();
 }
 
+
+// Cerrar modal de cambio de oposición
+function cerrarCambiadorOposicion() {
+  const overlay = document.getElementById('overlayOposiciones');
+  if (overlay) {
+    overlay.remove();
+  }
+}
+
+// Mostrar modal para completar oposición
+function mostrarCompletarOposicion() {
+  const confirmar = confirm(`🏁 ¿Completar la oposición "${oposicionActiva.nombre}"?\n\n✅ Se marcará como completada\n🔄 Pasará a la siguiente vuelta\n📋 Se resetearán los progresos de temas\n\n¿Continuar?`);
+  
+  if (!confirmar) return;
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      if (resultado.success) {
+        alert('🎉 ' + resultado.mensaje);
+        inicializarSeccionPlanificacion();
+      } else {
+        alert('❌ Error al completar oposición');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error al completar oposición:', error);
+      alert('❌ Error al completar oposición: ' + error.message);
+    })
+    .completarOposicion(oposicionActiva.id);
+}
+
+// Placeholder para configuración
+function mostrarConfiguracion() {
+  alert('⚙️ Configuración en desarrollo');
+}
+
 // 3. Mostrar página principal (VERSIÓN CON COMPARACIÓN)
 function mostrarPaginaPrincipal() {
+  mostrarPantallaPrincipalMejorada();
+}
+
+// Mostrar pantalla principal mejorada con opciones de oposición
+function mostrarPantallaPrincipalMejorada() {
   const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
   
   if (!oposicionActiva) {
-    // No hay oposición activa - mostrar selector
-    let html = '<div style="text-align: center; padding: 40px;">';
-    html += '<h3>Selecciona una oposición para planificar</h3>';
-    html += '<p style="color: #666; margin-bottom: 30px;">Solo puedes tener una oposición activa a la vez</p>';
-    
-    html += '<div style="max-width: 400px; margin: 0 auto;">';
-    html += '<label style="display: block; margin-bottom: 10px; text-align: left;">Oposición:</label>';
-    html += '<select id="selectorOposicion" style="width: 100%; padding: 10px; margin-bottom: 20px;">';
-    html += '<option value="">-- Selecciona una oposición --</option>';
-    html += '</select>';
-    
-    html += '<button onclick="establecerOposicionActiva()" ';
-    html += 'style="background: #007bff; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer;">';
-    html += 'Establecer como activa</button>';
-    html += '</div>';
-    html += '</div>';
-    
-    contenedor.innerHTML = html;
-    cargarOposicionesDisponibles();
-    
-  } else {
-    // Ya hay oposición activa
-    let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
-    html += '<div>';
-    html += '<h3 style="margin: 0; color: #007bff;">📚 ' + oposicionActiva.nombre + '</h3>';
-    html += '<p style="margin: 5px 0 0 0; color: #666;">Oposición activa</p>';
-    html += '</div>';
-    html += '<div>';
-    html += '<button onclick="cambiarOposicion()" style="background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 3px; margin-right: 10px;">Cambiar</button>';
-    html += '<button id="btnCompararOposiciones" onclick="mostrarComparadorOposiciones()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 3px; margin-right: 10px;" disabled>';
-    html += '🔍 Comparar</button>';
-    html += '</div>';
-    html += '</div>';
-    
-    contenedor.innerHTML = html;
-    
-    // Verificar si hay más de una oposición para habilitar comparación
-    verificarOposicionesDisponibles();
+    mostrarSelectorOposicion();
+    return;
   }
+  
+  let html = '';
+  
+  // Header con oposición activa
+  html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center;">';
+  html += '<h3 style="margin: 0 0 10px 0;">🎯 ' + oposicionActiva.nombre + '</h3>';
+  html += '<p style="margin: 0; opacity: 0.9;">Oposición activa - Planificación de estudio</p>';
+  html += '</div>';
+  
+  // Panel de acciones
+  html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">';
+  
+  // Cambiar oposición
+  html += '<button onclick="mostrarCambiadorOposicion()" style="background: #ff9800; color: white; border: none; padding: 15px 20px; border-radius: 8px; cursor: pointer; text-align: center;">';
+  html += '<div style="font-size: 24px; margin-bottom: 5px;">🔄</div>';
+  html += '<div style="font-weight: bold;">Cambiar Oposición</div>';
+  html += '<div style="font-size: 12px; opacity: 0.9;">Pausar actual y activar otra</div>';
+  html += '</button>';
+  
+  // Completar oposición
+  html += '<button onclick="mostrarCompletarOposicion()" style="background: #4caf50; color: white; border: none; padding: 15px 20px; border-radius: 8px; cursor: pointer; text-align: center;">';
+  html += '<div style="font-size: 24px; margin-bottom: 5px;">🏁</div>';
+  html += '<div style="font-weight: bold;">Completar Oposición</div>';
+  html += '<div style="font-size: 12px; opacity: 0.9;">Pasar a siguiente vuelta</div>';
+  html += '</button>';
+  
+  // Configuración
+  html += '<button onclick="mostrarConfiguracion()" style="background: #607d8b; color: white; border: none; padding: 15px 20px; border-radius: 8px; cursor: pointer; text-align: center;">';
+  html += '<div style="font-size: 24px; margin-bottom: 5px;">⚙️</div>';
+  html += '<div style="font-weight: bold;">Configuración</div>';
+  html += '<div style="font-size: 12px; opacity: 0.9;">Tiempos y parámetros</div>';
+  html += '</button>';
+  
+  html += '</div>';
+  
+  contenedor.innerHTML = html;
 }
 
 // 4. Cargar oposiciones disponibles
@@ -253,32 +331,83 @@ function verificarOposicionesDisponibles() {
     .getOposicionesOrdenadas();
 }
 
+// Mostrar modal para cambiar oposición
+function mostrarCambiadorOposicion() {
+  // Crear overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'overlayOposiciones';
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+  
+  // Crear modal
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;';
+  
+  modal.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h3 style="margin: 0;">🔄 Cambiar Oposición Activa</h3>
+      <button onclick="cerrarCambiadorOposicion()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+    </div>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <strong>⚠️ Importante:</strong> La oposición actual "${oposicionActiva.nombre}" pasará a estado "en pausa" y podrás reactivarla más tarde.
+    </div>
+    
+    <div id="listaOposiciones" style="text-align: center; padding: 20px;">
+      <div class="loading-spinner"></div>
+      <p>Cargando oposiciones...</p>
+    </div>
+  `;
+  
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  
+  // Cargar oposiciones
+  cargarOposicionesParaCambio();
+}
+
 // 8. Mostrar comparador de oposiciones
 function mostrarComparadorOposiciones() {
   mostrarAdvertencia('Próximo paso: Implementar modal de comparación');
 }
 
-// 9. Cargar oposiciones para cambio (excluyendo la actual)
+// Cargar lista de oposiciones para cambio
 function cargarOposicionesParaCambio() {
   google.script.run
     .withSuccessHandler(function(oposiciones) {
-      const select = document.getElementById('selectorNuevaOposicion');
+      const container = document.getElementById('listaOposiciones');
+      if (!container) return;
       
-      oposiciones.forEach(function(op) {
-        // Excluir la oposición actualmente activa
-        if (op.id != oposicionActiva.id) {
-          const option = document.createElement('option');
-          option.value = op.id;
-          option.textContent = op.nombre;
-          select.appendChild(option);
-        }
-      });
+      let html = '';
+      
+      const oposicionesDisponibles = oposiciones.filter(op => op.id != oposicionActiva.id);
+      
+      if (oposicionesDisponibles.length === 0) {
+        html = '<div style="text-align: center; color: #666; padding: 40px;"><h6>No hay otras oposiciones</h6><p>Solo tienes una oposición disponible</p></div>';
+      } else {
+        oposicionesDisponibles.forEach(function(op) {
+          const estadoColor = op.estado === 'completada' ? '#4caf50' : op.estado === 'en_pausa' ? '#ff9800' : '#607d8b';
+          const estadoTexto = op.estado === 'completada' ? 'Completada' : op.estado === 'en_pausa' ? 'En pausa' : 'Inactiva';
+          
+          html += '<div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">';
+          html += '<div>';
+          html += '<div style="font-weight: bold; font-size: 16px;">' + op.nombre + '</div>';
+          html += '<div style="font-size: 12px; color: ' + estadoColor + '; font-weight: bold;">● ' + estadoTexto + '</div>';
+          html += '</div>';
+          html += '<button onclick="confirmarCambioOposicion(' + op.id + ', \'' + op.nombre + '\')" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Activar</button>';
+          html += '</div>';
+        });
+      }
+      
+      container.innerHTML = html;
     })
     .withFailureHandler(function(error) {
       console.error('Error al cargar oposiciones:', error);
-      alert('Error al cargar oposiciones');
+      const container = document.getElementById('listaOposiciones');
+      if (container) {
+        container.innerHTML = '<div style="color: #dc3545; text-align: center; padding: 20px;"><h6>❌ Error</h6><p>No se pudieron cargar las oposiciones</p></div>';
+      }
     })
-    .getOposicionesOrdenadas();
+    .getTodasLasOposiciones();
 }
 
 // 10. Cancelar cambio de oposición
@@ -288,25 +417,43 @@ function cancelarCambioOposicion() {
 }
 
 // 11. Confirmar cambio de oposición
-function confirmarCambioOposicion() {
-  const idNuevaOposicion = document.getElementById('selectorNuevaOposicion').value;
+function confirmarCambioOposicion(idOposicion, nombreOposicion) {
+  const confirmar = confirm(`¿Cambiar a la oposición "${nombreOposicion}"?\n\nLa oposición actual "${oposicionActiva.nombre}" pasará a estado "en pausa".`);
   
-  if (!idNuevaOposicion) {
-    mostrarAdvertencia('Selecciona una nueva oposición');
-    return;
+  if (!confirmar) return;
+  
+  // Mostrar loading
+  const container = document.getElementById('listaOposiciones');
+  if (container) {
+    container.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="loading-spinner"></div><p>Cambiando oposición...</p></div>';
   }
   
   google.script.run
-    .withSuccessHandler(function() {
-      mostrarExito('Oposición cambiada correctamente', '🔄 Actualizado');
-      cargarOposicionActiva();
+    .withSuccessHandler(function(resultado) {
+      if (resultado.success) {
+        // Actualizar oposición activa global
+        oposicionActiva = resultado.oposicion;
+        
+        // Cerrar modal
+        cerrarCambiadorOposicion();
+        
+        // Mostrar mensaje de éxito
+        alert(`✅ Oposición cambiada correctamente a "${resultado.oposicion.nombre}"`);
+        
+        // Recargar sección
+        inicializarSeccionPlanificacion();
+        
+      } else {
+        alert('❌ Error al cambiar oposición');
+      }
     })
     .withFailureHandler(function(error) {
       console.error('Error al cambiar oposición:', error);
-      mostrarError('Error al cambiar oposición', 'Error de conexión');
+      alert('❌ Error al cambiar oposición: ' + error.message);
     })
-    .setOposicionActiva(idNuevaOposicion);
+    .cambiarOposicionActiva(idOposicion);
 }
+
 
 // Renderizar calendario
 if (typeof renderizarCalendario === 'undefined') {
@@ -392,34 +539,41 @@ function irAHoy() {
   seleccionarDia(new Date().getDate());
 }
 
-// Seleccionar día
+// ACTUALIZAR seleccionarDia() para usar la nueva función
 function seleccionarDia(dia) {
-  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  fechaSeleccionada.setHours(0, 0, 0, 0);
+  console.log('📅 FRONTEND: Seleccionando día:', dia);
   
-  const esDiaPasado = fechaSeleccionada < hoy;
-  
-  diaSeleccionado = dia;
-  renderizarCalendario(); // Re-renderizar para mostrar selección
-  
-  // Actualizar detalle del día
-  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
-  
-  if (esDiaPasado) {
-    document.getElementById('tituloDetalleDia').textContent = tituloFecha + ' (Solo lectura)';
-    document.getElementById('contenidoDetalleDia').innerHTML = 
-      '<div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-bottom: 15px;">' +
-      '<strong>ℹ️ Día pasado:</strong> Solo puedes consultar la información, no modificar.' +
-      '</div>' +
-      '<p style="color: #999;">Detalle del día en desarrollo...</p>';
-  } else {
-    document.getElementById('tituloDetalleDia').textContent = tituloFecha;
-    document.getElementById('contenidoDetalleDia').innerHTML = 
-      '<p style="color: #999;">Día seleccionado: ' + dia + '. Detalle en desarrollo...</p>';
+  try {
+    diaSeleccionado = dia;
+    renderizarCalendario(); // Re-renderizar para mostrar selección
+    cargarDetalleDiaCompletoNuevo(dia); // ← USAR LA NUEVA FUNCIÓN
+  } catch (error) {
+    console.error('❌ FRONTEND: Error al seleccionar día:', error);
+    
+    // Mostrar error en detalle
+    const contenido = document.getElementById('contenidoDetalleDia');
+    if (contenido) {
+      contenido.innerHTML = 
+        '<div style="text-align: center; color: #dc3545; padding: 40px;">' +
+        '<h6>❌ Error</h6>' +
+        '<p>Error al cargar información del día</p>' +
+        '<button onclick="seleccionarDia(' + dia + ')" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button>' +
+        '</div>';
+    }
   }
+}
+
+// Función temporal para inicializar con la nueva función
+function inicializarCalendarioConNuevaFuncion() {
+  console.log('🚀 FRONTEND: Inicializando calendario con nueva función...');
+  
+  // Renderizar calendario
+  renderizarCalendario();
+  
+  // Cargar planificaciones con la nueva función
+  cargarPlanificacionesDelMes(); // Ya usa la nueva función
+  
+  console.log('✅ FRONTEND: Calendario inicializado');
 }
 
 // Limpiar detalle del día
@@ -427,6 +581,312 @@ function limpiarDetalleDia() {
   document.getElementById('tituloDetalleDia').textContent = 'Selecciona un día';
   document.getElementById('contenidoDetalleDia').innerHTML = '<p style="text-align: center; color: #666; padding: 40px 0;"><i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3;"></i><br>Selecciona un día del calendario</p>';
 }
+
+function mostrarPlanificacionesEnCalendario(planificaciones) {
+  console.log('📅 Mostrando planificaciones en calendario:', planificaciones);
+  
+  // VALIDACIÓN ROBUSTA
+  if (!planificaciones || !Array.isArray(planificaciones)) {
+    console.warn('⚠️ planificaciones no es un array válido:', planificaciones);
+    return;
+  }
+  
+  if (planificaciones.length === 0) {
+    console.log('ℹ️ No hay planificaciones para mostrar');
+    return;
+  }
+  
+  let planificacionesMostradas = 0;
+  
+  planificaciones.forEach(function(planificacion) {
+    try {
+      // Validar que la planificación tenga datos válidos
+      if (!planificacion || !planificacion.fecha || !planificacion.temas) {
+        console.warn('⚠️ Planificación inválida:', planificacion);
+        return;
+      }
+      
+      // Validar que temas sea un array
+      if (!Array.isArray(planificacion.temas)) {
+        console.warn('⚠️ Temas no es un array:', planificacion.temas);
+        return;
+      }
+      
+      const fechaPlan = new Date(planificacion.fecha);
+      
+      // Validar fecha válida
+      if (isNaN(fechaPlan.getTime())) {
+        console.warn('⚠️ Fecha inválida en planificación:', planificacion.fecha);
+        return;
+      }
+      
+      const año = fechaPlan.getFullYear();
+      const mes = fechaPlan.getMonth();
+      const dia = fechaPlan.getDate();
+      
+      // Buscar el contenedor del día específico
+      const contenedorDia = document.getElementById('contenido-' + año + '-' + mes + '-' + dia);
+      
+      if (contenedorDia) {
+        // Crear HTML para la planificación
+        let html = '';
+        
+        // Indicador de planificación
+        html += '<div style="background: #4caf50; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px; font-weight: bold;">';
+        html += '📚 ' + planificacion.temas.length + ' temas';
+        html += '</div>';
+        
+        // Tiempo total
+        const tiempoTotal = planificacion.tiempoTotal || 0;
+        const horas = Math.floor(tiempoTotal / 60);
+        const minutos = tiempoTotal % 60;
+        const tiempoTexto = horas > 0 ? horas + 'h ' + minutos + 'm' : minutos + 'm';
+        
+        html += '<div style="background: #2196f3; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 8px;">';
+        html += '⏱️ ' + tiempoTexto;
+        html += '</div>';
+        
+        contenedorDia.innerHTML = html;
+        planificacionesMostradas++;
+        
+        console.log('✅ Planificación mostrada en día', dia);
+      } else {
+        console.warn('⚠️ Contenedor no encontrado para día', dia, 'ID esperado:', 'contenido-' + año + '-' + mes + '-' + dia);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error al mostrar planificación individual:', error, planificacion);
+    }
+  });
+  
+  console.log('📊 Total planificaciones mostradas:', planificacionesMostradas);
+}
+
+// Función para cargar detalle del día con planificaciones
+function cargarDetalleDiaCompleto(dia) {
+  console.log('🔍 Cargando detalle para día:', dia);
+  
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  const esDiaPasado = fechaSeleccionada < hoy;
+  
+  // Actualizar título
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
+  const sufijo = esDiaPasado ? ' (Solo lectura)' : '';
+  
+  const tituloElement = document.getElementById('tituloDetalleDia');
+  if (tituloElement) {
+    tituloElement.textContent = tituloFecha + sufijo;
+  }
+  
+  // Mostrar loading
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (!contenido) {
+    console.error('❌ Elemento contenidoDetalleDia no encontrado');
+    return;
+  }
+  
+  contenido.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="loading-spinner"></div><p>Cargando información del día...</p></div>';
+  
+  // Buscar planificación para este día
+  const año = fechaSeleccionada.getFullYear();
+  const mes = fechaSeleccionada.getMonth();
+  
+  console.log('📅 Buscando planificaciones para:', año, mes);
+  
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      console.log('✅ Planificaciones recibidas:', planificaciones);
+      
+      // VALIDACIÓN ROBUSTA
+      if (!planificaciones || !Array.isArray(planificaciones)) {
+        console.warn('⚠️ Planificaciones no es un array válido:', planificaciones);
+        planificaciones = [];
+      }
+      
+      // Buscar planificación para este día específico
+      let planDelDia = null;
+      
+      try {
+        planDelDia = planificaciones.find(function(p) {
+          if (!p || !p.fecha) return false;
+          
+          const fechaPlan = new Date(p.fecha);
+          fechaPlan.setHours(0, 0, 0, 0);
+          return fechaPlan.getTime() === fechaSeleccionada.getTime();
+        });
+      } catch (error) {
+        console.error('❌ Error al buscar planificación del día:', error);
+        planDelDia = null;
+      }
+      
+      console.log('🎯 Planificación del día encontrada:', planDelDia);
+      
+      // Buscar repasos para este día
+      console.log('🔄 Buscando repasos para:', fechaSeleccionada.getTime());
+      
+      google.script.run
+        .withSuccessHandler(function(repasos) {
+          console.log('✅ Repasos recibidos:', repasos);
+          
+          // VALIDACIÓN ROBUSTA
+          if (!repasos || !Array.isArray(repasos)) {
+            console.warn('⚠️ Repasos no es un array válido:', repasos);
+            repasos = [];
+          }
+          
+          mostrarDetalleCompletoRobust(planDelDia, repasos, esDiaPasado);
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ Error al cargar repasos:', error);
+          mostrarDetalleCompletoRobust(planDelDia, [], esDiaPasado);
+        })
+        .getRepasosDelDia(fechaSeleccionada.getTime());
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error al cargar planificaciones:', error);
+      
+      // Mostrar error en el contenido
+      if (contenido) {
+        contenido.innerHTML = 
+          '<div style="text-align: center; color: #dc3545; padding: 40px;">' +
+          '<h6>❌ Error de conexión</h6>' +
+          '<p>No se pudo cargar la información del día</p>' +
+          '<button onclick="cargarDetalleDiaCompleto(' + dia + ')" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button>' +
+          '</div>';
+      }
+    })
+    .getPlanificacionesDelMes(año, mes);
+}
+
+function mostrarDetalleCompletoRobust(planificacion, repasos, esDiaPasado) {
+  console.log('🎨 Mostrando detalle completo:', { planificacion, repasos, esDiaPasado });
+  
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (!contenido) {
+    console.error('❌ Elemento contenidoDetalleDia no encontrado');
+    return;
+  }
+  
+  let html = '';
+  
+  // Validar datos
+  const tienePlanificacion = planificacion && planificacion.temas && Array.isArray(planificacion.temas);
+  const tieneRepasos = repasos && Array.isArray(repasos) && repasos.length > 0;
+  
+  console.log('📊 Estado:', { tienePlanificacion, tieneRepasos });
+  
+  // Si hay planificación
+  if (tienePlanificacion) {
+    html += '<div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #4caf50;">';
+    html += '<h6 style="margin: 0 0 10px 0; color: #2e7d32;">📚 Planificación del día</h6>';
+    html += '<div style="margin-bottom: 10px;"><strong>Temas programados:</strong> ' + planificacion.temas.length + '</div>';
+    
+    const tiempoTotal = planificacion.tiempoTotal || 0;
+    const horas = Math.floor(tiempoTotal / 60);
+    const minutos = tiempoTotal % 60;
+    const tiempoTexto = horas > 0 ? horas + 'h ' + minutos + 'm' : minutos + 'm';
+    html += '<div style="margin-bottom: 15px;"><strong>Tiempo total:</strong> ' + tiempoTexto + '</div>';
+    
+    html += '<div><strong>Temas:</strong></div>';
+    html += '<ul style="margin: 5px 0 0 0; padding-left: 20px;">';
+    planificacion.temas.forEach(function(tema) {
+      const tiempoTema = tema.tiempo || 0;
+      html += '<li>' + (tema.nombre || 'Tema sin nombre') + ' <span style="color: #666;">(' + tiempoTema + ' min)</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+  }
+  
+  // Si hay repasos
+  if (tieneRepasos) {
+    html += '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107;">';
+    html += '<h6 style="margin: 0 0 10px 0; color: #856404;">🔄 Repasos programados</h6>';
+    html += '<div style="margin-bottom: 10px;"><strong>Total:</strong> ' + repasos.length + ' repasos (' + (repasos.length * 30) + ' min)</div>';
+    html += '<ul style="margin: 5px 0 0 0; padding-left: 20px;">';
+    repasos.forEach(function(repaso) {
+      const nombreTema = repaso.nombreTema || 'Tema sin nombre';
+      const numeroRepaso = repaso.numeroRepaso || '?';
+      html += '<li>' + nombreTema + ' <span style="color: #856404;">(Repaso #' + numeroRepaso + ')</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+  }
+  
+  // Si no hay nada
+  if (!tienePlanificacion && !tieneRepasos) {
+    html += '<div style="text-align: center; color: #666; padding: 40px;">';
+    html += '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3; margin-bottom: 15px; display: block;"></i>';
+    html += '<h6>📅 Día libre</h6>';
+    html += '<p>No hay planificaciones ni repasos programados</p>';
+    if (!esDiaPasado) {
+      html += '<button onclick="nuevaPlanificacion()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-top: 10px;">➕ Crear Planificación</button>';
+    }
+    html += '</div>';
+  }
+  
+  contenido.innerHTML = html;
+  console.log('✅ Detalle del día mostrado correctamente');
+}
+
+// Mostrar detalle completo (planificación + repasos)
+function mostrarDetalleCompleto(planificacion, repasos, esDiaPasado) {
+  const contenido = document.getElementById('contenidoDetalleDia');
+  let html = '';
+  
+  // Si hay planificación
+  if (planificacion) {
+    html += '<div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #4caf50;">';
+    html += '<h6 style="margin: 0 0 10px 0; color: #2e7d32;">📚 Planificación del día</h6>';
+    html += '<div style="margin-bottom: 10px;"><strong>Temas programados:</strong> ' + planificacion.temas.length + '</div>';
+    
+    const horas = Math.floor(planificacion.tiempoTotal / 60);
+    const minutos = planificacion.tiempoTotal % 60;
+    const tiempoTexto = horas > 0 ? horas + 'h ' + minutos + 'm' : minutos + 'm';
+    html += '<div style="margin-bottom: 15px;"><strong>Tiempo total:</strong> ' + tiempoTexto + '</div>';
+    
+    html += '<div><strong>Temas:</strong></div>';
+    html += '<ul style="margin: 5px 0 0 0; padding-left: 20px;">';
+    planificacion.temas.forEach(function(tema) {
+      html += '<li>' + tema.nombre + ' <span style="color: #666;">(' + tema.tiempo + ' min)</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+  }
+  
+  // Si hay repasos
+  if (repasos && repasos.length > 0) {
+    html += '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107;">';
+    html += '<h6 style="margin: 0 0 10px 0; color: #856404;">🔄 Repasos programados</h6>';
+    html += '<div style="margin-bottom: 10px;"><strong>Total:</strong> ' + repasos.length + ' repasos (' + (repasos.length * 30) + ' min)</div>';
+    html += '<ul style="margin: 5px 0 0 0; padding-left: 20px;">';
+    repasos.forEach(function(repaso) {
+      html += '<li>' + repaso.nombreTema + ' <span style="color: #856404;">(Repaso #' + repaso.numeroRepaso + ')</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+  }
+  
+  // Si no hay nada
+  if (!planificacion && (!repasos || repasos.length === 0)) {
+    html += '<div style="text-align: center; color: #666; padding: 40px;">';
+    html += '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3; margin-bottom: 15px; display: block;"></i>';
+    html += '<h6>📅 Día libre</h6>';
+    html += '<p>No hay planificaciones ni repasos programados</p>';
+    if (!esDiaPasado) {
+      html += '<button onclick="nuevaPlanificacion()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-top: 10px;">➕ Crear Planificación</button>';
+    }
+    html += '</div>';
+  }
+  
+  contenido.innerHTML = html;
+  console.log('✅ Detalle del día mostrado');
+}
+
 
 // Abrir modal de nueva planificación
 function nuevaPlanificacion() {
@@ -459,8 +919,8 @@ function nuevaPlanificacion() {
     String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
     String(fechaSeleccionada.getDate()).padStart(2, '0');
 
-    // Cargar oposiciones
-  cargarOposiciones();
+  // Cargar oposiciones
+  // No cargar oposiciones aquí - se configura automáticamente en mostrarPaso1()
   
   // Guardar fecha en variable global (crear si no existe)
   window.fechaPlanificacion = fechaStr;
@@ -582,17 +1042,186 @@ function mostrarPaso(numeroPaso) {
   }
 }
 
+// REEMPLAZAR la función mostrarPaso1() en scriptsPlanificacion.html
+
 function mostrarPaso1() {
-  // Por ahora vacía, ya funciona lo básico
-  console.log('Paso 1 cargado');
+  console.log('📅 Configurando paso 1 con UI elegante');
+  
+  // Configurar fecha elegante
+  if (window.fechaPlanificacion) {
+    const fecha = new Date(window.fechaPlanificacion);
+    
+    // Ocultar input y rellenar displays elegantes
+    const fechaInput = document.getElementById('fechaPlanificacion');
+    if (fechaInput) {
+      fechaInput.value = window.fechaPlanificacion;
+    }
+    
+    // Configurar fecha elegante
+    const fechaElegante = document.getElementById('fechaElegante');
+    const diaSemanaElegante = document.getElementById('diaSemanaElegante');
+    
+    if (fechaElegante && diaSemanaElegante) {
+      const opciones = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      };
+      const fechaFormateada = fecha.toLocaleDateString('es-ES', opciones);
+      
+      // Separar día de la semana del resto
+      const partes = fechaFormateada.split(', ');
+      const diaSemana = partes[0]; // ej: "miércoles"
+      const fechaSinDia = partes[1]; // ej: "16 de julio de 2025"
+      
+      fechaElegante.textContent = fechaSinDia;
+      diaSemanaElegante.textContent = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+    }
+  }
+  
+  // Configurar oposición elegante
+  if (oposicionActiva && oposicionActiva.nombre) {
+    const oposicionElegante = document.getElementById('oposicionElegante');
+    if (oposicionElegante) {
+      oposicionElegante.textContent = oposicionActiva.nombre;
+    }
+    
+    // También rellenar el select oculto para compatibilidad
+    const select = document.getElementById('oposicionPlanificacion');
+    if (select) {
+      select.innerHTML = '';
+      const option = document.createElement('option');
+      option.value = oposicionActiva.id;
+      option.textContent = oposicionActiva.nombre;
+      option.selected = true;
+      select.appendChild(option);
+    }
+    
+    // Cargar configuración automáticamente
+    setTimeout(cargarConfiguracionActual, 200);
+  }
+  
+  // Verificar repasos del día automáticamente
+  verificarRepasosDelDia();
+}
+
+// AÑADIR también esta función para configurar el listener del input
+function configurarListenerTiempo() {
+  const horasInput = document.getElementById('horasEstudio');
+  if (horasInput) {
+    // Quitar listeners anteriores
+    horasInput.removeEventListener('input', actualizarTiempoDisponible);
+    horasInput.removeEventListener('change', actualizarTiempoDisponible);
+    
+    // Añadir listeners
+    horasInput.addEventListener('input', actualizarTiempoDisponible);
+    horasInput.addEventListener('change', actualizarTiempoDisponible);
+    
+    console.log('✅ Listener de tiempo configurado');
+  }
+}
+
+// Nueva función específica para configurar oposición en paso 1
+function configurarOposicionEnPaso1() {
+  const select = document.getElementById('oposicionPlanificacion');
+  if (!select) {
+    console.error('❌ Select oposicionPlanificacion no encontrado');
+    return;
+  }
+  
+  if (!oposicionActiva || !oposicionActiva.id) {
+    console.error('❌ No hay oposición activa');
+    select.innerHTML = '<option value="">-- Error: Sin oposición activa --</option>';
+    return;
+  }
+  
+  console.log('✅ Configurando oposición activa:', oposicionActiva.nombre);
+  
+  // Limpiar y configurar select
+  select.innerHTML = '';
+  const option = document.createElement('option');
+  option.value = oposicionActiva.id;
+  option.textContent = oposicionActiva.nombre;
+  option.selected = true;
+  select.appendChild(option);
+  select.disabled = true;
+  
+  // Añadir texto explicativo si no existe
+  const container = select.parentElement;
+  let explicacion = container.querySelector('.explicacion-oposicion');
+  if (!explicacion) {
+    explicacion = document.createElement('small');
+    explicacion.className = 'explicacion-oposicion';
+    explicacion.style.color = '#666';
+    explicacion.style.display = 'block';
+    explicacion.style.marginTop = '5px';
+    explicacion.textContent = 'Oposición activa actual';
+    container.appendChild(explicacion);
+  }
+  
+  // Cargar configuración automáticamente
+  setTimeout(cargarConfiguracionActual, 200);
 }
 
 function mostrarPaso2() {
-  console.log('Paso 2 cargado');
+  console.log('⏰ Cargando paso 2 - Configuración de tiempo');
+  
+  // Configurar listener para actualizaciones dinámicas
+  setTimeout(configurarListenerTiempo, 100);
+  
+  // Mostrar repasos en paso 2 si existen
+  mostrarRepasosEnPasoDos();
+  
+  // Actualizar tiempo inicial
+  setTimeout(actualizarTiempoDisponible, 200);
+}
+
+// Función para mostrar repasos en paso 2
+function mostrarRepasosEnPasoDos() {
+  const infoDiv = document.getElementById('infoRepasosStepDos');
+  const detalleDiv = document.getElementById('detalleRepasosStepDos');
+  
+  if (!infoDiv || !detalleDiv) {
+    console.warn('⚠️ Elementos de repasos paso 2 no encontrados');
+    return;
+  }
+  
+  if (window.repasosDelDia && window.repasosDelDia.length > 0) {
+    const tiempoRepasos = window.repasosDelDia.length * 30;
+    
+    let html = '<div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">';
+    html += '<div>';
+    html += '<ul style="margin: 0; padding-left: 20px;">';
+    window.repasosDelDia.forEach(function(repaso) {
+      html += '<li>' + repaso.nombreTema + ' <span style="color: #856404; font-weight: bold;">(30 min)</span></li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+    html += '<div style="text-align: center; background: #ffc107; color: white; padding: 10px; border-radius: 5px; min-width: 80px;">';
+    html += '<div style="font-size: 20px; font-weight: bold;">' + tiempoRepasos + ' min</div>';
+    html += '<div style="font-size: 12px;">Total repasos</div>';
+    html += '</div>';
+    html += '</div>';
+    
+    detalleDiv.innerHTML = html;
+    infoDiv.style.display = 'block';
+    
+    console.log('✅ Repasos mostrados en paso 2:', window.repasosDelDia.length);
+  } else {
+    infoDiv.style.display = 'none';
+    console.log('ℹ️ No hay repasos para mostrar en paso 2');
+  }
 }
 
 function mostrarPaso3() {
-  console.log('Paso 3 cargado');
+  console.log('📚 Cargando temas para selección');
+  
+  // Actualizar resumen inicial
+  actualizarResumenTiempo();
+  
+  // Cargar árbol de temas de forma segura
+  cargarArbolTemasSeguro();
 }
 
 function validarPaso1() {
@@ -655,24 +1284,68 @@ function pasoAnterior() {
   }
 }
 
-// Cargar oposiciones (conectado al backend)
+// REEMPLAZAR la función cargarOposiciones() en scriptsPlanificacion.html
+
 function cargarOposiciones() {
+  console.log('🔄 Cargando oposiciones para modal...');
+  
   const select = document.getElementById('oposicionPlanificacion');
+  if (!select) {
+    console.error('❌ Select oposicionPlanificacion no encontrado');
+    return;
+  }
+  
+  // Si ya tenemos oposición activa, usarla directamente
+  if (oposicionActiva && oposicionActiva.id) {
+    console.log('✅ Usando oposición activa:', oposicionActiva.nombre);
+    
+    select.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = oposicionActiva.id;
+    option.textContent = oposicionActiva.nombre;
+    option.selected = true;
+    select.appendChild(option);
+    select.disabled = true;
+    
+    // Añadir texto explicativo
+    const container = select.parentElement;
+    let explicacion = container.querySelector('.explicacion-oposicion');
+    if (!explicacion) {
+      explicacion = document.createElement('small');
+      explicacion.className = 'explicacion-oposicion';
+      explicacion.style.color = '#666';
+      explicacion.style.display = 'block';
+      explicacion.style.marginTop = '5px';
+      explicacion.textContent = 'Oposición activa actual';
+      container.appendChild(explicacion);
+    }
+    
+    // Cargar configuración automáticamente
+    setTimeout(cargarConfiguracionActual, 100);
+    return;
+  }
+  
+  // Si no hay oposición activa, cargar todas
   select.innerHTML = '<option value="">-- Cargando oposiciones... --</option>';
+  select.disabled = true;
   
   google.script.run
     .withSuccessHandler(function(oposiciones) {
+      select.disabled = false;
       select.innerHTML = '<option value="">-- Selecciona una oposición --</option>';
       
-      oposiciones.forEach(function(oposicion) {
+      oposiciones.forEach(function(op) {
         const option = document.createElement('option');
-        option.value = oposicion.id;
-        option.textContent = oposicion.nombre;
+        option.value = op.id;
+        option.textContent = op.nombre;
         select.appendChild(option);
       });
+      
+      console.log('✅ Oposiciones cargadas:', oposiciones.length);
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar oposiciones:', error);
+      console.error('❌ Error al cargar oposiciones:', error);
+      select.disabled = false;
       select.innerHTML = '<option value="">-- Error al cargar --</option>';
     })
     .getOposicionesParaPlanificacion();
@@ -680,44 +1353,109 @@ function cargarOposiciones() {
 
 // 8. FUNCIÓN verificarRepasosDelDia() con loading
 function verificarRepasosDelDia() {
-  var fechaInput = document.getElementById('fechaPlanificacion');
-  if (!fechaInput.value) return;
+  console.log('🔄 Verificando repasos del día...');
   
-  // Loading inline en la sección de repasos
-  var alertaDiv = document.getElementById('alertaRepasos');
-  if (alertaDiv) {
-    mostrarLoading(alertaDiv, {
-      mensaje: 'Verificando repasos...',
-      tipo: 'inline'
-    });
+  var fechaInput = document.getElementById('fechaPlanificacion');
+  if (!fechaInput || !fechaInput.value) {
+    console.warn('⚠️ No hay fecha seleccionada');
+    return;
   }
   
   var fechaMs = new Date(fechaInput.value + 'T00:00:00').getTime();
+  console.log('🔍 Buscando repasos para:', new Date(fechaMs));
   
   google.script.run
     .withSuccessHandler(function(repasos) {
+      console.log('✅ Repasos recibidos:', repasos);
+      
       if (typeof repasosDelDia === 'undefined') {
         window.repasosDelDia = [];
       }
       repasosDelDia = repasos || [];
       
-      if (alertaDiv) {
-        ocultarLoading(alertaDiv);
+      // MOSTRAR REPASOS DIRECTAMENTE - SIN BUSCAR ELEMENTOS COMPLICADOS
+      if (repasos && repasos.length > 0) {
+        // Buscar contenedor del paso 1
+        var paso1 = document.getElementById('paso1');
+        if (!paso1) {
+          console.error('❌ Paso 1 no encontrado');
+          return;
+        }
+        
+        // Crear o encontrar div de repasos
+        var alertaExistente = document.getElementById('alertaRepasos');
+        if (alertaExistente) {
+          alertaExistente.remove();
+        }
+        
+        // Crear nuevo div de repasos
+        var alertaDiv = document.createElement('div');
+        alertaDiv.id = 'alertaRepasos';
+        alertaDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 15px 0;';
+        
+        var html = '<h6 style="margin: 0 0 10px 0; color: #856404;">⚠️ Repasos programados para este día:</h6>';
+        html += '<ul style="margin: 0; padding-left: 20px;">';
+        repasos.forEach(function(repaso) {
+          html += '<li><strong>' + repaso.nombreTema + '</strong> - Repaso #' + repaso.numeroRepaso + '</li>';
+        });
+        html += '</ul>';
+        html += '<p style="margin: 10px 0 0 0; font-size: 14px; color: #856404;"><strong>Consejo:</strong> Ten en cuenta estos repasos al calcular el tiempo de estudio.</p>';
+        
+        alertaDiv.innerHTML = html;
+        
+        // Insertarlo al final del paso 1
+        paso1.appendChild(alertaDiv);
+        
+        console.log('✅ Repasos mostrados correctamente');
+        
+      } else {
+        console.log('ℹ️ No hay repasos para este día');
+        // Quitar alerta si existe
+        var alertaExistente = document.getElementById('alertaRepasos');
+        if (alertaExistente) {
+          alertaExistente.remove();
+        }
       }
-      mostrarRepasosEnPaso1(repasos);
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar repasos:', error);
+      console.error('❌ Error al cargar repasos:', error);
       if (typeof repasosDelDia === 'undefined') {
         window.repasosDelDia = [];
       }
       repasosDelDia = [];
-      
-      if (alertaDiv) {
-        ocultarLoading(alertaDiv);
-      }
     })
     .getRepasosDelDia(fechaMs);
+}
+
+// AÑADIR esta función en scriptsPlanificacion.html (después de verificarRepasosDelDia)
+function mostrarRepasosEnPaso1(repasos) {
+  var alertaDiv = document.getElementById('alertaRepasos');
+  var listaDiv = document.getElementById('listaRepasos');
+  
+  if (!alertaDiv || !listaDiv) {
+    console.warn('Elementos de repasos no encontrados en paso 1');
+    return;
+  }
+  
+  if (repasos && repasos.length > 0) {
+    // Mostrar alerta
+    alertaDiv.style.display = 'block';
+    
+    // Construir lista de repasos
+    var html = '<ul style="margin: 0; padding-left: 20px;">';
+    repasos.forEach(function(repaso) {
+      html += '<li><strong>' + repaso.nombreTema + '</strong> - Repaso #' + repaso.numeroRepaso + '</li>';
+    });
+    html += '</ul>';
+    
+    listaDiv.innerHTML = html;
+    
+    console.log('✅ Repasos mostrados en paso 1:', repasos.length);
+  } else {
+    // Ocultar alerta si no hay repasos
+    alertaDiv.style.display = 'none';
+    console.log('ℹ️ No hay repasos para este día');
+  }
 }
 
 // Cargar configuración actual (conectado al backend)
@@ -1330,23 +2068,139 @@ function cargarDetalleDia(fecha, esDiaPasado) {
 
 // 4. FUNCIÓN cargarPlanificacionesDelMes() con loading en calendario
 function cargarPlanificacionesDelMes() {
-  var año = mesActual.getFullYear();
-  var mes = mesActual.getMonth();
+  const año = mesActual.getFullYear();
+  const mes = mesActual.getMonth();
   
-  console.log('Cargando planificaciones para:', año, mes);
+  console.log('🔄 FRONTEND: Cargando planificaciones para:', año, mes);
   
   google.script.run
     .withSuccessHandler(function(planificaciones) {
-      console.log('Planificaciones cargadas:', planificaciones);
+      console.log('✅ FRONTEND: Planificaciones recibidas desde backend:', planificaciones);
       
-      if (planificaciones && planificaciones.length > 0 && typeof mostrarPlanificacionesEnCalendario === 'function') {
+      // VALIDACIÓN ROBUSTA
+      if (!planificaciones) {
+        console.warn('⚠️ FRONTEND: Backend devolvió null/undefined');
+        planificaciones = [];
+      }
+      
+      if (!Array.isArray(planificaciones)) {
+        console.warn('⚠️ FRONTEND: Backend no devolvió array:', typeof planificaciones);
+        planificaciones = [];
+      }
+      
+      if (planificaciones.length > 0) {
+        console.log('📅 FRONTEND: Mostrando', planificaciones.length, 'planificaciones en calendario');
         mostrarPlanificacionesEnCalendario(planificaciones);
+      } else {
+        console.log('ℹ️ FRONTEND: No hay planificaciones para mostrar en calendario');
       }
     })
     .withFailureHandler(function(error) {
-      console.error('Error al cargar planificaciones del mes:', error);
+      console.error('❌ FRONTEND: Error al cargar planificaciones del mes:', error);
+      console.log('ℹ️ FRONTEND: Continuando sin mostrar planificaciones en calendario');
     })
-    .getPlanificacionesDelMes(año, mes);
+    .getPlanificacionesDelMesNueva(año, mes);  // ← USAR LA NUEVA FUNCIÓN
+}
+
+// TAMBIÉN MODIFICAR cargarDetalleDiaCompleto() para usar la nueva función
+function cargarDetalleDiaCompletoNuevo(dia) {
+  console.log('🔍 FRONTEND: Cargando detalle para día:', dia);
+  
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  const esDiaPasado = fechaSeleccionada < hoy;
+  
+  // Actualizar título
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
+  const sufijo = esDiaPasado ? ' (Solo lectura)' : '';
+  
+  const tituloElement = document.getElementById('tituloDetalleDia');
+  if (tituloElement) {
+    tituloElement.textContent = tituloFecha + sufijo;
+  }
+  
+  // Mostrar loading
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (!contenido) {
+    console.error('❌ FRONTEND: Elemento contenidoDetalleDia no encontrado');
+    return;
+  }
+  
+  contenido.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="loading-spinner"></div><p>Cargando información del día...</p></div>';
+  
+  // Buscar planificación para este día
+  const año = fechaSeleccionada.getFullYear();
+  const mes = fechaSeleccionada.getMonth();
+  
+  console.log('📅 FRONTEND: Buscando planificaciones para:', año, mes);
+  
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      console.log('✅ FRONTEND: Planificaciones recibidas:', planificaciones);
+      
+      // VALIDACIÓN ROBUSTA
+      if (!planificaciones || !Array.isArray(planificaciones)) {
+        console.warn('⚠️ FRONTEND: Planificaciones no es un array válido:', planificaciones);
+        planificaciones = [];
+      }
+      
+      // Buscar planificación para este día específico
+      let planDelDia = null;
+      
+      try {
+        planDelDia = planificaciones.find(function(p) {
+          if (!p || !p.fecha) return false;
+          
+          const fechaPlan = new Date(p.fecha);
+          fechaPlan.setHours(0, 0, 0, 0);
+          return fechaPlan.getTime() === fechaSeleccionada.getTime();
+        });
+      } catch (error) {
+        console.error('❌ FRONTEND: Error al buscar planificación del día:', error);
+        planDelDia = null;
+      }
+      
+      console.log('🎯 FRONTEND: Planificación del día encontrada:', planDelDia);
+      
+      // Buscar repasos para este día
+      console.log('🔄 FRONTEND: Buscando repasos para:', fechaSeleccionada.getTime());
+      
+      google.script.run
+        .withSuccessHandler(function(repasos) {
+          console.log('✅ FRONTEND: Repasos recibidos:', repasos);
+          
+          // VALIDACIÓN ROBUSTA
+          if (!repasos || !Array.isArray(repasos)) {
+            console.warn('⚠️ FRONTEND: Repasos no es un array válido:', repasos);
+            repasos = [];
+          }
+          
+          mostrarDetalleCompletoRobust(planDelDia, repasos, esDiaPasado);
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ FRONTEND: Error al cargar repasos:', error);
+          mostrarDetalleCompletoRobust(planDelDia, [], esDiaPasado);
+        })
+        .getRepasosDelDia(fechaSeleccionada.getTime());
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error al cargar planificaciones:', error);
+      
+      // Mostrar error en el contenido
+      if (contenido) {
+        contenido.innerHTML = 
+          '<div style="text-align: center; color: #dc3545; padding: 40px;">' +
+          '<h6>❌ Error de conexión</h6>' +
+          '<p>No se pudo cargar la información del día</p>' +
+          '<button onclick="cargarDetalleDiaCompletoNuevo(' + dia + ')" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button>' +
+          '</div>';
+      }
+    })
+    .getPlanificacionesDelMesNueva(año, mes);  // ← USAR LA NUEVA FUNCIÓN
 }
 
 function marcarTemaCompleto(idProgreso, nombreTema) {
@@ -1599,49 +2453,142 @@ function crearPlanificacionSegura() {
   }, contexto, Promise.reject(new Error('Error en validación inicial')));
 }
 
-// Función mejorada para cargar árbol de temas
+// Función segura para cargar árbol de temas
 function cargarArbolTemasSeguro() {
-  var contexto = 'cargarArbolTemas';
+  const contenedor = document.getElementById('arbolTemas');
   
-  return ejecutarSeguro(function() {
-    var contenedor = document.getElementById('arbolTemas');
-    
-    if (!contenedor) {
-      throw new Error('Contenedor del árbol de temas no encontrado');
-    }
-    
-    if (!oposicionActiva) {
-      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error: No hay oposición activa</p>';
-      return Promise.reject(new Error('No hay oposición activa'));
-    }
-    
-    var tiempoDisponible = tiempoTotalDisponible;
-    
-    // Mostrar loading
-    mostrarLoadingArbol();
-    
-    return ejecutarConManejadorErrores(
-      google.script.run.getArbolTemasConEstadosSeguro,
-      contexto,
-      {
-        parametros: [oposicionActiva.id, tiempoDisponible],
-        successHandler: true,
-        mensajeError: 'No se pudieron cargar los temas',
-        reintentos: 2
-      }
-    ).then(function(data) {
+  if (!contenedor) {
+    console.error('❌ Contenedor arbolTemas no encontrado');
+    return;
+  }
+  
+  if (!oposicionActiva) {
+    contenedor.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px;"><h6>❌ No hay oposición activa</h6><p>Configura una oposición antes de continuar</p></div>';
+    return;
+  }
+  
+  // Mostrar loading
+  contenedor.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="loading-spinner loading-spinner-large"></div><p>Cargando temas...</p></div>';
+  
+  // Llamar al backend de forma segura
+  google.script.run
+    .withSuccessHandler(function(data) {
+      console.log('✅ Temas cargados:', data);
+      
       if (!data || !data.arbol || data.arbol.length === 0) {
-        contenedor.innerHTML = '<p style="text-align: center; color: #999;">No hay temas vinculados a esta oposición</p>';
+        contenedor.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;"><h6>📭 Sin temas</h6><p>No hay temas vinculados a esta oposición</p></div>';
         return;
       }
       
-      renderizarArbolTemas(data.arbol, data.bloques);
+      // Renderizar árbol
+      renderizarArbolBasico(data.arbol, data.bloques || {});
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error al cargar temas:', error);
       
-    }).catch(function(errorInfo) {
-      contenedor.innerHTML = '<p style="color: red; text-align: center;">Error al cargar temas. <button onclick="cargarArbolTemasSeguro()">Reintentar</button></p>';
+      contenedor.innerHTML = 
+        '<div style="text-align: center; color: #dc3545; padding: 40px;">' +
+        '<h6>❌ Error al cargar temas</h6>' +
+        '<p>' + (error.message || 'Error de conexión') + '</p>' +
+        '<button onclick="cargarArbolTemasSeguro()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">🔄 Reintentar</button>' +
+        '</div>';
+    })
+    .getArbolTemasConEstados(oposicionActiva.id, tiempoTotalDisponible);
+}
+
+// Función básica para renderizar árbol (sin complicaciones)
+function renderizarArbolBasico(arbolTemas, bloquesInfo) {
+  const contenedor = document.getElementById('arbolTemas');
+  
+  if (!arbolTemas || arbolTemas.length === 0) {
+    contenedor.innerHTML = '<p style="text-align: center; color: #666;">No hay temas disponibles</p>';
+    return;
+  }
+  
+  let html = '<div style="padding: 10px;">';
+  
+  // Renderizar temas de forma simple
+  arbolTemas.forEach(function(tema, index) {
+    html += renderizarTemaBásico(tema, 0);
+  });
+  
+  html += '</div>';
+  contenedor.innerHTML = html;
+  
+  console.log('✅ Árbol de temas renderizado');
+}
+
+// Renderizar tema básico
+function renderizarTemaBásico(tema, nivel) {
+  const margen = nivel * 20;
+  let html = '';
+  
+  html += '<div style="margin-left: ' + margen + 'px; margin-bottom: 8px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px; background: white;">';
+  
+  // Checkbox solo si es seleccionable
+  if (tema.seleccionable || tema.seleccionablePadre) {
+    const yaSeleccionado = temasSeleccionados.some(t => t.id === tema.id);
+    
+    html += '<label style="display: flex; align-items: center; cursor: pointer;">';
+    html += '<input type="checkbox" ';
+    html += 'onchange="toggleSeleccionBasica(this, ' + tema.id + ', ' + tema.tiempoMinutos + ')" ';
+    html += (yaSeleccionado ? 'checked ' : '');
+    html += 'style="margin-right: 10px;"> ';
+    html += '<div>';
+    html += '<div style="font-weight: bold;">' + tema.nombreCompleto + '</div>';
+    if (tema.tiempoTexto) {
+      html += '<small style="color: #666;">' + tema.tiempoTexto + '</small>';
+    }
+    html += '</div>';
+    html += '</label>';
+  } else {
+    html += '<div style="color: #999;">';
+    html += '<div style="font-weight: bold;">' + tema.nombreCompleto + '</div>';
+    html += '<small>Estado: ' + tema.estado + '</small>';
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  
+  // Renderizar hijos si existen
+  if (tema.hijos && tema.hijos.length > 0) {
+    tema.hijos.forEach(function(hijo) {
+      html += renderizarTemaBásico(hijo, nivel + 1);
+    });
+  }
+  
+  return html;
+}
+
+// Función básica para toggle de selección
+function toggleSeleccionBasica(checkbox, idTema, tiempoMinutos) {
+  if (checkbox.checked) {
+    // Validar tiempo disponible
+    if (tiempoUsado + tiempoMinutos > tiempoTotalDisponible) {
+      checkbox.checked = false;
+      alert('⚠️ No hay tiempo suficiente para este tema');
+      return;
+    }
+    
+    // Agregar tema
+    temasSeleccionados.push({
+      id: idTema,
+      tiempo: tiempoMinutos
     });
     
-  }, contexto, Promise.reject(new Error('Error al inicializar carga de árbol')));
+    tiempoUsado += tiempoMinutos;
+    
+  } else {
+    // Quitar tema
+    const index = temasSeleccionados.findIndex(t => t.id === idTema);
+    if (index > -1) {
+      const tema = temasSeleccionados[index];
+      temasSeleccionados.splice(index, 1);
+      tiempoUsado -= tema.tiempo;
+    }
+  }
+  
+  actualizarResumenTiempo();
 }
 
 // Función mejorada para cargar planificaciones del mes
@@ -2237,5 +3184,20 @@ function limpiarDetalleDia() {
 }
 
 console.log('✅ Calendario básico funcional cargado');
+
+function testRepasosDesdeWeb() {
+  console.log('🧪 Testeando repasos desde web...');
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ RESULTADO TEST REPASOS:', resultado);
+      alert('TEST REPASOS:\n' + JSON.stringify(resultado, null, 2));
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ ERROR TEST REPASOS:', error);
+      alert('ERROR: ' + error.message);
+    })
+    .testRepasosDelDia();
+}
 
 </script>
