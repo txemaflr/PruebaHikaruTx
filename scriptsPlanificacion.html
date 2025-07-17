@@ -12,10 +12,22 @@ var tiempoUsado = 0;
 var bloquesActivos = [];
 var configuracionActual = null;
 var oposicionActiva = null;
+var detalleActual = {
+  dia: null,
+  mes: null,
+  año: null,
+  fijo: false // Si true, no cambiar automáticamente
+};
+var estadoDetalle = {
+  diaActual: null,
+  mesActual: null,
+  añoActual: null
+};
+var cargandoCalendario = false;
 
 // 1. Inicializar sección de planificación
 function inicializarSeccionPlanificacion() {
-  console.log('🚀 Inicializando sección Planificación mejorada...');
+  console.log('🚀 Inicializando sección Planificación COMPLETA...');
   
   const contenedor = document.getElementById('contenidoPrincipalPlanificacion');
   
@@ -23,38 +35,207 @@ function inicializarSeccionPlanificacion() {
     contenedor.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="loading-spinner loading-spinner-large"></div><p>Cargando configuración...</p></div>';
   }
   
-  // Cargar oposición activa
+  // 1. Procesar repasos pendientes primero
+  google.script.run
+    .withSuccessHandler(function() {
+      console.log('✅ Repasos pendientes procesados');
+      cargarOposicionYCalendario();
+    })
+    .withFailureHandler(function(error) {
+      console.warn('⚠️ Error al procesar repasos:', error);
+      cargarOposicionYCalendario(); // Continuar aunque falle
+    })
+    .procesarRepasosPendientes();
+}
+
+// FUNCIÓN COMPLETA PARA CARGAR TODO
+function cargarOposicionYCalendario() {
   google.script.run
     .withSuccessHandler(function(oposicion) {
       oposicionActiva = oposicion;
-      console.log('✅ Oposición activa cargada:', oposicion);
       
       if (oposicion) {
-        // Mostrar interfaz principal mejorada
         mostrarPantallaPrincipalMejorada();
-        
-        // Inicializar calendario después de mostrar la interfaz
-        setTimeout(inicializarCalendarioConNuevaFuncion, 500);
-        
+        inicializarCalendarioCompleto();
       } else {
-        // No hay oposición activa - mostrar selector
         mostrarSelectorOposicion();
       }
     })
     .withFailureHandler(function(error) {
-      console.error('❌ Error al cargar oposición activa:', error);
-      
-      if (contenedor) {
-        contenedor.innerHTML = 
-          '<div style="background: #f8d7da; padding: 20px; border-radius: 8px; text-align: center;">' +
-          '<h3 style="margin: 0; color: #721c24;">❌ Error de conexión</h3>' +
-          '<p style="margin: 10px 0; color: #721c24;">No se pudo cargar la configuración</p>' +
-          '<button onclick="inicializarSeccionPlanificacion()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px;">Reintentar</button>' +
-          '</div>';
-      }
+      console.error('❌ Error al cargar oposición:', error);
+      mostrarSelectorOposicion();
     })
     .getOposicionActiva();
 }
+
+// CALENDARIO COMPLETO QUE CARGA TODO AL INICIO
+function inicializarCalendarioCompleto() {
+  renderizarCalendario();
+  
+  // ✅ MOSTRAR LOADING EN CALENDARIO
+  mostrarLoadingEnCalendario();
+  
+  // Seleccionar día de hoy por defecto
+  const hoy = new Date();
+  if (hoy.getFullYear() === mesActual.getFullYear() && hoy.getMonth() === mesActual.getMonth()) {
+    seleccionarDia(hoy.getDate());
+  }
+  
+  cargarTodoElMes();
+}
+
+// FUNCIÓN PARA MOSTRAR LOADING EN CALENDARIO
+function mostrarLoadingEnCalendario() {
+  console.log('⏳ Mostrando loading calendario');
+  
+  const calendario = document.getElementById('calendario');
+  if (!calendario) return;
+  
+  // Buscar o crear loading
+  let loadingDiv = document.getElementById('calendario-loading');
+  if (!loadingDiv) {
+    loadingDiv = document.createElement('div');
+    loadingDiv.id = 'calendario-loading';
+    loadingDiv.style.cssText = `
+      text-align: center; 
+      padding: 15px; 
+      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
+      border-radius: 8px; 
+      margin-bottom: 15px; 
+      color: #1976d2; 
+      font-size: 14px; 
+      font-weight: 500;
+      border: 1px solid #90caf9;
+    `;
+    calendario.parentNode.insertBefore(loadingDiv, calendario);
+  }
+  
+  loadingDiv.innerHTML = `
+    <div class="loading-spinner" style="display: inline-block; margin-right: 10px;"></div>
+    📅 Cargando planificaciones y repasos del mes...
+  `;
+  loadingDiv.style.display = 'block';
+  
+  cargandoCalendario = true;
+}
+
+function ocultarLoadingCalendario() {
+  console.log('✅ Ocultando loading calendario');
+  
+  const loadingDiv = document.getElementById('calendario-loading');
+  if (loadingDiv) {
+    loadingDiv.style.display = 'none';
+  }
+  
+  cargandoCalendario = false;
+}
+
+// FUNCIÓN QUE CARGA PLANIFICACIONES Y REPASOS DE TODO EL MES
+function cargarTodoElMes() {
+  const año = mesActual.getFullYear();
+  const mes = mesActual.getMonth();
+  
+  console.log('📅 Cargando TODO el mes:', año, mes);
+  
+  let planificacionesCargadas = false;
+  let repasosCargados = false;
+  let planificaciones = [];
+  let repasosPorDia = {};
+  
+  function verificarCargaCompleta() {
+    if (planificacionesCargadas && repasosCargados) {
+      mostrarTodoEnCalendario(planificaciones, repasosPorDia);
+    }
+  }
+  
+  // Cargar planificaciones
+  google.script.run
+    .withSuccessHandler(function(plans) {
+      planificaciones = plans || [];
+      planificacionesCargadas = true;
+      console.log('✅ Planificaciones cargadas:', planificaciones.length);
+      verificarCargaCompleta();
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error planificaciones:', error);
+      planificacionesCargadas = true;
+      verificarCargaCompleta();
+    })
+    .getPlanificacionesDelMes(año, mes);
+  
+  // Cargar repasos de todos los días del mes
+  const diasDelMes = new Date(año, mes + 1, 0).getDate();
+  let repasosPendientes = diasDelMes;
+  
+  for (let dia = 1; dia <= diasDelMes; dia++) {
+    const fechaDia = new Date(año, mes, dia).getTime();
+    
+    google.script.run
+      .withSuccessHandler(function(repasos) {
+        if (repasos && repasos.length > 0) {
+          const diaKey = new Date(fechaDia).getDate();
+          repasosPorDia[diaKey] = repasos;
+        }
+        
+        repasosPendientes--;
+        if (repasosPendientes === 0) {
+          repasosCargados = true;
+          console.log('✅ Repasos cargados para', Object.keys(repasosPorDia).length, 'días');
+          verificarCargaCompleta();
+        }
+      })
+      .withFailureHandler(function(error) {
+        repasosPendientes--;
+        if (repasosPendientes === 0) {
+          repasosCargados = true;
+          verificarCargaCompleta();
+        }
+      })
+      .getRepasosDelDia(fechaDia);
+  }
+}
+
+// MOSTRAR TODO EN CALENDARIO
+function mostrarTodoEnCalendario(planificaciones, repasosPorDia) {
+  console.log('🎨 Mostrando todo en calendario');
+  
+  // ✅ OCULTAR LOADING
+  ocultarLoadingCalendario();
+  
+  // Limpiar contenido anterior
+  document.querySelectorAll('[id^="contenido-"]').forEach(el => el.innerHTML = '');
+  
+  // Mostrar planificaciones
+  planificaciones.forEach(plan => {
+    const contenedor = document.getElementById('contenido-' + mesActual.getFullYear() + '-' + mesActual.getMonth() + '-' + plan.dia);
+    if (contenedor) {
+      const tiempoHoras = Math.round(plan.tiempoTotal / 60 * 10) / 10;
+      contenedor.innerHTML += `<div style="background: #4caf50; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px;">📚 ${plan.temas.length} temas • ${tiempoHoras}h</div>`;
+    }
+  });
+  
+  // Mostrar repasos
+  Object.keys(repasosPorDia).forEach(dia => {
+    const contenedor = document.getElementById('contenido-' + mesActual.getFullYear() + '-' + mesActual.getMonth() + '-' + dia);
+    if (contenedor) {
+      const repasos = repasosPorDia[dia];
+      contenedor.innerHTML += `<div style="background: #ff9800; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px;">🔄 ${repasos.length} repasos</div>`;
+    }
+  });
+  
+  // ✅ SOLO en carga inicial (no en navegación)
+  if (!estadoDetalle.diaActual) {
+    const hoy = new Date();
+    if (hoy.getFullYear() === mesActual.getFullYear() && hoy.getMonth() === mesActual.getMonth()) {
+      setTimeout(function() {
+        seleccionarDia(hoy.getDate());
+      }, 200);
+    }
+  }
+  
+  console.log('✅ Calendario completamente cargado');
+}
+
 
 // 2. Cargar oposición activa
 function cargarOposicionActiva() {
@@ -526,41 +707,127 @@ if (typeof renderizarCalendario === 'undefined') {
 
 // Cambiar mes
 function cambiarMes(direccion) {
-  mesActual.setMonth(mesActual.getMonth() + direccion);
-  diaSeleccionado = null; // Reset selección
-  renderizarCalendario();
-  limpiarDetalleDia();
-}
-
-// Ir a hoy
-function irAHoy() {
-  mesActual = new Date();
-  renderizarCalendario();
-  seleccionarDia(new Date().getDate());
-}
-
-// ACTUALIZAR seleccionarDia() para usar la nueva función
-function seleccionarDia(dia) {
-  console.log('📅 FRONTEND: Seleccionando día:', dia);
+  console.log('📅 Navegando mes, dirección:', direccion);
   
-  try {
-    diaSeleccionado = dia;
-    renderizarCalendario(); // Re-renderizar para mostrar selección
-    cargarDetalleDiaCompletoNuevo(dia); // ← USAR LA NUEVA FUNCIÓN
-  } catch (error) {
-    console.error('❌ FRONTEND: Error al seleccionar día:', error);
-    
-    // Mostrar error en detalle
-    const contenido = document.getElementById('contenidoDetalleDia');
-    if (contenido) {
-      contenido.innerHTML = 
-        '<div style="text-align: center; color: #dc3545; padding: 40px;">' +
-        '<h6>❌ Error</h6>' +
-        '<p>Error al cargar información del día</p>' +
-        '<button onclick="seleccionarDia(' + dia + ')" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button>' +
-        '</div>';
+  // ✅ MOSTRAR LOADING INMEDIATAMENTE
+  cargandoCalendario = true;
+  mostrarLoadingEnCalendario();
+  
+  // Cambiar mes
+  mesActual.setMonth(mesActual.getMonth() + direccion);
+  
+  // ✅ MANTENER día seleccionado visualmente (NO cambiar diaSeleccionado)
+  console.log('📍 Manteniendo día seleccionado:', diaSeleccionado);
+  
+  // Renderizar calendario SIN cambiar selección
+  renderizarCalendario();
+  
+  // Cargar datos del nuevo mes
+  cargarTodoElMes();
+  
+  // Al terminar de cargar, restaurar selección visual si existe
+  if (diaSeleccionado) {
+    setTimeout(function() {
+      marcarDiaSeleccionado(diaSeleccionado);
+    }, 300);
+  }
+}
+
+// Función auxiliar para verificar si es mes actual
+function esMesActual() {
+  const hoy = new Date();
+  return mesActual.getFullYear() === hoy.getFullYear() && 
+         mesActual.getMonth() === hoy.getMonth();
+}
+
+// Función para marcar día visualmente SIN cambiar detalle
+function marcarDiaSeleccionado(dia) {
+  // Quitar selección anterior
+  document.querySelectorAll('[onclick*="seleccionarDia"]').forEach(el => {
+    const esHoy = el.style.border && el.style.border.includes('2196f3');
+    if (!esHoy) {
+      el.style.background = 'white';
+    }
+  });
+  
+  // Marcar día específico
+  const diaElement = document.querySelector(`[onclick="seleccionarDia(${dia})"]`);
+  if (diaElement) {
+    const esHoy = diaElement.style.border && diaElement.style.border.includes('2196f3');
+    if (esHoy) {
+      diaElement.style.background = '#e3f2fd';
+    } else {
+      diaElement.style.background = '#f0f0f0';
     }
   }
+  
+  diaSeleccionado = dia;
+}
+
+// SELECCIONAR DÍA SIN RECARGAR CALENDARIO
+function seleccionarDia(dia) {
+  console.log('📅 Intentando seleccionar día:', dia);
+  
+  const mesSeleccion = mesActual.getMonth();
+  const añoSeleccion = mesActual.getFullYear();
+  
+  // ✅ VERIFICAR SI YA ESTÁ SELECCIONADO
+  if (estadoDetalle.diaActual === dia && 
+      estadoDetalle.mesActual === mesSeleccion && 
+      estadoDetalle.añoActual === añoSeleccion) {
+    console.log('📍 Día ya seleccionado, no recargar detalle');
+    return; // ✅ NO HACER NADA
+  }
+  
+  console.log('🔄 Seleccionando nuevo día:', dia);
+  
+  // Actualizar estado
+  diaSeleccionado = dia;
+  estadoDetalle = {
+    diaActual: dia,
+    mesActual: mesSeleccion,
+    añoActual: añoSeleccion
+  };
+  
+  // Marcar visualmente
+  marcarDiaSeleccionado(dia);
+  
+  // Cargar detalle solo si es diferente
+  cargarDetalleDiaCompleto(dia);
+}
+
+// FUNCIÓN DE TEST DESDE EL FRONTEND
+function testPlanificacionesDesdeWeb() {
+  console.log('🧪 FRONTEND: Ejecutando test de planificaciones...');
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ FRONTEND: Resultado del test:', resultado);
+      
+      let mensaje = '🧪 RESULTADO DEL TEST:\n\n';
+      mensaje += '📅 Búsqueda: ' + resultado.año + '-' + (resultado.mes + 1) + ' (Julio 2025)\n';
+      mensaje += '📊 Planificaciones encontradas: ' + resultado.planificaciones + '\n';
+      
+      if (resultado.planificaciones > 0) {
+        mensaje += '\n✅ ¡ÉXITO! Se encontraron planificaciones\n';
+        mensaje += 'Detalles: ' + JSON.stringify(resultado.datos, null, 2);
+      } else {
+        mensaje += '\n❌ No se encontraron planificaciones\n';
+        mensaje += 'Verifica que existan datos en la hoja Planificacion_Temas para julio 2025';
+      }
+      
+      alert(mensaje);
+      
+      // Recargar automáticamente si encontró datos
+      if (resultado.planificaciones > 0) {
+        cargarPlanificacionesDelMes();
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error en test:', error);
+      alert('❌ Error en test: ' + error.message);
+    })
+    .testPlanificacionesJulio2025();
 }
 
 // Función temporal para inicializar con la nueva función
@@ -583,40 +850,39 @@ function limpiarDetalleDia() {
 }
 
 function mostrarPlanificacionesEnCalendario(planificaciones) {
-  console.log('📅 Mostrando planificaciones en calendario:', planificaciones);
+  console.log('📅 FRONTEND: Mostrando', planificaciones.length, 'planificaciones en calendario');
   
-  // VALIDACIÓN ROBUSTA
-  if (!planificaciones || !Array.isArray(planificaciones)) {
-    console.warn('⚠️ planificaciones no es un array válido:', planificaciones);
-    return;
-  }
-  
-  if (planificaciones.length === 0) {
-    console.log('ℹ️ No hay planificaciones para mostrar');
+  if (!planificaciones || !Array.isArray(planificaciones) || planificaciones.length === 0) {
+    console.log('ℹ️ FRONTEND: Sin planificaciones válidas para mostrar');
     return;
   }
   
   let planificacionesMostradas = 0;
   
-  planificaciones.forEach(function(planificacion) {
+  planificaciones.forEach(function(planificacion, index) {
     try {
-      // Validar que la planificación tenga datos válidos
-      if (!planificacion || !planificacion.fecha || !planificacion.temas) {
-        console.warn('⚠️ Planificación inválida:', planificacion);
+      console.log('🔍 FRONTEND: Procesando planificación', index, ':', planificacion);
+      
+      // Validaciones estrictas
+      if (!planificacion) {
+        console.warn('⚠️ FRONTEND: Planificación', index, 'es null/undefined');
         return;
       }
       
-      // Validar que temas sea un array
-      if (!Array.isArray(planificacion.temas)) {
-        console.warn('⚠️ Temas no es un array:', planificacion.temas);
+      if (!planificacion.fecha) {
+        console.warn('⚠️ FRONTEND: Planificación', index, 'sin fecha');
+        return;
+      }
+      
+      if (!planificacion.temas || !Array.isArray(planificacion.temas)) {
+        console.warn('⚠️ FRONTEND: Planificación', index, 'sin temas válidos');
         return;
       }
       
       const fechaPlan = new Date(planificacion.fecha);
       
-      // Validar fecha válida
       if (isNaN(fechaPlan.getTime())) {
-        console.warn('⚠️ Fecha inválida en planificación:', planificacion.fecha);
+        console.warn('⚠️ FRONTEND: Fecha inválida en planificación', index, ':', planificacion.fecha);
         return;
       }
       
@@ -624,42 +890,394 @@ function mostrarPlanificacionesEnCalendario(planificaciones) {
       const mes = fechaPlan.getMonth();
       const dia = fechaPlan.getDate();
       
-      // Buscar el contenedor del día específico
-      const contenedorDia = document.getElementById('contenido-' + año + '-' + mes + '-' + dia);
+      console.log('📍 FRONTEND: Buscando contenedor para fecha:', año, mes, dia);
+      
+      // Buscar contenedor del día
+      const idContenedor = 'contenido-' + año + '-' + mes + '-' + dia;
+      const contenedorDia = document.getElementById(idContenedor);
       
       if (contenedorDia) {
         // Crear HTML para la planificación
         let html = '';
         
-        // Indicador de planificación
-        html += '<div style="background: #4caf50; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px; font-weight: bold;">';
-        html += '📚 ' + planificacion.temas.length + ' temas';
+        // Indicador de planificación (verde)
+        html += '<div style="background: #4caf50; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px; font-weight: bold; text-align: center;">';
+        html += '📚 ' + planificacion.temas.length + ' tema' + (planificacion.temas.length > 1 ? 's' : '');
         html += '</div>';
         
-        // Tiempo total
+        // Indicador de tiempo (azul)
         const tiempoTotal = planificacion.tiempoTotal || 0;
-        const horas = Math.floor(tiempoTotal / 60);
-        const minutos = tiempoTotal % 60;
-        const tiempoTexto = horas > 0 ? horas + 'h ' + minutos + 'm' : minutos + 'm';
-        
-        html += '<div style="background: #2196f3; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 8px;">';
-        html += '⏱️ ' + tiempoTexto;
-        html += '</div>';
+        if (tiempoTotal > 0) {
+          const horas = Math.floor(tiempoTotal / 60);
+          const minutos = tiempoTotal % 60;
+          const tiempoTexto = horas > 0 ? horas + 'h' + (minutos > 0 ? ' ' + minutos + 'm' : '') : minutos + 'm';
+          
+          html += '<div style="background: #2196f3; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 8px; text-align: center;">';
+          html += '⏱️ ' + tiempoTexto;
+          html += '</div>';
+        }
         
         contenedorDia.innerHTML = html;
         planificacionesMostradas++;
         
-        console.log('✅ Planificación mostrada en día', dia);
+        console.log('✅ FRONTEND: Planificación mostrada en día', dia, '- Contenedor:', idContenedor);
       } else {
-        console.warn('⚠️ Contenedor no encontrado para día', dia, 'ID esperado:', 'contenido-' + año + '-' + mes + '-' + dia);
+        console.warn('⚠️ FRONTEND: Contenedor no encontrado:', idContenedor);
       }
       
     } catch (error) {
-      console.error('❌ Error al mostrar planificación individual:', error, planificacion);
+      console.error('❌ FRONTEND: Error al mostrar planificación', index, ':', error);
     }
   });
   
-  console.log('📊 Total planificaciones mostradas:', planificacionesMostradas);
+  console.log('📊 FRONTEND: Total planificaciones mostradas en calendario:', planificacionesMostradas);
+}
+
+// FUNCIÓN PARA COMPLETAR REPASOS
+function marcarRepasoComoCompletado(idRepaso, nombreTema) {
+  console.log('📝 FRONTEND: Completando repaso:', idRepaso, nombreTema);
+  
+  const tiempoReal = prompt('⏱️ ¿Cuántos minutos dedicaste al repaso de "' + nombreTema + '"?', '30');
+  
+  if (!tiempoReal || isNaN(tiempoReal) || parseInt(tiempoReal) < 1) {
+    alert('⚠️ Por favor, introduce un tiempo válido en minutos');
+    return;
+  }
+  
+  const notaTest = prompt('📝 ¿Cómo fue el repaso? (Bien/Regular/Mal o nota específica):', 'Bien');
+  
+  // Mostrar loading en el botón
+  const botones = document.querySelectorAll('button');
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idRepaso)) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ FRONTEND: Repaso completado exitosamente:', resultado);
+      
+      if (resultado.success) {
+        alert('🎉 ¡Repaso completado!\n\n✅ ' + resultado.mensaje);
+        
+        // Recargar detalle del día
+        setTimeout(function() {
+          cargarDetalleDiaCompletoMejorado(diaSeleccionado);
+        }, 500);
+      } else {
+        alert('❌ Error al completar repaso: ' + resultado.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error al completar repaso:', error);
+      alert('❌ Error de conexión al completar repaso: ' + error.message);
+    })
+    .marcarRepasoComoCompletado(idRepaso, parseInt(tiempoReal), notaTest || null);
+}
+
+// FUNCIÓN PARA MOSTRAR DETALLE CON ACCIONES
+function mostrarDetalleCompletoConAcciones(planificacion, repasos, esDiaPasado) {
+  console.log('🎨 FRONTEND: Mostrando detalle con árbol colapsable');
+  
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (!contenido) return;
+  
+  let html = '';
+  
+  // SECCIÓN PLANIFICACIONES
+  if (planificacion && planificacion.temas && planificacion.temas.length > 0) {
+    html += crearSeccionPlanificaciones(planificacion, esDiaPasado);
+  }
+  
+  // SECCIÓN REPASOS
+  if (repasos && repasos.length > 0) {
+    html += crearSeccionRepasos(repasos, esDiaPasado);
+  }
+  
+  // SIN CONTENIDO
+  if (!planificacion?.temas?.length && !repasos?.length) {
+    html += crearSeccionVacia(esDiaPasado);
+  }
+  
+  contenido.innerHTML = html;
+  console.log('✅ FRONTEND: Detalle con árbol mostrado');
+}
+
+// CREAR SECCIÓN DE PLANIFICACIONES AGRUPADAS
+function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
+  console.log('📚 Agrupando planificaciones por tema padre');
+  
+  // Agrupar temas por padre original
+  const gruposPorPadre = {};
+  
+  planificacion.temas.forEach(tema => {
+    // Extraer tema padre del nombre jerárquico
+    const nombreCompleto = tema.nombre || '';
+    const partes = nombreCompleto.split(' → ');
+    const temaPadre = partes[0] || 'Sin clasificar';
+    
+    if (!gruposPorPadre[temaPadre]) {
+      gruposPorPadre[temaPadre] = {
+        nombre: temaPadre,
+        temas: [],
+        tiempoTotal: 0
+      };
+    }
+    
+    gruposPorPadre[temaPadre].temas.push(tema);
+    gruposPorPadre[temaPadre].tiempoTotal += (tema.tiempo || 0);
+  });
+  
+  let html = '<div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #4caf50;">';
+  html += '<h6 style="margin: 0 0 15px 0; color: #2e7d32;">📚 Planificación del día</h6>';
+  
+  // Crear árbol colapsable por cada grupo
+  Object.values(gruposPorPadre).forEach(grupo => {
+    const idGrupo = 'grupo-' + grupo.nombre.replace(/[^a-zA-Z0-9]/g, '-');
+    const tiempoHoras = Math.round(grupo.tiempoTotal / 60 * 100) / 100;
+    
+    html += `
+      <div style="background: white; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0; overflow: hidden;">
+        <div onclick="toggleGrupo('${idGrupo}')" style="
+          background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); 
+          color: white; 
+          padding: 12px 15px; 
+          cursor: pointer; 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center;
+          font-weight: bold;
+        ">
+          <span>📂 ${grupo.nombre}</span>
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 12px; opacity: 0.9;">${grupo.temas.length} temas • ${tiempoHoras}h</span>
+            <span id="icono-${idGrupo}" style="font-size: 12px;">▼</span>
+          </div>
+        </div>
+        
+        <div id="${idGrupo}" style="padding: 15px; display: block;">
+    `;
+    
+    // Temas dentro del grupo
+    grupo.temas.forEach(tema => {
+      const nombreTema = tema.nombre.includes(' → ') ? tema.nombre.split(' → ').slice(1).join(' → ') : tema.nombre;
+      
+      html += `
+        <div style="
+          background: #f8f9fa; 
+          padding: 12px; 
+          border-radius: 5px; 
+          margin-bottom: 8px; 
+          border-left: 3px solid #4caf50;
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center;
+        ">
+          <div style="flex: 1;">
+            <div style="font-weight: 500; color: #2e7d32; margin-bottom: 4px;">${nombreTema}</div>
+            <div style="font-size: 12px; color: #666;">⏱️ ${tema.tiempo || 0} minutos</div>
+          </div>
+          ${!esDiaPasado ? `
+            <button onclick="marcarTemaComoCompletado('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
+              style="
+                background: #4caf50; 
+                color: white; 
+                border: none; 
+                padding: 8px 16px; 
+                border-radius: 5px; 
+                cursor: pointer; 
+                font-size: 12px;
+                font-weight: 500;
+              ">
+              ✅ Completar
+            </button>
+          ` : ''}
+        </div>
+      `;
+    });
+    
+    html += '</div></div>';
+  });
+  
+  html += '</div>';
+  return html;
+}
+
+// CREAR SECCIÓN DE REPASOS
+function crearSeccionRepasos(repasos, esDiaPasado) {
+  let html = '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107;">';
+  html += '<div onclick="toggleGrupo(\'repasos-grupo\')" style="';
+  html += 'background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%); color: #212529; padding: 12px 15px; cursor: pointer; ';
+  html += 'display: flex; justify-content: space-between; align-items: center; font-weight: bold; border-radius: 5px; margin-bottom: 15px;">';
+  html += '<span>📂 REPASOS</span>';
+  html += '<div style="display: flex; align-items: center; gap: 15px;">';
+  html += `<span style="font-size: 12px; opacity: 0.8;">${repasos.length} repasos • ${repasos.length * 30} min</span>`;
+  html += '<span id="icono-repasos-grupo" style="font-size: 12px;">▼</span>';
+  html += '</div></div>';
+  
+  html += '<div id="repasos-grupo" style="display: block;">';
+  
+  repasos.forEach(repaso => {
+    const nombreCompleto = repaso.nombreTema || 'Repaso sin nombre';
+    const estado = repaso.estado === 'retraso' ? ' (RETRASO)' : '';
+    
+    html += `
+      <div style="
+        background: white; 
+        padding: 12px; 
+        border-radius: 5px; 
+        margin-bottom: 8px; 
+        border-left: 3px solid #ffc107;
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+      ">
+        <div style="flex: 1;">
+          <div style="font-weight: 500; color: #856404; margin-bottom: 4px;">🔄 ${nombreCompleto}${estado}</div>
+          <div style="font-size: 12px; color: #666;">Repaso #${repaso.numeroRepaso} • ⏱️ 30 minutos</div>
+        </div>
+        ${!esDiaPasado ? `
+          <button onclick="marcarRepasoComoCompletado('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
+            style="
+              background: #ffc107; 
+              color: #212529; 
+              border: none; 
+              padding: 8px 16px; 
+              border-radius: 5px; 
+              cursor: pointer; 
+              font-size: 12px;
+              font-weight: 500;
+            ">
+            ✅ Completar
+          </button>
+        ` : ''}
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  
+  // Advertencia sobre repasos
+  html += '<div style="background: #f8d7da; padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid #f5c6cb;">';
+  html += '<div style="color: #721c24; font-size: 12px; text-align: center;">';
+  html += '<strong>⚠️ Importante:</strong> Los repasos no completados se moverán automáticamente al día siguiente';
+  html += '</div></div>';
+  
+  html += '</div>';
+  return html;
+}
+
+// CREAR SECCIÓN VACÍA
+function crearSeccionVacia(esDiaPasado) {
+  let html = '<div style="text-align: center; color: #666; padding: 40px;">';
+  html += '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3; margin-bottom: 15px; display: block;"></i>';
+  html += '<h6>📅 Día libre</h6>';
+  html += '<p>No hay planificaciones ni repasos programados</p>';
+  if (!esDiaPasado) {
+    html += '<button onclick="nuevaPlanificacion()" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">➕ Crear Planificación</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// FUNCIÓN PARA TOGGLE DE GRUPOS
+function toggleGrupo(idGrupo) {
+  const contenido = document.getElementById(idGrupo);
+  const icono = document.getElementById('icono-' + idGrupo);
+  
+  if (contenido && icono) {
+    if (contenido.style.display === 'none') {
+      contenido.style.display = 'block';
+      icono.textContent = '▼';
+    } else {
+      contenido.style.display = 'none';
+      icono.textContent = '▶';
+    }
+  }
+}
+
+// FUNCIÓN MEJORADA PARA CARGAR DETALLE DEL DÍA
+function cargarDetalleDiaCompletoMejorado(dia) {
+  console.log('🔍 FRONTEND: Cargando detalle mejorado para día:', dia);
+  
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fechaSeleccionada.setHours(0, 0, 0, 0);
+  
+  const esDiaPasado = fechaSeleccionada < hoy;
+  
+  // Actualizar título
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
+  const sufijo = esDiaPasado ? ' (Solo lectura)' : '';
+  
+  const tituloElement = document.getElementById('tituloDetalleDia');
+  if (tituloElement) {
+    tituloElement.textContent = tituloFecha + sufijo;
+  }
+  
+  // Mostrar loading
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (!contenido) {
+    console.error('❌ FRONTEND: Elemento contenidoDetalleDia no encontrado');
+    return;
+  }
+  
+  contenido.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="loading-spinner"></div><p>Cargando información del día...</p></div>';
+  
+  // Cargar planificaciones y repasos en paralelo
+  const año = fechaSeleccionada.getFullYear();
+  const mes = fechaSeleccionada.getMonth();
+  
+  let planificacionDelDia = null;
+  let repasosDelDia = [];
+  let cargasCompletas = 0;
+  
+  function verificarCargaCompleta() {
+    cargasCompletas++;
+    if (cargasCompletas === 2) {
+      mostrarDetalleCompletoConAcciones(planificacionDelDia, repasosDelDia, esDiaPasado);
+    }
+  }
+  
+  // Cargar planificaciones
+  google.script.run
+    .withSuccessHandler(function(planificaciones) {
+      console.log('✅ FRONTEND: Planificaciones del día recibidas:', planificaciones);
+      
+      if (planificaciones && Array.isArray(planificaciones)) {
+        planificacionDelDia = planificaciones.find(function(p) {
+          if (!p || !p.fecha) return false;
+          const fechaPlan = new Date(p.fecha);
+          fechaPlan.setHours(0, 0, 0, 0);
+          return fechaPlan.getTime() === fechaSeleccionada.getTime();
+        });
+      }
+      
+      console.log('🎯 FRONTEND: Planificación encontrada para el día:', planificacionDelDia);
+      verificarCargaCompleta();
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error al cargar planificaciones del día:', error);
+      verificarCargaCompleta();
+    })
+    .getPlanificacionesDelMes(año, mes);
+  
+  // Cargar repasos
+  google.script.run
+    .withSuccessHandler(function(repasos) {
+      console.log('✅ FRONTEND: Repasos del día recibidos:', repasos);
+      repasosDelDia = repasos && Array.isArray(repasos) ? repasos : [];
+      verificarCargaCompleta();
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error al cargar repasos del día:', error);
+      verificarCargaCompleta();
+    })
+    .getRepasosDelDia(fechaSeleccionada.getTime());
 }
 
 // Función para cargar detalle del día con planificaciones
@@ -2071,35 +2689,42 @@ function cargarPlanificacionesDelMes() {
   const año = mesActual.getFullYear();
   const mes = mesActual.getMonth();
   
-  console.log('🔄 FRONTEND: Cargando planificaciones para:', año, mes);
+  console.log('🔄 FRONTEND: Cargando planificaciones para año:', año, 'mes:', mes, '(', getMonthName(mes), ')');
   
   google.script.run
     .withSuccessHandler(function(planificaciones) {
-      console.log('✅ FRONTEND: Planificaciones recibidas desde backend:', planificaciones);
+      console.log('✅ FRONTEND: Respuesta del backend:', typeof planificaciones, planificaciones);
       
-      // VALIDACIÓN ROBUSTA
-      if (!planificaciones) {
+      // VALIDACIÓN MEJORADA
+      if (planificaciones === null || planificaciones === undefined) {
         console.warn('⚠️ FRONTEND: Backend devolvió null/undefined');
         planificaciones = [];
-      }
-      
-      if (!Array.isArray(planificaciones)) {
+      } else if (!Array.isArray(planificaciones)) {
         console.warn('⚠️ FRONTEND: Backend no devolvió array:', typeof planificaciones);
         planificaciones = [];
       }
       
+      console.log('📅 FRONTEND: Planificaciones válidas:', planificaciones.length);
+      
       if (planificaciones.length > 0) {
-        console.log('📅 FRONTEND: Mostrando', planificaciones.length, 'planificaciones en calendario');
+        console.log('🎯 FRONTEND: Detalles de planificaciones:', planificaciones);
         mostrarPlanificacionesEnCalendario(planificaciones);
       } else {
-        console.log('ℹ️ FRONTEND: No hay planificaciones para mostrar en calendario');
+        console.log('ℹ️ FRONTEND: Sin planificaciones para mostrar');
       }
     })
     .withFailureHandler(function(error) {
-      console.error('❌ FRONTEND: Error al cargar planificaciones del mes:', error);
-      console.log('ℹ️ FRONTEND: Continuando sin mostrar planificaciones en calendario');
+      console.error('❌ FRONTEND: Error al cargar planificaciones:', error);
+      alert('Error de conexión al cargar planificaciones: ' + error.message);
     })
-    .getPlanificacionesDelMesNueva(año, mes);  // ← USAR LA NUEVA FUNCIÓN
+    .getPlanificacionesDelMes(año, mes);
+}
+
+// FUNCIÓN AUXILIAR PARA NOMBRES DE MESES
+function getMonthName(mes) {
+  const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  return nombres[mes] || 'Mes inválido';
 }
 
 // TAMBIÉN MODIFICAR cargarDetalleDiaCompleto() para usar la nueva función
@@ -2233,6 +2858,49 @@ function marcarTemaCompleto(idProgreso, nombreTema) {
     .marcarTemaComoCompletado(idProgreso, parseInt(tiempoReal), nota || null);
 }
 
+// FUNCIÓN PARA COMPLETAR TEMAS
+function marcarTemaComoCompletado(idProgreso, nombreTema) {
+  console.log('📝 FRONTEND: Completando tema:', idProgreso, nombreTema);
+  
+  const tiempoReal = prompt('⏱️ ¿Cuántos minutos dedicaste al tema "' + nombreTema + '"?', '60');
+  
+  if (!tiempoReal || isNaN(tiempoReal) || parseInt(tiempoReal) < 1) {
+    alert('⚠️ Por favor, introduce un tiempo válido en minutos');
+    return;
+  }
+  
+  const nota = prompt('💭 Nota personal sobre el estudio (opcional):', '');
+  
+  // Mostrar loading en el botón
+  const botones = document.querySelectorAll('button');
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idProgreso)) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ FRONTEND: Tema completado exitosamente:', resultado);
+      
+      if (resultado.success) {
+        alert('🎉 ¡Tema completado!\n\n✅ ' + resultado.mensaje + '\n📅 Se han programado ' + resultado.repasosCreados + ' repasos automáticos');
+        
+        // Recargar detalle del día
+        setTimeout(function() {
+          cargarDetalleDiaCompletoMejorado(diaSeleccionado);
+        }, 500);
+      } else {
+        alert('❌ Error al completar tema: ' + resultado.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error al completar tema:', error);
+      alert('❌ Error de conexión al completar tema: ' + error.message);
+    })
+    .marcarTemaComoCompletado(idProgreso, parseInt(tiempoReal), nota || null);
+}
 
 // Validar orden consecutivo de temas
 function validarOrdenConsecutivo(nodoSeleccionado, arbolCompleto) {
@@ -3128,10 +3796,10 @@ function renderizarCalendarioBasico() {
       estilos += 'background: white; ';
     }
     
-    html += '<div onclick="seleccionarDia(' + dia + ')" style="' + estilos + '">';
-    html += '<div style="font-weight: bold; color: ' + (esHoy ? '#2196f3' : '#333') + ';">' + dia + '</div>';
-    html += '<div id="contenido-' + año + '-' + mes + '-' + dia + '" style="font-size: 10px; flex: 1;"></div>';
-    html += '</div>';
+      html += '<div onclick="seleccionarDia(' + dia + ')" style="' + estilos + '">';
+      html += '<div style="font-weight: bold; color: ' + (esHoy ? '#2196f3' : '#333') + ';">' + dia + '</div>';
+      html += '<div id="contenido-' + año + '-' + mes + '-' + dia + '" style="font-size: 10px; flex: 1;"></div>';
+      html += '</div>';
   }
   
   html += '</div>';
@@ -3151,21 +3819,44 @@ if (typeof renderizarCalendario !== 'undefined') {
   }
 }
 
-// Función para navegación del calendario
-function cambiarMes(direccion) {
-  mesActual.setMonth(mesActual.getMonth() + direccion);
-  diaSeleccionado = null;
-  renderizarCalendarioBasico();
-  cargarPlanificacionesDelMes();
-  limpiarDetalleDia();
-}
-
 function irAHoy() {
-  mesActual = new Date();
-  renderizarCalendarioBasico();
-  cargarPlanificacionesDelMes();
-  var hoy = new Date();
-  seleccionarDia(hoy.getDate());
+  const hoy = new Date();
+  const diaHoy = hoy.getDate();
+  const mesHoy = hoy.getMonth();
+  const añoHoy = hoy.getFullYear();
+  
+  const yaEnMesActual = (mesActual.getFullYear() === añoHoy && mesActual.getMonth() === mesHoy);
+  const yaEnDiaHoy = (estadoDetalle.diaActual === diaHoy && 
+                      estadoDetalle.mesActual === mesHoy && 
+                      estadoDetalle.añoActual === añoHoy);
+  
+  // ✅ VERIFICACIONES INTELIGENTES
+  if (yaEnMesActual && yaEnDiaHoy) {
+    console.log('📍 Ya estás en el día de hoy');
+    alert('📅 Ya estás visualizando el día de hoy');
+    return; // ✅ NO HACER NADA
+  }
+  
+  if (yaEnMesActual && !yaEnDiaHoy) {
+    console.log('📍 Ya en mes actual, solo cambiar día');
+    // Solo cambiar día, sin recargar calendario
+    seleccionarDia(diaHoy);
+    return;
+  }
+  
+  // ✅ CAMBIO DE MES NECESARIO
+  console.log('📅 Cambiando a mes actual y día hoy');
+  mesActual = new Date(añoHoy, mesHoy, 1); // Primer día del mes actual
+  
+  // Mostrar loading
+  mostrarLoadingEnCalendario();
+  renderizarCalendario();
+  cargarTodoElMes();
+  
+  // Seleccionar hoy después de cargar
+  setTimeout(function() {
+    seleccionarDia(diaHoy);
+  }, 500);
 }
 
 function limpiarDetalleDia() {
