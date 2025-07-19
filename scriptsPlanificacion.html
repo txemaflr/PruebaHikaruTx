@@ -24,6 +24,9 @@ var estadoDetalle = {
   añoActual: null
 };
 var cargandoCalendario = false;
+// CACHÉ PARA OPTIMIZACIÓN
+var cacheCalendario = {};
+var mesAnterior = null;
 
 // 1. Inicializar sección de planificación
 function inicializarSeccionPlanificacion() {
@@ -134,65 +137,48 @@ function ocultarLoadingCalendario() {
 function cargarTodoElMes() {
   const año = mesActual.getFullYear();
   const mes = mesActual.getMonth();
+  const claveCache = año + '-' + mes;
   
-  console.log('📅 Cargando TODO el mes:', año, mes);
+  console.log('💾 Verificando caché para:', claveCache);
   
-  let planificacionesCargadas = false;
-  let repasosCargados = false;
-  let planificaciones = [];
-  let repasosPorDia = {};
-  
-  function verificarCargaCompleta() {
-    if (planificacionesCargadas && repasosCargados) {
-      mostrarTodoEnCalendario(planificaciones, repasosPorDia);
-    }
+  // Verificar si ya tenemos los datos en caché
+  if (cacheCalendario[claveCache]) {
+    console.log('🎯 CACHÉ HIT - Usando datos guardados');
+    const datos = cacheCalendario[claveCache];
+    mostrarTodoEnCalendario(datos.planificaciones, datos.repasosPorDia);
+    return; // ← SALIR SIN LLAMAR AL BACKEND
   }
   
-  // Cargar planificaciones
+  console.log('🚀 CACHÉ MISS - Cargando del servidor:', año, mes);
+  
+  // UNA SOLA LLAMADA para obtener todo
   google.script.run
-    .withSuccessHandler(function(plans) {
-      planificaciones = plans || [];
-      planificacionesCargadas = true;
-      console.log('✅ Planificaciones cargadas:', planificaciones.length);
-      verificarCargaCompleta();
+    .withSuccessHandler(function(datos) {
+      console.log('✅ Datos completos recibidos:', datos);
+      
+      const planificaciones = datos.planificaciones || [];
+      const repasosPorDia = datos.repasosPorDia || {};
+      
+      // GUARDAR EN CACHÉ
+      cacheCalendario[claveCache] = {
+        planificaciones: planificaciones,
+        repasosPorDia: repasosPorDia,
+        timestamp: new Date().getTime()
+      };
+      
+      console.log('💾 Datos guardados en caché para:', claveCache);
+      console.log('📊 Total:', planificaciones.length, 'planificaciones,', Object.keys(repasosPorDia).length, 'días con repasos');
+      
+      mostrarTodoEnCalendario(planificaciones, repasosPorDia);
     })
     .withFailureHandler(function(error) {
-      console.error('❌ Error planificaciones:', error);
-      planificacionesCargadas = true;
-      verificarCargaCompleta();
+      console.error('❌ Error al cargar datos completos:', error);
+      
+      // Fallback: mostrar calendario vacío
+      renderizarCalendario();
+      ocultarLoadingCalendario();
     })
-    .getPlanificacionesDelMes(año, mes);
-  
-  // Cargar repasos de todos los días del mes
-  const diasDelMes = new Date(año, mes + 1, 0).getDate();
-  let repasosPendientes = diasDelMes;
-  
-  for (let dia = 1; dia <= diasDelMes; dia++) {
-    const fechaDia = new Date(año, mes, dia).getTime();
-    
-    google.script.run
-      .withSuccessHandler(function(repasos) {
-        if (repasos && repasos.length > 0) {
-          const diaKey = new Date(fechaDia).getDate();
-          repasosPorDia[diaKey] = repasos;
-        }
-        
-        repasosPendientes--;
-        if (repasosPendientes === 0) {
-          repasosCargados = true;
-          console.log('✅ Repasos cargados para', Object.keys(repasosPorDia).length, 'días');
-          verificarCargaCompleta();
-        }
-      })
-      .withFailureHandler(function(error) {
-        repasosPendientes--;
-        if (repasosPendientes === 0) {
-          repasosCargados = true;
-          verificarCargaCompleta();
-        }
-      })
-      .getRepasosDelDia(fechaDia);
-  }
+    .getDatosCompletosDelMes(año, mes);
 }
 
 // MOSTRAR TODO EN CALENDARIO
@@ -1063,23 +1049,31 @@ function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
     // Temas dentro del grupo
     grupo.temas.forEach(tema => {
       const nombreTema = tema.nombre.includes(' → ') ? tema.nombre.split(' → ').slice(1).join(' → ') : tema.nombre;
+      const estaCompletado = tema.estado === 'completado';
+      
+      // Determinar colores según estado
+      const colorFondo = estaCompletado ? '#d4edda' : '#f8f9fa';
+      const colorBorde = estaCompletado ? '#28a745' : '#4caf50';
+      const colorTexto = estaCompletado ? '#155724' : '#2e7d32';
+      const iconoEstado = estaCompletado ? '✅' : '📝';
+      const textoEstado = estaCompletado ? ' ✅ COMPLETADO' : '';
       
       html += `
         <div style="
-          background: #f8f9fa; 
+          background: ${colorFondo}; 
           padding: 12px; 
           border-radius: 5px; 
           margin-bottom: 8px; 
-          border-left: 3px solid #4caf50;
+          border-left: 3px solid ${colorBorde};
           display: flex; 
           justify-content: space-between; 
           align-items: center;
         ">
           <div style="flex: 1;">
-            <div style="font-weight: 500; color: #2e7d32; margin-bottom: 4px;">${nombreTema}</div>
+            <div style="font-weight: 500; color: ${colorTexto}; margin-bottom: 4px;">${iconoEstado} ${nombreTema}${textoEstado}</div>
             <div style="font-size: 12px; color: #666;">⏱️ ${tema.tiempo || 0} minutos</div>
           </div>
-          ${!esDiaPasado ? `
+          ${!esDiaPasado && !estaCompletado ? `
             <button onclick="marcarTemaComoCompletado('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
               style="
                 background: #4caf50; 
@@ -1093,6 +1087,24 @@ function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
               ">
               ✅ Completar
             </button>
+          ` : estaCompletado ? `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+              <button onclick="deshacerTemaCompletado('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
+                style="
+                  background: #6c757d; 
+                  color: white; 
+                  border: none; 
+                  padding: 4px 8px; 
+                  border-radius: 3px; 
+                  cursor: pointer; 
+                  font-size: 10px;
+                  font-weight: 500;
+                " 
+                title="Deshacer completado">
+                ↶ Deshacer
+              </button>
+            </div>
           ` : ''}
         </div>
       `;
@@ -1103,6 +1115,45 @@ function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
   
   html += '</div>';
   return html;
+}
+
+// FUNCIÓN PARA DESHACER TEMA COMPLETADO
+function deshacerTemaCompletado(idProgreso, nombreTema, idGrupo) {
+  console.log('↶ FRONTEND: Deshaciendo tema completado:', idProgreso, nombreTema);
+  
+  const confirmar = confirm('¿Deshacer la finalización del tema "' + nombreTema + '"?\n\n⚠️ Esto eliminará todos los repasos pendientes programados para este tema.');
+  
+  if (!confirmar) return;
+  
+  // Mostrar loading en el botón
+  const botones = document.querySelectorAll('button');
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idProgreso)) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Deshaciendo...';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ FRONTEND: Tema deshecho exitosamente:', resultado);
+      
+      if (resultado.success) {
+        alert('↶ ¡Tema deshecho!\n\n✅ ' + resultado.mensaje + '\n🗑️ Eliminados ' + resultado.repasosEliminados + ' repasos pendientes');
+        
+        // Recargar detalle del día
+        setTimeout(function() {
+          cargarDetalleDiaCompletoMejorado(diaSeleccionado);
+        }, 500);
+      } else {
+        alert('❌ Error al deshacer tema: ' + resultado.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ FRONTEND: Error al deshacer tema:', error);
+      alert('❌ Error de conexión al deshacer tema: ' + error.message);
+    })
+    .deshacerTemaCompletado(idProgreso);
 }
 
 // CREAR SECCIÓN DE REPASOS
@@ -1119,43 +1170,63 @@ function crearSeccionRepasos(repasos, esDiaPasado) {
   
   html += '<div id="repasos-grupo" style="display: block;">';
   
-  repasos.forEach(repaso => {
-    const nombreCompleto = repaso.nombreTema || 'Repaso sin nombre';
-    const estado = repaso.estado === 'retraso' ? ' (RETRASO)' : '';
-    
-    html += `
-      <div style="
-        background: white; 
-        padding: 12px; 
-        border-radius: 5px; 
-        margin-bottom: 8px; 
-        border-left: 3px solid #ffc107;
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-      ">
-        <div style="flex: 1;">
-          <div style="font-weight: 500; color: #856404; margin-bottom: 4px;">🔄 ${nombreCompleto}${estado}</div>
-          <div style="font-size: 12px; color: #666;">Repaso #${repaso.numeroRepaso} • ⏱️ 30 minutos</div>
-        </div>
-        ${!esDiaPasado ? `
-          <button onclick="marcarRepasoComoCompletado('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
-            style="
-              background: #ffc107; 
-              color: #212529; 
-              border: none; 
-              padding: 8px 16px; 
-              border-radius: 5px; 
-              cursor: pointer; 
-              font-size: 12px;
-              font-weight: 500;
-            ">
-            ✅ Completar
-          </button>
-        ` : ''}
+repasos.forEach(repaso => {
+  const nombreCompleto = repaso.nombreTema || 'Repaso sin nombre';
+  let estadoTexto = '';
+  let colorFondo = 'white';
+  let colorBorde = '#ffc107';
+  let colorTexto = '#856404';
+  let iconoEstado = '🔄';
+  let botonHtml = '';
+  
+  // Determinar colores y textos según estado
+  if (repaso.estado === 'completado') {
+    estadoTexto = ' ✅ COMPLETADO';
+    colorFondo = '#d4edda';
+    colorBorde = '#28a745';
+    colorTexto = '#155724';
+    iconoEstado = '✅';
+    botonHtml = '<span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>';
+  } else if (repaso.estado === 'retraso') {
+    estadoTexto = ' ⚠️ RETRASO';
+    colorBorde = '#dc3545';
+    colorTexto = '#721c24';
+    iconoEstado = '⚠️';
+    if (!esDiaPasado) {
+      botonHtml = `<button onclick="marcarRepasoComoCompletado('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
+        style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
+        ✅ Completar
+      </button>`;
+    }
+  } else {
+    // Estado pendiente
+    if (!esDiaPasado) {
+      botonHtml = `<button onclick="marcarRepasoComoCompletado('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
+        style="background: #ffc107; color: #212529; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
+        ✅ Completar
+      </button>`;
+    }
+  }
+  
+  html += `
+    <div style="
+      background: ${colorFondo}; 
+      padding: 12px; 
+      border-radius: 5px; 
+      margin-bottom: 8px; 
+      border-left: 3px solid ${colorBorde};
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+    ">
+      <div style="flex: 1;">
+        <div style="font-weight: 500; color: ${colorTexto}; margin-bottom: 4px;">${iconoEstado} ${nombreCompleto}${estadoTexto}</div>
+        <div style="font-size: 12px; color: #666;">Repaso #${repaso.numeroRepaso} • ⏱️ 30 minutos</div>
       </div>
-    `;
-  });
+      ${botonHtml}
+    </div>
+  `;
+});
   
   html += '</div>';
   
@@ -1357,7 +1428,7 @@ function cargarDetalleDiaCompleto(dia) {
             repasos = [];
           }
           
-          mostrarDetalleCompletoRobust(planDelDia, repasos, esDiaPasado);
+          mostrarDetalleCompletoConAcciones(planDelDia, repasos, esDiaPasado);
         })
         .withFailureHandler(function(error) {
           console.error('❌ Error al cargar repasos:', error);
@@ -2804,7 +2875,7 @@ function cargarDetalleDiaCompletoNuevo(dia) {
             repasos = [];
           }
           
-          mostrarDetalleCompletoRobust(planDelDia, repasos, esDiaPasado);
+          mostrarDetalleCompletoConAcciones(planDelDia, repasos, esDiaPasado);
         })
         .withFailureHandler(function(error) {
           console.error('❌ FRONTEND: Error al cargar repasos:', error);
