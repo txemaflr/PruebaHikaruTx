@@ -295,7 +295,7 @@ function getRepasosDelDia(fechaMs) {
       
       const estado = data[i][5]; // estado
       
-      if (fechaRepaso.getTime() === fecha.getTime() && (estado === 'pendiente' || estado === 'retraso')) {
+      if (fechaRepaso.getTime() === fecha.getTime() && (estado === 'pendiente' || estado === 'retraso' || estado === 'completado')) {
         const idTema = data[i][1];
         const tema = getTemaByIdRobust(idTema);
         
@@ -364,6 +364,174 @@ function getTemaPadreOriginal(idTema) {
   }
 }
 
+// FUNCIÓN SUPER EFICIENTE: Planificaciones + Repasos en UNA SOLA LLAMADA
+function getDatosCompletosDelMes(año, mes) {
+  try {
+    console.log('🚀 BACKEND: Obteniendo datos completos del mes:', año, mes);
+    
+    // 1. Obtener planificaciones (reutilizar función existente)
+    const planificaciones = getPlanificacionesDelMes(año, mes);
+    
+    // 2. Obtener repasos (reutilizar función que acabamos de crear)
+    const repasosPorDia = getRepasosDelMesCompleto(año, mes);
+    
+    const resultado = {
+      planificaciones: planificaciones,
+      repasosPorDia: repasosPorDia,
+      mes: mes,
+      año: año,
+      timestamp: new Date().getTime()
+    };
+    
+    console.log('✅ BACKEND: Datos completos obtenidos -', planificaciones.length, 'planificaciones,', Object.keys(repasosPorDia).length, 'días con repasos');
+    
+    return resultado;
+    
+  } catch (error) {
+    console.error('❌ BACKEND: Error al obtener datos completos:', error);
+    return {
+      planificaciones: [],
+      repasosPorDia: {},
+      error: error.message
+    };
+  }
+}
+
+// FUNCIÓN EFICIENTE: Obtener TODOS los repasos del mes de una vez
+function getRepasosDelMesCompleto(año, mes) {
+  try {
+    console.log('📅 BACKEND: Obteniendo repasos de todo el mes:', año, mes);
+    
+    const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
+    const repasosSheet = spreadsheet.getSheetByName('Repasos_Programados');
+    
+    if (!repasosSheet) return {};
+    
+    const data = repasosSheet.getDataRange().getValues();
+    const repasosPorDia = {};
+    
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][3]) continue; // fecha_programada
+      
+      const fechaRepaso = new Date(data[i][3]);
+      fechaRepaso.setHours(0, 0, 0, 0);
+      
+      // Solo repasos del año y mes especificado
+      if (fechaRepaso.getFullYear() === parseInt(año) && fechaRepaso.getMonth() === parseInt(mes)) {
+        const estado = data[i][5]; // estado
+        
+        // Incluir todos los estados
+        if (estado === 'pendiente' || estado === 'retraso' || estado === 'completado') {
+          const dia = fechaRepaso.getDate();
+          const idTema = data[i][1];
+          const tema = getTemaByIdRobust(idTema);
+          
+          if (!repasosPorDia[dia]) {
+            repasosPorDia[dia] = [];
+          }
+          
+          repasosPorDia[dia].push({
+            id: data[i][0],
+            numeroRepaso: data[i][2],
+            nombreTema: tema.nombreCompleto,
+            idTema: idTema,
+            estado: estado
+          });
+        }
+      }
+    }
+    
+    console.log('✅ BACKEND: Repasos del mes obtenidos:', Object.keys(repasosPorDia).length, 'días');
+    return repasosPorDia;
+    
+  } catch (error) {
+    console.error('❌ BACKEND: Error al obtener repasos del mes:', error);
+    return {};
+  }
+}
+
+// FUNCIÓN AUXILIAR PARA ELIMINAR REPASOS PENDIENTES
+function eliminarRepasosPendientes(idTema) {
+  try {
+    console.log('🗑️ BACKEND: Eliminando repasos pendientes para tema:', idTema);
+    
+    const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
+    const repasosSheet = spreadsheet.getSheetByName('Repasos_Programados');
+    
+    if (!repasosSheet) {
+      console.log('⚠️ BACKEND: Hoja Repasos_Programados no encontrada');
+      return 0;
+    }
+    
+    const data = repasosSheet.getDataRange().getValues();
+    let repasosEliminados = 0;
+    
+    // Recorrer desde atrás para evitar problemas al eliminar filas
+    for (let i = data.length - 1; i >= 1; i--) {
+      const idTemaRepaso = data[i][1]; // id_tema
+      const estadoRepaso = data[i][5]; // estado
+      
+      // Eliminar solo repasos pendientes del tema específico
+      if (idTemaRepaso == idTema && estadoRepaso === 'pendiente') {
+        repasosSheet.deleteRow(i + 1);
+        repasosEliminados++;
+        console.log('🗑️ BACKEND: Repaso eliminado, fila', i + 1);
+      }
+    }
+    
+    console.log('✅ BACKEND: Total repasos eliminados:', repasosEliminados);
+    return repasosEliminados;
+    
+  } catch (error) {
+    console.error('❌ BACKEND: Error al eliminar repasos:', error);
+    return 0;
+  }
+}
+
+// FUNCIÓN PARA DESHACER TEMA COMPLETADO
+function deshacerTemaCompletado(idProgreso) {
+  try {
+    console.log('↶ BACKEND: Deshaciendo tema completado - ID:', idProgreso);
+    
+    const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
+    
+    // 1. Actualizar en Planificacion_Temas y obtener id_tema_actual
+    const planSheet = spreadsheet.getSheetByName('Planificacion_Temas');
+    let idTemaActual = null;
+    
+    if (planSheet) {
+      const planData = planSheet.getDataRange().getValues();
+      
+      for (let i = 1; i < planData.length; i++) {
+        if (planData[i][0] == idProgreso) { // Buscar por id_planificacion_tema
+          idTemaActual = planData[i][3]; // Obtener id_tema_actual
+          planSheet.getRange(i + 1, 8).setValue(''); // Limpiar fecha_completado
+          planSheet.getRange(i + 1, 9).setValue('activo'); // Cambiar estado a activo
+          planSheet.getRange(i + 1, 11).setValue(0); // Limpiar tiempo_real_minutos
+          console.log('✅ BACKEND: Tema deshecho en Planificacion_Temas, fila', i + 1);
+          console.log('📝 BACKEND: ID tema actual obtenido:', idTemaActual);
+          break;
+        }
+      }
+    }
+    
+    // 2. Eliminar repasos pendientes
+    const repasosEliminados = eliminarRepasosPendientes(idTemaActual);
+    
+    return {
+      success: true,
+      repasosEliminados: repasosEliminados,
+      mensaje: 'Tema deshecho exitosamente'
+    };
+    
+  } catch (error) {
+    console.error('❌ BACKEND: Error al deshacer tema:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
 
 // FUNCIÓN PARA POSPONER REPASOS AUTOMÁTICAMENTE
 function procesarRepasosPendientes() {
@@ -1229,24 +1397,28 @@ function marcarTemaComoCompletado(idProgreso, tiempoReal, nota) {
     
     const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
     
-    // 1. Actualizar en Planificacion_Temas
+    // 1. Actualizar en Planificacion_Temas y obtener id_tema_actual
     const planSheet = spreadsheet.getSheetByName('Planificacion_Temas');
+    let idTemaActual = null;
+
     if (planSheet) {
       const planData = planSheet.getDataRange().getValues();
       
       for (let i = 1; i < planData.length; i++) {
         if (planData[i][0] == idProgreso) { // Buscar por id_planificacion_tema
+          idTemaActual = planData[i][3]; // ← OBTENER id_tema_actual (columna 3)
           planSheet.getRange(i + 1, 8).setValue(new Date()); // fecha_completado
           planSheet.getRange(i + 1, 9).setValue('completado'); // estado
           planSheet.getRange(i + 1, 11).setValue(tiempoReal); // tiempo_real_minutos
           console.log('✅ BACKEND: Actualizado en Planificacion_Temas, fila', i + 1);
+          console.log('📝 BACKEND: ID tema actual obtenido:', idTemaActual);
           break;
         }
       }
     }
-    
-    // 2. Crear repasos automáticos
-    const repasosCreados = crearRepasosAutomaticos(idProgreso, tiempoReal);
+
+    // 2. Crear repasos automáticos con el ID correcto
+    const repasosCreados = crearRepasosAutomaticos(idTemaActual, tiempoReal);
     
     return {
       success: true,
