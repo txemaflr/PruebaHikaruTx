@@ -181,9 +181,9 @@ function cargarTodoElMes() {
     .getDatosCompletosDelMes(año, mes);
 }
 
-// MOSTRAR TODO EN CALENDARIO
+// MOSTRAR TODO EN CALENDARIO CON ESTADOS COMPLETOS
 function mostrarTodoEnCalendario(planificaciones, repasosPorDia) {
-  console.log('🎨 Mostrando todo en calendario');
+  console.log('🎨 Mostrando calendario con estados completos');
   
   // ✅ OCULTAR LOADING
   ocultarLoadingCalendario();
@@ -191,21 +191,22 @@ function mostrarTodoEnCalendario(planificaciones, repasosPorDia) {
   // Limpiar contenido anterior
   document.querySelectorAll('[id^="contenido-"]').forEach(el => el.innerHTML = '');
   
-  // Mostrar planificaciones
+  // MOSTRAR PLANIFICACIONES CON ESTADOS
   planificaciones.forEach(plan => {
     const contenedor = document.getElementById('contenido-' + mesActual.getFullYear() + '-' + mesActual.getMonth() + '-' + plan.dia);
     if (contenedor) {
-      const tiempoHoras = Math.round(plan.tiempoTotal / 60 * 10) / 10;
-      contenedor.innerHTML += `<div style="background: #4caf50; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px;">📚 ${plan.temas.length} temas • ${tiempoHoras}h</div>`;
+      const htmlPlanificacion = generarHtmlPlanificacion(plan);
+      contenedor.innerHTML += htmlPlanificacion;
     }
   });
   
-  // Mostrar repasos
+  // MOSTRAR REPASOS CON ESTADOS DIFERENCIADOS
   Object.keys(repasosPorDia).forEach(dia => {
     const contenedor = document.getElementById('contenido-' + mesActual.getFullYear() + '-' + mesActual.getMonth() + '-' + dia);
     if (contenedor) {
       const repasos = repasosPorDia[dia];
-      contenedor.innerHTML += `<div style="background: #ff9800; color: white; padding: 2px 4px; margin: 1px 0; border-radius: 3px; font-size: 9px;">🔄 ${repasos.length} repasos</div>`;
+      const htmlRepasos = generarHtmlRepasos(repasos);
+      contenedor.innerHTML += htmlRepasos;
     }
   });
   
@@ -219,9 +220,101 @@ function mostrarTodoEnCalendario(planificaciones, repasosPorDia) {
     }
   }
   
-  console.log('✅ Calendario completamente cargado');
+  console.log('✅ Calendario con estados completos cargado');
 }
 
+// GENERAR HTML PARA PLANIFICACIONES CON ESTADOS
+function generarHtmlPlanificacion(plan) {
+  const tiempoHoras = Math.round(plan.tiempoTotal / 60 * 10) / 10;
+  const estado = plan.estado || 'activo';
+  
+  // Determinar colores según estado
+  let color, icono, texto;
+  
+  switch (estado) {
+    case 'completado':
+      color = '#4caf50';
+      icono = '✅';
+      texto = 'COMPLETADO';
+      break;
+    case 'cancelado':
+      color = '#f44336';
+      icono = '❌';
+      texto = 'CANCELADO';
+      break;
+    case 'en_progreso':
+      color = '#ff9800';
+      icono = '🔄';
+      texto = 'EN PROGRESO';
+      break;
+    default: // activo
+      color = '#2196f3';
+      icono = '📚';
+      texto = 'PLANIFICADO';
+  }
+  
+  return `<div style="
+    background: ${color}; 
+    color: white; 
+    padding: 3px 5px; 
+    margin: 1px 0; 
+    border-radius: 3px; 
+    font-size: 9px; 
+    font-weight: bold;
+    text-align: center;
+  ">
+    ${icono} ${plan.temas.length} tema${plan.temas.length > 1 ? 's' : ''} • ${tiempoHoras}h
+    <div style="font-size: 7px; opacity: 0.9; margin-top: 1px;">${texto}</div>
+  </div>`;
+}
+
+// GENERAR HTML PARA REPASOS CON ESTADOS DIFERENCIADOS
+function generarHtmlRepasos(repasos) {
+  // Agrupar repasos por estado
+  const estados = {
+    completado: { repasos: [], color: '#4caf50', icono: '✅', texto: 'COMPLETADOS' },
+    pendiente: { repasos: [], color: '#ff9800', icono: '🔄', texto: 'PENDIENTES' },
+    retraso: { repasos: [], color: '#f44336', icono: '⚠️', texto: 'RETRASO' },
+    omitido: { repasos: [], color: '#9e9e9e', icono: '⏭️', texto: 'OMITIDOS' },
+    pospuesto: { repasos: [], color: '#673ab7', icono: '📅', texto: 'POSPUESTOS' }
+  };
+  
+  // Clasificar repasos por estado
+  repasos.forEach(repaso => {
+    const estado = repaso.estado || 'pendiente';
+    if (estados[estado]) {
+      estados[estado].repasos.push(repaso);
+    } else {
+      estados.pendiente.repasos.push(repaso); // Default
+    }
+  });
+  
+  let html = '';
+  
+  // Generar HTML para cada estado que tenga repasos
+  Object.keys(estados).forEach(tipoEstado => {
+    const grupo = estados[tipoEstado];
+    if (grupo.repasos.length > 0) {
+      const tiempoTotal = grupo.repasos.length * 30;
+      
+      html += `<div style="
+        background: ${grupo.color}; 
+        color: white; 
+        padding: 3px 5px; 
+        margin: 1px 0; 
+        border-radius: 3px; 
+        font-size: 9px; 
+        font-weight: bold;
+        text-align: center;
+      ">
+        ${grupo.icono} ${grupo.repasos.length} repaso${grupo.repasos.length > 1 ? 's' : ''} • ${tiempoTotal}m
+        <div style="font-size: 7px; opacity: 0.9; margin-top: 1px;">${grupo.texto}</div>
+      </div>`;
+    }
+  });
+  
+  return html;
+}
 
 // 2. Cargar oposición activa
 function cargarOposicionActiva() {
@@ -991,15 +1084,60 @@ function mostrarDetalleCompletoConAcciones(planificacion, repasos, esDiaPasado) 
   console.log('✅ FRONTEND: Detalle con árbol mostrado');
 }
 
-// CREAR SECCIÓN DE PLANIFICACIONES AGRUPADAS
+// CREAR SECCIÓN VACÍA CON OPCIONES INTELIGENTES
+function crearSeccionVacia(esDiaPasado) {
+  let html = '<div style="text-align: center; color: #666; padding: 40px;">';
+  html += '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3; margin-bottom: 15px; display: block;"></i>';
+  
+  if (esDiaPasado) {
+    // Día pasado sin planificación
+    html += '<h6>📅 Día pasado</h6>';
+    html += '<p>No hubo planificaciones ni repasos este día</p>';
+  } else {
+    // Día presente o futuro
+    const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), diaSeleccionado);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fechaSeleccionada.setHours(0, 0, 0, 0);
+    
+    const esHoy = fechaSeleccionada.getTime() === hoy.getTime();
+    const esFuturo = fechaSeleccionada > hoy;
+    
+    if (esHoy) {
+      html += '<h6>📅 Hoy - Día libre</h6>';
+      html += '<p>No hay planificaciones ni repasos programados para hoy</p>';
+      html += '<div style="margin-top: 20px;">';
+      html += '<button onclick="nuevaPlanificacion()" style="background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; margin-right: 10px; font-weight: 500;">➕ Crear Planificación</button>';
+      html += '<button onclick="estudiarLibremente()" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-weight: 500;">📚 Estudio Libre</button>';
+      html += '</div>';
+    } else if (esFuturo) {
+      html += '<h6>📅 Día futuro libre</h6>';
+      html += '<p>No hay planificaciones programadas para este día</p>';
+      html += '<button onclick="nuevaPlanificacion(' + diaSeleccionado + ')" style="background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; margin-top: 15px; font-weight: 500;">➕ Planificar este día</button>';
+    }
+  }
+  
+  html += '</div>';
+  return html;
+}
+
+// FUNCIÓN PLACEHOLDER PARA ESTUDIO LIBRE
+function estudiarLibremente() {
+  alert('🚀 Próximamente: Modo de estudio libre sin planificación\n\nPodrás estudiar cualquier tema y registrar el tiempo dedicado.');
+}
+
+
+
+
+
+// CREAR SECCIÓN DE PLANIFICACIONES CON CONTROL ESTRICTO
 function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
-  console.log('📚 Agrupando planificaciones por tema padre');
+  console.log('📚 Agrupando planificaciones - Día pasado:', esDiaPasado);
   
   // Agrupar temas por padre original
   const gruposPorPadre = {};
   
   planificacion.temas.forEach(tema => {
-    // Extraer tema padre del nombre jerárquico
     const nombreCompleto = tema.nombre || '';
     const partes = nombreCompleto.split(' → ');
     const temaPadre = partes[0] || 'Sin clasificar';
@@ -1046,7 +1184,7 @@ function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
         <div id="${idGrupo}" style="padding: 15px; display: block;">
     `;
     
-    // Temas dentro del grupo
+    // Temas dentro del grupo - CON CONTROL ESTRICTO DE DÍAS PASADOS
     grupo.temas.forEach(tema => {
       const nombreTema = tema.nombre.includes(' → ') ? tema.nombre.split(' → ').slice(1).join(' → ') : tema.nombre;
       const estaCompletado = tema.estado === 'completado';
@@ -1073,39 +1211,7 @@ function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
             <div style="font-weight: 500; color: ${colorTexto}; margin-bottom: 4px;">${iconoEstado} ${nombreTema}${textoEstado}</div>
             <div style="font-size: 12px; color: #666;">⏱️ ${tema.tiempo || 0} minutos</div>
           </div>
-          ${!esDiaPasado && !estaCompletado ? `
-            <button onclick="marcarTemaComoCompletado('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
-              style="
-                background: #4caf50; 
-                color: white; 
-                border: none; 
-                padding: 8px 16px; 
-                border-radius: 5px; 
-                cursor: pointer; 
-                font-size: 12px;
-                font-weight: 500;
-              ">
-              ✅ Completar
-            </button>
-          ` : estaCompletado ? `
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
-              <button onclick="deshacerTemaCompletado('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
-                style="
-                  background: #6c757d; 
-                  color: white; 
-                  border: none; 
-                  padding: 4px 8px; 
-                  border-radius: 3px; 
-                  cursor: pointer; 
-                  font-size: 10px;
-                  font-weight: 500;
-                " 
-                title="Deshacer completado">
-                ↶ Deshacer
-              </button>
-            </div>
-          ` : ''}
+          ${generarBotonesTemaPlanificacion(tema, esDiaPasado, nombreTema, idGrupo)}
         </div>
       `;
     });
@@ -1115,6 +1221,61 @@ function crearSeccionPlanificaciones(planificacion, esDiaPasado) {
   
   html += '</div>';
   return html;
+}
+
+// GENERAR BOTONES SEGÚN ESTADO Y FECHA
+function generarBotonesTemaPlanificacion(tema, esDiaPasado, nombreTema, idGrupo) {
+  const estaCompletado = tema.estado === 'completado';
+  
+  // DÍA PASADO - SOLO LECTURA ESTRICTA
+  if (esDiaPasado) {
+    if (estaCompletado) {
+      return `<div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+        <span style="color: #999; font-size: 10px; opacity: 0.7;">Solo lectura</span>
+      </div>`;
+    } else {
+      return `<div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: #666; font-size: 12px; font-weight: bold;">PENDIENTE</span>
+        <span style="color: #999; font-size: 10px; opacity: 0.7;">Solo lectura</span>
+      </div>`;
+    }
+  }
+  
+  // DÍA PRESENTE/FUTURO - BOTONES NORMALES
+  if (!estaCompletado) {
+    return `<button onclick="marcarTemaComoCompletadoConActualizacion('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
+      style="
+        background: #4caf50; 
+        color: white; 
+        border: none; 
+        padding: 8px 16px; 
+        border-radius: 5px; 
+        cursor: pointer; 
+        font-size: 12px;
+        font-weight: 500;
+      ">
+      ✅ Completar
+    </button>`;
+  } else {
+    return `<div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+      <button onclick="deshacerTemaCompletadoConActualizacion('${tema.idProgreso}', '${nombreTema.replace(/'/g, "\\'")}', '${idGrupo}')" 
+        style="
+          background: #6c757d; 
+          color: white; 
+          border: none; 
+          padding: 4px 8px; 
+          border-radius: 3px; 
+          cursor: pointer; 
+          font-size: 10px;
+          font-weight: 500;
+        " 
+        title="Deshacer completado">
+        ↶ Deshacer
+      </button>
+    </div>`;
+  }
 }
 
 // FUNCIÓN PARA DESHACER TEMA COMPLETADO
@@ -1156,7 +1317,9 @@ function deshacerTemaCompletado(idProgreso, nombreTema, idGrupo) {
     .deshacerTemaCompletado(idProgreso);
 }
 
-// CREAR SECCIÓN DE REPASOS
+// REEMPLAZAR crearSeccionRepasos() en scriptsPlanificacion.html
+
+// CREAR SECCIÓN DE REPASOS CON BOTÓN DESHACER
 function crearSeccionRepasos(repasos, esDiaPasado) {
   let html = '<div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107;">';
   html += '<div onclick="toggleGrupo(\'repasos-grupo\')" style="';
@@ -1170,87 +1333,127 @@ function crearSeccionRepasos(repasos, esDiaPasado) {
   
   html += '<div id="repasos-grupo" style="display: block;">';
   
-repasos.forEach(repaso => {
-  const nombreCompleto = repaso.nombreTema || 'Repaso sin nombre';
-  let estadoTexto = '';
-  let colorFondo = 'white';
-  let colorBorde = '#ffc107';
-  let colorTexto = '#856404';
-  let iconoEstado = '🔄';
-  let botonHtml = '';
-  
-  // Determinar colores y textos según estado
-  if (repaso.estado === 'completado') {
-    estadoTexto = ' ✅ COMPLETADO';
-    colorFondo = '#d4edda';
-    colorBorde = '#28a745';
-    colorTexto = '#155724';
-    iconoEstado = '✅';
-    botonHtml = '<span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>';
-  } else if (repaso.estado === 'retraso') {
-    estadoTexto = ' ⚠️ RETRASO';
-    colorBorde = '#dc3545';
-    colorTexto = '#721c24';
-    iconoEstado = '⚠️';
-    if (!esDiaPasado) {
-      botonHtml = `<button onclick="marcarRepasoComoCompletado('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
-        style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
-        ✅ Completar
-      </button>`;
+  repasos.forEach(repaso => {
+    const nombreCompleto = repaso.nombreTema || 'Repaso sin nombre';
+    let estadoTexto = '';
+    let colorFondo = 'white';
+    let colorBorde = '#ffc107';
+    let colorTexto = '#856404';
+    let iconoEstado = '🔄';
+    let botonHtml = '';
+    
+    // Determinar colores y textos según estado
+    if (repaso.estado === 'completado') {
+      estadoTexto = ' ✅ COMPLETADO';
+      colorFondo = '#d4edda';
+      colorBorde = '#28a745';
+      colorTexto = '#155724';
+      iconoEstado = '✅';
+      botonHtml = generarBotonesRepasoCompletado(repaso, esDiaPasado, nombreCompleto);
+    } else if (repaso.estado === 'retraso') {
+      estadoTexto = ' ⚠️ RETRASO';
+      colorBorde = '#dc3545';
+      colorTexto = '#721c24';
+      iconoEstado = '⚠️';
+      botonHtml = generarBotonesRepasoPendiente(repaso, esDiaPasado, nombreCompleto, '#dc3545');
+    } else if (repaso.estado === 'omitido') {
+      estadoTexto = ' ⏭️ OMITIDO';
+      colorBorde = '#9e9e9e';
+      colorTexto = '#666';
+      iconoEstado = '⏭️';
+      botonHtml = '<span style="color: #666; font-size: 12px; font-weight: bold;">OMITIDO</span>';
+    } else if (repaso.estado === 'pospuesto') {
+      estadoTexto = ' 📅 POSPUESTO';
+      colorBorde = '#673ab7';
+      colorTexto = '#4a148c';
+      iconoEstado = '📅';
+      botonHtml = '<span style="color: #673ab7; font-size: 12px; font-weight: bold;">POSPUESTO</span>';
+    } else {
+      // Estado pendiente
+      botonHtml = generarBotonesRepasoPendiente(repaso, esDiaPasado, nombreCompleto, '#ffc107');
     }
-  } else {
-    // Estado pendiente
-    if (!esDiaPasado) {
-      botonHtml = `<button onclick="marcarRepasoComoCompletado('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
-        style="background: #ffc107; color: #212529; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
-        ✅ Completar
-      </button>`;
-    }
-  }
-  
-  html += `
-    <div style="
-      background: ${colorFondo}; 
-      padding: 12px; 
-      border-radius: 5px; 
-      margin-bottom: 8px; 
-      border-left: 3px solid ${colorBorde};
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-    ">
-      <div style="flex: 1;">
-        <div style="font-weight: 500; color: ${colorTexto}; margin-bottom: 4px;">${iconoEstado} ${nombreCompleto}${estadoTexto}</div>
-        <div style="font-size: 12px; color: #666;">Repaso #${repaso.numeroRepaso} • ⏱️ 30 minutos</div>
+    
+    html += `
+      <div style="
+        background: ${colorFondo}; 
+        padding: 12px; 
+        border-radius: 5px; 
+        margin-bottom: 8px; 
+        border-left: 3px solid ${colorBorde};
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+      ">
+        <div style="flex: 1;">
+          <div style="font-weight: 500; color: ${colorTexto}; margin-bottom: 4px;">${iconoEstado} ${nombreCompleto}${estadoTexto}</div>
+          <div style="font-size: 12px; color: #666;">Repaso #${repaso.numeroRepaso} • ⏱️ 30 minutos</div>
+        </div>
+        ${botonHtml}
       </div>
-      ${botonHtml}
-    </div>
-  `;
-});
+    `;
+  });
   
   html += '</div>';
   
-  // Advertencia sobre repasos
-  html += '<div style="background: #f8d7da; padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid #f5c6cb;">';
-  html += '<div style="color: #721c24; font-size: 12px; text-align: center;">';
-  html += '<strong>⚠️ Importante:</strong> Los repasos no completados se moverán automáticamente al día siguiente';
-  html += '</div></div>';
+  // Advertencia adaptada según día
+  if (esDiaPasado) {
+    html += '<div style="background: #e2e3e5; padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid #d6d8db;">';
+    html += '<div style="color: #6c757d; font-size: 12px; text-align: center;">';
+    html += '<strong>📖 Día pasado:</strong> Los repasos no completados fueron movidos automáticamente al día siguiente';
+    html += '</div></div>';
+  } else {
+    html += '<div style="background: #f8d7da; padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid #f5c6cb;">';
+    html += '<div style="color: #721c24; font-size: 12px; text-align: center;">';
+    html += '<strong>⚠️ Importante:</strong> Los repasos no completados se moverán automáticamente al día siguiente';
+    html += '</div></div>';
+  }
   
   html += '</div>';
   return html;
 }
 
-// CREAR SECCIÓN VACÍA
-function crearSeccionVacia(esDiaPasado) {
-  let html = '<div style="text-align: center; color: #666; padding: 40px;">';
-  html += '<i class="fas fa-calendar-alt" style="font-size: 48px; opacity: 0.3; margin-bottom: 15px; display: block;"></i>';
-  html += '<h6>📅 Día libre</h6>';
-  html += '<p>No hay planificaciones ni repasos programados</p>';
-  if (!esDiaPasado) {
-    html += '<button onclick="nuevaPlanificacion()" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">➕ Crear Planificación</button>';
+// GENERAR BOTONES PARA REPASO COMPLETADO
+function generarBotonesRepasoCompletado(repaso, esDiaPasado, nombreCompleto) {
+  if (esDiaPasado) {
+    return `<div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+      <span style="color: #999; font-size: 10px; opacity: 0.7;">Solo lectura</span>
+    </div>`;
+  } else {
+    return `<div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+      <button onclick="deshacerRepasoCompletadoConActualizacion('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
+        style="
+          background: #6c757d; 
+          color: white; 
+          border: none; 
+          padding: 4px 8px; 
+          border-radius: 3px; 
+          cursor: pointer; 
+          font-size: 10px;
+          font-weight: 500;
+        " 
+        title="Deshacer repaso completado">
+        ↶ Deshacer
+      </button>
+    </div>`;
   }
-  html += '</div>';
-  return html;
+}
+
+// GENERAR BOTONES PARA REPASO PENDIENTE
+function generarBotonesRepasoPendiente(repaso, esDiaPasado, nombreCompleto, colorBoton) {
+  if (esDiaPasado) {
+    return `<div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: #666; font-size: 12px; font-weight: bold;">NO COMPLETADO</span>
+      <span style="color: #999; font-size: 10px; opacity: 0.7;">Solo lectura</span>
+    </div>`;
+  } else {
+    const colorTexto = colorBoton === '#dc3545' ? 'white' : '#212529';
+    return `<button onclick="marcarRepasoComoCompletadoConActualizacion('${repaso.id}', '${nombreCompleto.replace(/'/g, "\\'")}', 'repasos-grupo')" 
+      style="background: ${colorBoton}; color: ${colorTexto}; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
+      ✅ Completar
+    </button>`;
+  }
 }
 
 // FUNCIÓN PARA TOGGLE DE GRUPOS
@@ -1280,14 +1483,38 @@ function cargarDetalleDiaCompletoMejorado(dia) {
   
   const esDiaPasado = fechaSeleccionada < hoy;
   
-  // Actualizar título
+  // Actualizar título CON BOTÓN DE EDICIÓN PARA DÍAS PASADOS
   const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const tituloFecha = fechaSeleccionada.toLocaleDateString('es-ES', opciones);
-  const sufijo = esDiaPasado ? ' (Solo lectura)' : '';
   
   const tituloElement = document.getElementById('tituloDetalleDia');
   if (tituloElement) {
-    tituloElement.textContent = tituloFecha + sufijo;
+    if (esDiaPasado) {
+      tituloElement.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <span>${tituloFecha}</span>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="color: #6c757d; font-size: 14px; font-weight: normal;">(Solo lectura)</span>
+            <button onclick="activarEdicionDiaPasado(${dia})" 
+              style="
+                background: #17a2b8; 
+                color: white; 
+                border: none; 
+                padding: 6px 12px; 
+                border-radius: 4px; 
+                font-size: 12px; 
+                cursor: pointer; 
+                font-weight: 500;
+              " 
+              title="Editar día pasado (ajustes administrativos)">
+              ✏️ Editar día
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      tituloElement.textContent = tituloFecha;
+    }
   }
   
   // Mostrar loading
@@ -1349,6 +1576,185 @@ function cargarDetalleDiaCompletoMejorado(dia) {
       verificarCargaCompleta();
     })
     .getRepasosDelDia(fechaSeleccionada.getTime());
+}
+
+// ACTIVAR EDICIÓN TEMPORAL PARA DÍA PASADO (STANDALONE)
+function activarEdicionDiaPasado(dia) {
+  console.log('✏️ Activando edición para día pasado:', dia);
+  
+  const confirmar = confirm(
+    '✏️ Activar edición para día pasado\n\n' +
+    '🔧 Esto te permitirá:\n' +
+    '• Marcar temas/repasos como completados retrospectivamente\n' +
+    '• Mover repasos no completados al día siguiente\n' +
+    '• Hacer ajustes administrativos\n\n' +
+    '⚠️ Usar solo para correcciones necesarias\n\n' +
+    '¿Continuar?'
+  );
+  
+  if (!confirmar) return;
+  
+  // Cambiar título a modo edición
+  const titulo = document.getElementById('tituloDetalleDia');
+  if (titulo) {
+    const textoTitulo = titulo.textContent || titulo.innerText || '';
+    const soloFecha = textoTitulo.replace(' (Solo lectura)', '').trim();
+    
+    titulo.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span>${soloFecha}</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="color: #17a2b8; font-size: 14px; font-weight: bold;">✏️ MODO EDICIÓN</span>
+          <button onclick="salirModoEdicion(${dia})" 
+            style="
+              background: #6c757d; 
+              color: white; 
+              border: none; 
+              padding: 6px 12px; 
+              border-radius: 4px; 
+              font-size: 12px; 
+              cursor: pointer; 
+              font-weight: 500;
+            " 
+            title="Salir del modo edición">
+            ❌ Salir
+          </button>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Añadir aviso de modo edición
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (contenido) {
+    // Quitar aviso anterior si existe
+    const avisoAnterior = contenido.querySelector('.aviso-modo-edicion');
+    if (avisoAnterior) {
+      avisoAnterior.remove();
+    }
+    
+    const aviso = document.createElement('div');
+    aviso.className = 'aviso-modo-edicion';
+    aviso.style.cssText = 'background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px; padding: 12px; margin-bottom: 15px; color: #0c5460; font-size: 14px; text-align: center; font-weight: 500;';
+    aviso.innerHTML = '✏️ <strong>MODO EDICIÓN ACTIVADO</strong> - Puedes editar este día pasado temporalmente';
+    contenido.insertBefore(aviso, contenido.firstChild);
+  }
+  
+  // Habilitar todos los botones de completar/deshacer
+  habilitarBotonesEdicion();
+  
+  alert('✏️ Modo edición activado\n\nAhora puedes completar/deshacer temas y repasos de este día pasado.');
+}
+
+// SALIR DEL MODO EDICIÓN
+function salirModoEdicion(dia) {
+  console.log('❌ Saliendo del modo edición para día:', dia);
+  
+  // Recargar el día como solo lectura
+  seleccionarDia(dia);
+  
+  // Mensaje confirmación
+  setTimeout(function() {
+    alert('❌ Has salido del modo edición\n\nEl día vuelve a estar en solo lectura.');
+  }, 500);
+}
+
+// HABILITAR BOTONES PARA EDICIÓN
+function habilitarBotonesEdicion() {
+  // Buscar todos los elementos que dicen "Solo lectura" y reemplazarlos por botones
+  const contenido = document.getElementById('contenidoDetalleDia');
+  if (!contenido) return;
+  
+  // Reemplazar spans de "Solo lectura" por botones de acción
+  const spansSoloLectura = contenido.querySelectorAll('span');
+  spansSoloLectura.forEach(function(span) {
+    if (span.textContent && span.textContent.includes('Solo lectura')) {
+      const parent = span.parentElement;
+      if (parent) {
+        // Determinar tipo de acción según el contexto
+        const esTema = parent.innerHTML.includes('COMPLETADO') || parent.innerHTML.includes('PENDIENTE');
+        const esRepaso = parent.closest('[style*="border-left: 3px solid"]');
+        
+        if (esTema && parent.innerHTML.includes('COMPLETADO')) {
+          // Tema completado - añadir botón deshacer
+          parent.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+              <button onclick="alert('Función de deshacer tema en desarrollo')" 
+                style="
+                  background: #6c757d; 
+                  color: white; 
+                  border: none; 
+                  padding: 4px 8px; 
+                  border-radius: 3px; 
+                  cursor: pointer; 
+                  font-size: 10px;
+                  font-weight: 500;
+                ">
+                ↶ Deshacer
+              </button>
+            </div>
+          `;
+        } else if (esTema && parent.innerHTML.includes('PENDIENTE')) {
+          // Tema pendiente - añadir botón completar
+          parent.innerHTML = `
+            <button onclick="alert('Función de completar tema en desarrollo')" 
+              style="
+                background: #4caf50; 
+                color: white; 
+                border: none; 
+                padding: 8px 16px; 
+                border-radius: 5px; 
+                cursor: pointer; 
+                font-size: 12px;
+                font-weight: 500;
+              ">
+              ✅ Completar
+            </button>
+          `;
+        } else if (esRepaso && parent.innerHTML.includes('COMPLETADO')) {
+          // Repaso completado - añadir botón deshacer
+          parent.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #28a745; font-size: 12px; font-weight: bold;">COMPLETADO</span>
+              <button onclick="alert('Función de deshacer repaso en desarrollo')" 
+                style="
+                  background: #6c757d; 
+                  color: white; 
+                  border: none; 
+                  padding: 4px 8px; 
+                  border-radius: 3px; 
+                  cursor: pointer; 
+                  font-size: 10px;
+                  font-weight: 500;
+                ">
+                ↶ Deshacer
+              </button>
+            </div>
+          `;
+        } else if (esRepaso && parent.innerHTML.includes('NO COMPLETADO')) {
+          // Repaso no completado - añadir botón completar
+          parent.innerHTML = `
+            <button onclick="alert('Función de completar repaso en desarrollo')" 
+              style="
+                background: #ffc107; 
+                color: #212529; 
+                border: none; 
+                padding: 8px 16px; 
+                border-radius: 5px; 
+                cursor: pointer; 
+                font-size: 12px;
+                font-weight: 500;
+              ">
+              ✅ Completar
+            </button>
+          `;
+        }
+      }
+    }
+  });
+  
+  console.log('✅ Botones de edición habilitados');
 }
 
 // Función para cargar detalle del día con planificaciones
@@ -1577,9 +1983,14 @@ function mostrarDetalleCompleto(planificacion, repasos, esDiaPasado) {
 }
 
 
-// Abrir modal de nueva planificación
-function nuevaPlanificacion() {
-  if (!diaSeleccionado) {
+// REEMPLAZAR nuevaPlanificacion() en scriptsPlanificacion.html
+
+// ABRIR MODAL DE NUEVA PLANIFICACIÓN (FLEXIBLE PARA DÍAS FUTUROS)
+function nuevaPlanificacion(diaEspecifico) {
+  // Si se especifica un día, usarlo; sino usar el seleccionado
+  const diaParaPlanificar = diaEspecifico || diaSeleccionado;
+  
+  if (!diaParaPlanificar) {
     mostrarAdvertencia('Primero selecciona un día del calendario', 'Día no seleccionado');
     return;
   }
@@ -1590,7 +2001,7 @@ function nuevaPlanificacion() {
   }
   
   // Validar que no es día pasado
-  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), diaSeleccionado);
+  const fechaSeleccionada = new Date(mesActual.getFullYear(), mesActual.getMonth(), diaParaPlanificar);
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   fechaSeleccionada.setHours(0, 0, 0, 0);
@@ -1600,25 +2011,35 @@ function nuevaPlanificacion() {
     return;
   }
   
-  // Resetear estado usando TUS variables
+  console.log('📝 Creando planificación para día:', diaParaPlanificar);
+  
+  // Resetear estado
   resetearEstadoPlanificacion();
   
-  // Establecer fecha automáticamente usando TUS variables  
+  // Establecer fecha automáticamente
   const fechaStr = fechaSeleccionada.getFullYear() + '-' + 
     String(fechaSeleccionada.getMonth() + 1).padStart(2, '0') + '-' + 
     String(fechaSeleccionada.getDate()).padStart(2, '0');
 
-  // Cargar oposiciones
-  // No cargar oposiciones aquí - se configura automáticamente en mostrarPaso1()
-  
-  // Guardar fecha en variable global (crear si no existe)
+  // Guardar fecha en variable global
   window.fechaPlanificacion = fechaStr;
+  
+  // Asegurar que el día esté seleccionado visualmente
+  if (diaParaPlanificar !== diaSeleccionado) {
+    seleccionarDia(diaParaPlanificar);
+  }
   
   document.getElementById('modalNuevaPlanificacion').style.display = 'flex';
   mostrarPaso(1);
 
-    // Verificar repasos del día seleccionado
+  // Verificar repasos del día seleccionado
   verificarRepasosDelDia();
+}
+
+// FUNCIÓN ESPECÍFICA PARA CREAR PLANIFICACIÓN DESDE DÍA VACÍO
+function crearPlanificacionDesdeDiaVacio(dia) {
+  console.log('➕ Creando planificación desde día vacío:', dia);
+  nuevaPlanificacion(dia);
 }
   
 
@@ -2651,7 +3072,9 @@ function actualizarResumenTiempo() {
   }
 }
 
-// 6. FUNCIÓN crearPlanificacion() con loading en modal
+// REEMPLAZAR crearPlanificacion() en scriptsPlanificacion.html
+
+// CREAR PLANIFICACIÓN CON AUTO-ACTUALIZACIÓN
 async function crearPlanificacion() {
   // Validaciones finales
   if (temasSeleccionados.length === 0) {
@@ -2693,17 +3116,31 @@ async function crearPlanificacion() {
     tipo: 'overlay'
   });
   
-  // Llamar al backend
+  // Llamar al backend con auto-actualización
   google.script.run
     .withSuccessHandler(function(resultado) {
       ocultarLoading(modal);
+      
       mostrarExito(
         'Planificación creada con ' + resultado.temasCreados + ' temas',
         '🎉 ¡Planificación lista!'
       );
+      
       cerrarModal();
-      cargarPlanificacionesDelMes();
-      seleccionarDia(diaSeleccionado);
+      
+      // AUTO-ACTUALIZACIÓN: Invalidar caché y recargar
+      const fechaCreada = new Date(datos.fecha);
+      const diaCreado = fechaCreada.getDate();
+      
+      setTimeout(function() {
+        invalidarCacheYRecargar(diaCreado);
+        
+        // Seleccionar el día recién creado
+        setTimeout(function() {
+          seleccionarDia(diaCreado);
+        }, 1000);
+      }, 500);
+      
     })
     .withFailureHandler(function(error) {
       console.error('Error al crear planificación:', error);
@@ -3961,5 +4398,451 @@ function testRepasosDesdeWeb() {
     })
     .testRepasosDelDia();
 }
+
+// AÑADIR AL FINAL de scriptsPlanificacion.html
+
+// ====================================
+// SISTEMA DE ACTUALIZACIÓN AUTOMÁTICA
+// ====================================
+
+// INVALIDAR CACHÉ Y RECARGAR CALENDARIO
+function invalidarCacheYRecargar(diaAfectado) {
+  console.log('🔄 Invalidando caché y recargando calendario para día:', diaAfectado);
+  
+  const año = mesActual.getFullYear();
+  const mes = mesActual.getMonth();
+  const claveCache = año + '-' + mes;
+  
+  // 1. LIMPIAR CACHÉ
+  if (cacheCalendario[claveCache]) {
+    delete cacheCalendario[claveCache];
+    console.log('💾 Caché eliminado para:', claveCache);
+  }
+  
+  // 2. RECARGAR DATOS DEL MES
+  mostrarLoadingEnCalendario();
+  cargarTodoElMes();
+  
+  // 3. RECARGAR DETALLE DEL DÍA SI ESTÁ SELECCIONADO
+  if (diaAfectado && estadoDetalle.diaActual === diaAfectado) {
+    setTimeout(function() {
+      cargarDetalleDiaCompletoMejorado(diaAfectado);
+    }, 800);
+  }
+}
+
+// WRAPPER PARA FUNCIONES QUE MODIFICAN DATOS
+function ejecutarConActualizacion(funcionBackend, parametros, diaAfectado, mensajeExito) {
+  console.log('📝 Ejecutando con actualización automática:', funcionBackend.name);
+  
+  // Mostrar loading en botones
+  deshabilitarBotonesAccion();
+  
+  funcionBackend
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ Operación exitosa:', resultado);
+      
+      if (resultado.success) {
+        // Mostrar mensaje de éxito
+        if (mensajeExito) {
+          mostrarExito(mensajeExito, '🎉 Operación completada');
+        }
+        
+        // Actualizar automáticamente
+        setTimeout(function() {
+          invalidarCacheYRecargar(diaAfectado);
+        }, 300);
+        
+      } else {
+        alert('❌ Error: ' + (resultado.error || 'Operación fallida'));
+      }
+      
+      // Rehabilitar botones
+      setTimeout(rehabilitarBotonesAccion, 1000);
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error en operación:', error);
+      alert('❌ Error de conexión: ' + error.message);
+      
+      // Rehabilitar botones
+      rehabilitarBotonesAccion();
+    });
+  
+  // Aplicar parámetros
+  if (parametros && parametros.length > 0) {
+    parametros.forEach(param => {
+      funcionBackend = funcionBackend.call(funcionBackend, param);
+    });
+  }
+  
+  // Ejecutar
+  funcionBackend();
+}
+
+// DESHABILITAR BOTONES DURANTE OPERACIONES
+function deshabilitarBotonesAccion() {
+  const botones = document.querySelectorAll('#contenidoDetalleDia button');
+  botones.forEach(function(btn) {
+    if (!btn.disabled) {
+      btn.dataset.textoOriginal = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+      btn.style.opacity = '0.6';
+    }
+  });
+}
+
+// REHABILITAR BOTONES DESPUÉS DE OPERACIONES
+function rehabilitarBotonesAccion() {
+  const botones = document.querySelectorAll('#contenidoDetalleDia button[disabled]');
+  botones.forEach(function(btn) {
+    btn.disabled = false;
+    if (btn.dataset.textoOriginal) {
+      btn.textContent = btn.dataset.textoOriginal;
+      delete btn.dataset.textoOriginal;
+    }
+    btn.style.opacity = '';
+  });
+}
+
+// ACTUALIZAR TEMA COMPLETADO CON RECARGA AUTOMÁTICA
+function marcarTemaComoCompletadoConActualizacion(idProgreso, nombreTema, idGrupo) {
+  console.log('📝 Completando tema:', idProgreso, nombreTema);
+  
+  const tiempoReal = prompt('⏱️ ¿Cuántos minutos dedicaste al tema "' + nombreTema + '"?', '60');
+  
+  if (!tiempoReal || isNaN(tiempoReal) || parseInt(tiempoReal) < 1) {
+    alert('⚠️ Por favor, introduce un tiempo válido en minutos');
+    return;
+  }
+  
+  const nota = prompt('💭 Nota personal sobre el estudio (opcional):', '');
+  
+  // Buscar y deshabilitar SOLO este botón
+  const botones = document.querySelectorAll('button');
+  let botonActual = null;
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idProgreso) && btn.textContent.includes('Completar')) {
+      botonActual = btn;
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+      btn.style.opacity = '0.6';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ Tema completado:', resultado);
+      
+      if (resultado.success) {
+        alert('🎉 ¡Tema completado!\n\n✅ ' + resultado.mensaje + '\n📅 Se han programado ' + resultado.repasosCreados + ' repasos automáticos');
+        
+        // Actualizar automáticamente
+        setTimeout(function() {
+          invalidarCacheYRecargar(diaSeleccionado);
+        }, 500);
+        
+      } else {
+        alert('❌ Error: ' + resultado.error);
+        // Rehabilitar botón
+        if (botonActual) {
+          botonActual.disabled = false;
+          botonActual.textContent = '✅ Completar';
+          botonActual.style.opacity = '';
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error:', error);
+      alert('❌ Error de conexión: ' + error.message);
+      
+      // Rehabilitar botón
+      if (botonActual) {
+        botonActual.disabled = false;
+        botonActual.textContent = '✅ Completar';
+        botonActual.style.opacity = '';
+      }
+    })
+    .marcarTemaComoCompletado(idProgreso, parseInt(tiempoReal), nota || null);
+}
+
+// DESHACER TEMA COMPLETADO CON RECARGA AUTOMÁTICA  
+function deshacerTemaCompletadoConActualizacion(idProgreso, nombreTema, idGrupo) {
+  console.log('↶ Deshaciendo tema:', idProgreso, nombreTema);
+  
+  const confirmar = confirm('¿Deshacer la finalización del tema "' + nombreTema + '"?\n\n⚠️ Esto eliminará todos los repasos pendientes programados para este tema.');
+  
+  if (!confirmar) return;
+  
+  // Buscar y deshabilitar SOLO este botón
+  const botones = document.querySelectorAll('button');
+  let botonActual = null;
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idProgreso) && btn.textContent.includes('Deshacer')) {
+      botonActual = btn;
+      btn.disabled = true;
+      btn.textContent = '⏳ Deshaciendo...';
+      btn.style.opacity = '0.6';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ Tema deshecho:', resultado);
+      
+      if (resultado.success) {
+        alert('↶ ¡Tema deshecho!\n\n✅ ' + resultado.mensaje + '\n🗑️ Eliminados ' + resultado.repasosEliminados + ' repasos pendientes');
+        
+        // Actualizar automáticamente
+        setTimeout(function() {
+          invalidarCacheYRecargar(diaSeleccionado);
+        }, 500);
+        
+      } else {
+        alert('❌ Error: ' + resultado.error);
+        // Rehabilitar botón
+        if (botonActual) {
+          botonActual.disabled = false;
+          botonActual.textContent = '↶ Deshacer';
+          botonActual.style.opacity = '';
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error:', error);
+      alert('❌ Error de conexión: ' + error.message);
+      
+      // Rehabilitar botón
+      if (botonActual) {
+        botonActual.disabled = false;
+        botonActual.textContent = '↶ Deshacer';
+        botonActual.style.opacity = '';
+      }
+    })
+    .deshacerTemaCompletado(idProgreso);
+}
+
+// FUNCIÓN SIMPLE PARA DESHACER REPASO CON ACTUALIZACIÓN
+function deshacerRepasoCompletadoConActualizacion(idRepaso, nombreTema, idGrupo) {
+  console.log('↶ Deshaciendo repaso:', idRepaso, nombreTema);
+  
+  const confirmar = confirm('¿Deshacer el repaso completado de "' + nombreTema + '"?\n\nEl repaso volverá a estado pendiente.');
+  
+  if (!confirmar) return;
+  
+  // Buscar y deshabilitar SOLO este botón
+  const botones = document.querySelectorAll('button');
+  let botonActual = null;
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idRepaso) && btn.textContent.includes('Deshacer')) {
+      botonActual = btn;
+      btn.disabled = true;
+      btn.textContent = '⏳ Deshaciendo...';
+      btn.style.opacity = '0.6';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ Repaso deshecho:', resultado);
+      
+      if (resultado.success) {
+        alert('↶ ¡Repaso deshecho!\n\n✅ ' + resultado.mensaje);
+        
+        // Actualizar automáticamente
+        setTimeout(function() {
+          invalidarCacheYRecargar(diaSeleccionado);
+        }, 500);
+        
+      } else {
+        alert('❌ Error: ' + resultado.error);
+        // Rehabilitar botón
+        if (botonActual) {
+          botonActual.disabled = false;
+          botonActual.textContent = '↶ Deshacer';
+          botonActual.style.opacity = '';
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error:', error);
+      alert('❌ Error de conexión: ' + error.message);
+      
+      // Rehabilitar botón
+      if (botonActual) {
+        botonActual.disabled = false;
+        botonActual.textContent = '↶ Deshacer';
+        botonActual.style.opacity = '';
+      }
+    })
+    .deshacerRepasoCompletado(idRepaso);
+}
+
+// COMPLETAR REPASO CON RECARGA AUTOMÁTICA
+function marcarRepasoComoCompletadoConActualizacion(idRepaso, nombreTema, idGrupo) {
+  console.log('📝 Completando repaso:', idRepaso, nombreTema);
+  
+  const tiempoReal = prompt('⏱️ ¿Cuántos minutos dedicaste al repaso de "' + nombreTema + '"?', '30');
+  
+  if (!tiempoReal || isNaN(tiempoReal) || parseInt(tiempoReal) < 1) {
+    alert('⚠️ Por favor, introduce un tiempo válido en minutos');
+    return;
+  }
+  
+  const notaTest = prompt('📝 ¿Cómo fue el repaso? (Bien/Regular/Mal o nota específica):', 'Bien');
+  
+  // Buscar y deshabilitar SOLO este botón
+  const botones = document.querySelectorAll('button');
+  let botonActual = null;
+  botones.forEach(function(btn) {
+    if (btn.onclick && btn.onclick.toString().includes(idRepaso) && btn.textContent.includes('Completar')) {
+      botonActual = btn;
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+      btn.style.opacity = '0.6';
+    }
+  });
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      console.log('✅ Repaso completado:', resultado);
+      
+      if (resultado.success) {
+        alert('🎉 ¡Repaso completado!\n\n✅ ' + resultado.mensaje);
+        
+        // Actualizar automáticamente
+        setTimeout(function() {
+          invalidarCacheYRecargar(diaSeleccionado);
+        }, 500);
+        
+      } else {
+        alert('❌ Error: ' + resultado.error);
+        // Rehabilitar botón
+        if (botonActual) {
+          botonActual.disabled = false;
+          botonActual.textContent = '✅ Completar';
+          botonActual.style.opacity = '';
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('❌ Error:', error);
+      alert('❌ Error de conexión: ' + error.message);
+      
+      // Rehabilitar botón
+      if (botonActual) {
+        botonActual.disabled = false;
+        botonActual.textContent = '✅ Completar';
+        botonActual.style.opacity = '';
+      }
+    })
+    .marcarRepasoComoCompletado(idRepaso, parseInt(tiempoReal), notaTest || null);
+}
+
+console.log('✅ Sistema de actualización simple cargado');
+
+// AÑADIR AL FINAL de scriptsPlanificacion.html
+
+// FUNCIÓN PARA FORZAR BOTÓN DE EDICIÓN EN DÍAS PASADOS
+function añadirBotonEdicionSiEsPasado() {
+  const titulo = document.getElementById('tituloDetalleDia');
+  if (!titulo) return;
+  
+  const textoTitulo = titulo.textContent || titulo.innerText || '';
+  
+  // Si contiene "Solo lectura" pero no tiene botón de edición
+  if (textoTitulo.includes('Solo lectura') && !titulo.innerHTML.includes('Editar día')) {
+    
+    // Extraer solo la fecha sin "(Solo lectura)"
+    const soloFecha = textoTitulo.replace(' (Solo lectura)', '').trim();
+    
+    // Extraer día del estado actual
+    const diaActual = estadoDetalle.diaActual || diaSeleccionado;
+    
+    console.log('📝 Añadiendo botón de edición para día pasado:', diaActual);
+    
+    titulo.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span>${soloFecha}</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="color: #6c757d; font-size: 14px; font-weight: normal;">(Solo lectura)</span>
+          <button onclick="activarEdicionDiaPasado(${diaActual})" 
+            style="
+              background: #17a2b8; 
+              color: white; 
+              border: none; 
+              padding: 6px 12px; 
+              border-radius: 4px; 
+              font-size: 12px; 
+              cursor: pointer; 
+              font-weight: 500;
+            " 
+            title="Editar día pasado (ajustes administrativos)">
+            ✏️ Editar día
+          </button>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// INTERCEPTAR LA FUNCIÓN ORIGINAL DE SELECCIONAR DÍA
+if (typeof seleccionarDia !== 'undefined') {
+  const seleccionarDiaOriginal = seleccionarDia;
+  
+  seleccionarDia = function(dia) {
+    console.log('🔄 Interceptando selección de día:', dia);
+    
+    // Llamar a la función original
+    seleccionarDiaOriginal(dia);
+    
+    // Después de un pequeño delay, añadir botón si es necesario
+    setTimeout(function() {
+      añadirBotonEdicionSiEsPasado();
+    }, 500);
+  };
+  
+  console.log('✅ Interceptor de seleccionar día configurado');
+}
+
+// INTERCEPTAR TAMBIÉN LA FUNCIÓN DE CARGAR DETALLE
+if (typeof cargarDetalleDiaCompleto !== 'undefined') {
+  const cargarDetalleDiaCompletoOriginal = cargarDetalleDiaCompleto;
+  
+  cargarDetalleDiaCompleto = function(dia) {
+    console.log('🔄 Interceptando carga de detalle día:', dia);
+    
+    // Llamar a la función original
+    cargarDetalleDiaCompletoOriginal(dia);
+    
+    // Después de un delay, añadir botón si es necesario
+    setTimeout(function() {
+      añadirBotonEdicionSiEsPasado();
+    }, 800);
+  };
+  
+  console.log('✅ Interceptor de cargar detalle configurado');
+}
+
+// TAMBIÉN INTERCEPTAR cargarDetalleDiaCompletoMejorado si existe
+if (typeof cargarDetalleDiaCompletoMejorado !== 'undefined') {
+  const cargarDetalleDiaCompletoMejoradoOriginal = cargarDetalleDiaCompletoMejorado;
+  
+  cargarDetalleDiaCompletoMejorado = function(dia) {
+    console.log('🔄 Interceptando carga mejorada día:', dia);
+    
+    // Llamar a la función original
+    cargarDetalleDiaCompletoMejoradoOriginal(dia);
+    
+    // Después de un delay, añadir botón si es necesario
+    setTimeout(function() {
+      añadirBotonEdicionSiEsPasado();
+    }, 800);
+  };
+  
+  console.log('✅ Interceptor de carga mejorada configurado');
+}
+
+console.log('✅ Sistema de botón de edición forzado cargado');
 
 </script>
