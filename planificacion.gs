@@ -364,6 +364,48 @@ function getTemaPadreOriginal(idTema) {
   }
 }
 
+// FUNCIÓN PARA DESHACER REPASO COMPLETADO
+function deshacerRepasoCompletado(idRepaso) {
+  try {
+    console.log('↶ BACKEND: Deshaciendo repaso completado - ID:', idRepaso);
+    
+    const spreadsheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1gJAbVASKrEvp2lR1yCO7Yn0obPlY6C6gCPd7Lgpm8n0/edit');
+    const repasosSheet = spreadsheet.getSheetByName('Repasos_Programados');
+    
+    if (!repasosSheet) {
+      throw new Error('Hoja Repasos_Programados no encontrada');
+    }
+    
+    const data = repasosSheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == idRepaso) { // Buscar por id_repaso
+        // Restaurar estado a pendiente
+        repasosSheet.getRange(i + 1, 5).setValue(''); // Limpiar fecha_completado
+        repasosSheet.getRange(i + 1, 6).setValue('pendiente'); // Cambiar estado a pendiente
+        repasosSheet.getRange(i + 1, 9).setValue(''); // Limpiar nota_test
+        repasosSheet.getRange(i + 1, 10).setValue(''); // Limpiar tiempo_test_minutos
+        
+        console.log('✅ BACKEND: Repaso deshecho, fila', i + 1);
+        
+        return {
+          success: true,
+          mensaje: 'Repaso deshecho correctamente'
+        };
+      }
+    }
+    
+    throw new Error('Repaso no encontrado');
+    
+  } catch (error) {
+    console.error('❌ BACKEND: Error al deshacer repaso:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 // FUNCIÓN SUPER EFICIENTE: Planificaciones + Repasos en UNA SOLA LLAMADA
 function getDatosCompletosDelMes(año, mes) {
   try {
